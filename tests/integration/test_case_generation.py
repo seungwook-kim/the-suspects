@@ -34,6 +34,20 @@ async def test_generated_case_passes_review(svc, seed):
     assert sum(1 for l in case.locations if l.unlock_condition is None) == 3
 
 
+def test_place_renames_from_cast_step():
+    from server.cases.generate import writer as W
+
+    plan = draw("x", "주제", None, seed=1)
+    concept = W.fake_concept(plan)
+    cast = W.fake_cast(plan).model_copy(update={
+        "watch_place": W.LocOut(slot="watch", name="학생회실", description="학생회장이 남아 있던 곳"),
+        "private_place": W.LocOut(slot="private", name="1층 입구", description="이름이 겹치면 무시"),
+    })
+    out = {l.slot: l.name for l in W.apply_place_renames(concept, cast).locations}
+    assert out["watch"] == "학생회실" and out["private"] == "개인 작업실"  # 겹치는 이름은 받지 않음
+    assert [l.slot for l in concept.locations] == list(out)
+
+
 def test_culprit_position_is_random():
     plots = {tuple(p.plot for p in draw("x", "주제", None, seed=s).people).index("culprit") for s in range(30)}
     assert len(plots) > 2  # 범인이 늘 같은 자리(첫 번째 인물 등)에 오지 않는다

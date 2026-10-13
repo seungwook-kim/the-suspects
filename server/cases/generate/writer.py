@@ -136,6 +136,9 @@ class CastOut(BaseModel):
     h2_motive: str
     h2_opportunity: str
     synopsis: str  # 진상 한 문장 (비공개)
+    # 세계관 단계에선 누가 목격자·H1인지 몰랐으니, 그 두 사람에게 맞게 장소를 다시 정한다
+    watch_place: LocOut | None = None
+    private_place: LocOut | None = None
 
 
 def _plot_label(plot: str) -> str:
@@ -150,7 +153,9 @@ def cast_prompt(plan: Plan, concept: ConceptOut) -> tuple[str, str]:
         f"- outfit은 {OUTFITS} 중 하나, accessory는 {ACCESSORIES} 중 하나.\n"
         "- relations는 인물 사이 관계 4~8개 (a, b는 slot 값).\n"
         "- 범인의 동기·수단·기회와 트릭, 의심 인물 두 명(H1, H2)의 동기·수단·기회를 사건 구조에 맞게 구체적으로 쓴다. "
-        "무고한 사람이 동기·수단·기회를 다 갖추면 안 된다."
+        "무고한 사람이 동기·수단·기회를 다 갖추면 안 된다.\n"
+        "- watch_place(slot='watch')는 목격자가 그날 밤 주로 있던 곳, private_place(slot='private')는 H1의 개인 공간이다. "
+        "지금 정한 직업에 어울리게 이름과 설명을 다시 쓴다(다른 장소와 이름이 겹치지 않게)."
     )
     people = "\n".join(
         f"- {p.slot}: 이름 {p.name}, 성별 {'남' if p.gender == 'M' else '여'}, 역할(비밀) {p.plot.upper() if not p.plot.startswith('b') else '주변 인물'} — {_plot_label(p.plot)}"
@@ -160,7 +165,7 @@ def cast_prompt(plan: Plan, concept: ConceptOut) -> tuple[str, str]:
     user = (
         f"사건: {concept.title} — {concept.incident_what}\n무대: {concept.setting}\n"
         f"사건 구조: {sk['label']} — {sk['desc']}\n동기 유형(범인): {plan.motive_type}\n"
-        f"장소: {', '.join(l.name for l in concept.locations)}\n분위기: {TONE_KO.get(plan.tone, '')}\n"
+        f"장소: {', '.join(f'{l.name}({l.slot})' for l in concept.locations)}\n분위기: {TONE_KO.get(plan.tone, '')}\n"
         f"인물 칸 (이름·성별은 바꾸지 않는다):\n{people}"
     )
     return system, user
@@ -182,7 +187,22 @@ def validate_cast(plan: Plan, c: CastOut) -> list[str]:
     for r in c.relations:
         if r.a not in want or r.b not in want:
             p.append(f"relations에 없는 slot: {r.a}, {r.b}")
+    for key, place in (("watch", c.watch_place), ("private", c.private_place)):
+        if place is not None and (place.slot != key or not place.name.strip()):
+            p.append(f"{key}_place는 slot='{key}'와 이름이 있어야 한다")
     return p
+
+
+def apply_place_renames(concept: ConceptOut, cast: CastOut) -> ConceptOut:
+    """인물 단계에서 다시 정한 목격자 자리·H1 개인 공간 이름을 세계관에 반영 (이름이 겹치면 무시)."""
+    locs = {l.slot: l for l in concept.locations}
+    for place in (cast.watch_place, cast.private_place):
+        if place is None or place.slot not in locs:
+            continue
+        others = {l.name for l in concept.locations if l.slot != place.slot}
+        if place.name.strip() and place.name not in others:
+            locs[place.slot] = LocOut(slot=place.slot, name=place.name, description=place.description or locs[place.slot].description)
+    return concept.model_copy(update={"locations": [locs[l.slot] for l in concept.locations]})
 
 
 _ROLES = ["직원", "관리인", "아르바이트생", "방문객", "청소원", "경비원", "팀장"]

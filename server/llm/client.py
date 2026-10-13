@@ -189,7 +189,7 @@ class LLMClient:
             rc = self.role_config(role)
             text, it, ot = await call_cli(self.cfg["profiles"][self.profile]["cli"], model=rc["model"],
                                           effort=rc.get("effort"), system=sys, user=msg,
-                                          schema=schema.model_json_schema())
+                                          schema=schema.model_json_schema(), timeout_s=rc.get("timeout_s"))
             m = _JSON_RE.search(text)
             if not m:
                 raise ValueError("JSON 객체가 없습니다")

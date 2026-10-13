@@ -92,6 +92,7 @@ async def node_cast(s: GenState) -> GenState:
         s["outcome"], s["message"] = "failed", "용의자 명단을 정리하지 못했어요."
         return s
     s["cast"] = cast
+    s["concept"] = W.apply_place_renames(s["concept"], cast)
     s["progress"](3, STAGE_TEXT[3], preview(plan, s["concept"], cast))
     return s
 

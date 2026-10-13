@@ -38,8 +38,8 @@ def _run(args: list[str], stdin: str, cwd: Path, timeout_s: float) -> subprocess
 
 
 async def call_cli(cli_cfg: dict, *, model: str, effort: str | None, system: str, user: str,
-                   schema: dict) -> tuple[str, int, int]:
-    """(답 텍스트, 입력 토큰, 출력 토큰)."""
+                   schema: dict, timeout_s: float | None = None) -> tuple[str, int, int]:
+    """(답 텍스트, 입력 토큰, 출력 토큰). timeout_s는 역할별 값(긴 글을 쓰는 사건 작가 등)이 있으면 그것을 쓴다."""
     cwd = Path(cli_cfg.get("cwd") or "var/cli_workdir")
     if not cwd.is_absolute():
         cwd = _ROOT / cwd
@@ -52,7 +52,7 @@ async def call_cli(cli_cfg: dict, *, model: str, effort: str | None, system: str
                   "schema": json.dumps(schema, ensure_ascii=False)}
         args = [str(a).format(**values) for a in cli_cfg["command"]]
         # 서브프로세스는 스레드에서: 이벤트 루프 종류(Windows Selector/Proactor)와 무관하게 동작
-        proc = await asyncio.to_thread(_run, args, user, cwd, float(cli_cfg.get("timeout_s", 90)))
+        proc = await asyncio.to_thread(_run, args, user, cwd, float(timeout_s or cli_cfg.get("timeout_s", 90)))
     finally:
         Path(system_file).unlink(missing_ok=True)
     out = proc.stdout.decode("utf-8", errors="replace").strip()
