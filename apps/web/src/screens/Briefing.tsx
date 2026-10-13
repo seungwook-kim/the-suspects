@@ -1,22 +1,44 @@
 import { useEffect, useState } from 'react'
 import { Portrait } from '../character/Portrait'
-import type { PlayerView } from '../api/types'
+import type { PlayerView, PublicCharacter } from '../api/types'
 
 interface Props {
   view: PlayerView | null
   onBegin: () => void
 }
 
+// 등장인물 카드. 하나씩 나타나고, 다 나타난 뒤 onDone 이 true 로 알려진다.
+export function Cast({ characters, onShown }: { characters: PublicCharacter[]; onShown?: (n: number) => void }) {
+  const [shown, setShown] = useState(0)
+  const total = characters.length
+
+  useEffect(() => {
+    if (shown >= total) return
+    const id = window.setTimeout(() => setShown((n) => n + 1), shown === 0 ? 900 : 800)
+    return () => window.clearTimeout(id)
+  }, [shown, total])
+
+  useEffect(() => onShown?.(shown), [shown, onShown])
+
+  return (
+    <div className="cast">
+      {characters.map((c, i) => (
+        <article key={c.id} className={`cast-card${i < shown ? ' in' : ''}`} aria-hidden={i >= shown} data-testid="cast-card">
+          <Portrait seed={c.face_seed} appearance={c.appearance} emotion="neutral" width={110} still />
+          <div>
+            <strong>{c.name}</strong>
+            <span className="muted"> · {c.role} · {c.age}세</span>
+            <p>{c.one_liner}</p>
+          </div>
+        </article>
+      ))}
+    </div>
+  )
+}
+
 export function Briefing({ view, onBegin }: Props) {
   const [shown, setShown] = useState(0)
   const total = view?.characters.length ?? 0
-
-  // 등장인물을 하나씩 나타나게 한다
-  useEffect(() => {
-    if (!view || shown >= total) return
-    const id = window.setTimeout(() => setShown((n) => n + 1), shown === 0 ? 900 : 800)
-    return () => window.clearTimeout(id)
-  }, [view, shown, total])
 
   if (!view) {
     return (
@@ -36,18 +58,7 @@ export function Briefing({ view, onBegin }: Props) {
       <p className="summary">{view.incident_summary}</p>
 
       <h2>등장인물</h2>
-      <div className="cast">
-        {view.characters.map((c, i) => (
-          <article key={c.id} className={`cast-card${i < shown ? ' in' : ''}`} aria-hidden={i >= shown}>
-            <Portrait seed={c.face_seed} appearance={c.appearance} emotion="neutral" width={110} still />
-            <div>
-              <strong>{c.name}</strong>
-              <span className="muted"> · {c.role} · {c.age}세</span>
-              <p>{c.one_liner}</p>
-            </div>
-          </article>
-        ))}
-      </div>
+      <Cast characters={view.characters} onShown={setShown} />
 
       <div className="brief-actions">
         <button className="primary big" onClick={onBegin}>

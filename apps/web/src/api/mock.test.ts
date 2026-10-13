@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { applyEvent, initialClientState, type ClientState } from '../state/reducer'
 import { mockApi } from './mock'
 import type { AgEvent } from './types'
@@ -71,5 +71,35 @@ describe('목 모드 한 판', () => {
     const { history, card } = await mockApi.clear(game_id)
     expect(history.success).toBe(false)
     expect(card).toBeNull()
+  })
+})
+
+describe('목 모드 자유 주제 사건 생성', () => {
+  it('단계가 오르고 preview 가 생긴 뒤 ready 에서 view 를 준다', async () => {
+    vi.useFakeTimers()
+    try {
+      const p = mockApi.createCase('도서관의 비밀')
+      await vi.advanceTimersByTimeAsync(200)
+      const { job_id } = await p
+      expect((await mockApi.caseJob(job_id)).preview).toBeNull()
+      await vi.advanceTimersByTimeAsync(3000)
+      const mid = await mockApi.caseJob(job_id)
+      expect(mid.status).toBe('running')
+      expect(mid.preview?.characters[0].location_id).toBeNull()
+      await vi.advanceTimersByTimeAsync(5000)
+      const done = await mockApi.caseJob(job_id)
+      expect(done.status).toBe('ready')
+      expect(done.game_id).toBeTruthy()
+      expect(done.view?.case_title).toContain('도서관')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('부적절한 단어는 rejected', async () => {
+    const { job_id } = await mockApi.createCase('야한 이야기')
+    const j = await mockApi.caseJob(job_id)
+    expect(j.status).toBe('rejected')
+    expect(j.message).toBeTruthy()
   })
 })

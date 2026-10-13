@@ -305,3 +305,13 @@ input, select {
 .slot { display: block; width: 100%; text-align: left; margin: 0 0 6px 14px; width: calc(100% - 14px); background: var(--surface-2); }
 .source-item { margin-top: 4px; }
 .source-item .kind { font-size: 0.7rem; background: #ebe7dc; border-radius: 999px; padding: 0 8px; }
+
+/* ---------- 자유 주제 사건 생성 ---------- */
+.custom-row { display: flex; gap: 8px; }
+.custom-row input { flex: 1; min-width: 0; }
+.char-count { text-align: right; }
+.gen-status { position: sticky; bottom: 0; background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--radius); padding: 10px 14px; margin-top: 16px; text-align: center; }
+.gen-steps { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
+.gen-steps span { width: 28px; height: 6px; border-radius: 3px; background: var(--line); }
+.gen-steps span.done { background: var(--accent); }
+.gen-error { text-align: center; padding: 40px 0; }

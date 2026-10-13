@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ClearHistory, CreateOptions, ShareCard } from './api/types'
 import { Briefing } from './screens/Briefing'
+import { Generating } from './screens/Generating'
 import { Finale } from './screens/Finale'
 import { History } from './screens/History'
 import { Main } from './screens/Main'
@@ -9,13 +10,15 @@ import { Start } from './screens/Start'
 import { useGame } from './state/useGame'
 import { getPref, setPref } from './util/saves'
 
-type Screen = 'start' | 'briefing' | 'main' | 'finale' | 'result' | 'history'
+type Screen = 'start' | 'generating' | 'briefing' | 'main' | 'finale' | 'result' | 'history'
 type Theme = 'light' | 'dark'
 
 export default function App() {
   const g = useGame()
   const [screen, setScreen] = useState<Screen>('start')
   const [creating, setCreating] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null) // 시작 화면에 띄울 안내(거절 사유 등)
+  const [job, setJob] = useState<{ text: string; options: CreateOptions; key: number } | null>(null)
   const [result, setResult] = useState<{ history: ClearHistory; card: ShareCard | null } | null>(null)
   const [theme, setTheme] = useState<Theme>(() =>
     getPref<Theme>('theme', window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
@@ -34,11 +37,19 @@ export default function App() {
   }, [needsResync, running, resync])
 
   const start = async (themeId: string, options: CreateOptions) => {
+    setNotice(null)
     setCreating(true)
     setScreen('briefing') // 사건 생성 중에도 빈 로딩 대신 브리핑 장면을 보여 준다
     const ok = await g.startGame(themeId, options)
     setCreating(false)
     if (!ok) setScreen('start')
+  }
+
+  const createCase = (text: string, options: CreateOptions) => {
+    setNotice(null)
+    g.resetAll()
+    setJob({ text, options, key: Date.now() })
+    setScreen('generating')
   }
 
   const enter = (view: { phase: string } | null) => {
@@ -64,6 +75,7 @@ export default function App() {
   }
 
   const home = () => {
+    setNotice(null)
     g.resetAll()
     setResult(null)
     setScreen('start')
@@ -82,11 +94,29 @@ export default function App() {
       {screen === 'start' && (
         <Start
           busy={creating}
-          error={g.state.error}
+          error={notice ?? g.state.error}
           onStart={start}
+          onCreateCase={createCase}
           onOpenGame={openGame}
           onLoadSlot={loadSlot}
           onHistory={() => setScreen('history')}
+        />
+      )}
+      {screen === 'generating' && job && (
+        <Generating
+          key={job.key}
+          themeText={job.text}
+          options={job.options}
+          onReady={(gameId, view) => {
+            g.adoptGame(gameId, view)
+            enter(view)
+          }}
+          onRejected={(message) => {
+            setNotice(message)
+            setScreen('start')
+          }}
+          onFallback={(themeId) => void start(themeId, job.options)}
+          onHome={home}
         />
       )}
       {screen === 'history' && <History onBack={home} />}

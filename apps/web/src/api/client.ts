@@ -3,6 +3,7 @@ import { readSseJson } from './sse'
 import type {
   Action,
   AgEvent,
+  CaseJob,
   ClearHistory,
   CreateOptions,
   FinaleStep,
@@ -17,6 +18,8 @@ import type {
 export interface Api {
   themes(): Promise<Theme[]>
   createGame(themeId: string, options?: CreateOptions): Promise<{ game_id: string; view: PlayerView }>
+  createCase(themeText: string, options?: CreateOptions): Promise<{ job_id: string }>
+  caseJob(jobId: string): Promise<CaseJob>
   listGames(): Promise<GameSummary[]>
   listSaves(gameId: string): Promise<SaveSlotInfo[]>
   sources(gameId: string, statementId: string): Promise<SourceItem[]>
@@ -75,6 +78,8 @@ async function* stream(path: string, body?: unknown): AsyncGenerator<AgEvent> {
 export const httpApi: Api = {
   themes: () => fetch(`${BASE}/themes`).then((r) => json<Theme[]>(r)),
   createGame: async (themeId, options) => json(await post('/games', { theme_id: themeId, options })),
+  createCase: async (themeText, options) => json(await post('/cases', { theme_text: themeText, options })),
+  caseJob: (id) => fetch(`${BASE}/cases/${encodeURIComponent(id)}`).then((r) => json<CaseJob>(r)),
   listGames: () => fetch(`${BASE}/games`).then((r) => json<GameSummary[]>(r)),
   listSaves: (id) => fetch(`${BASE}/games/${id}/saves`).then((r) => json<SaveSlotInfo[]>(r)),
   sources: (id, st) => fetch(`${BASE}/games/${id}/sources/${encodeURIComponent(st)}`).then((r) => json<SourceItem[]>(r)),

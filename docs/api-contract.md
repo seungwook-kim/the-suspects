@@ -24,6 +24,34 @@
 | POST | `/api/games/{game_id}/clear` | — | `{history: ClearHistory, card: ShareCard}` |
 | GET | `/api/history` | — | `ClearHistory[]` |
 
+### 사건 직접 만들기 (자유 주제, PRD §4.1·§4.2·§5.2)
+| 메서드 | 경로 | 요청 | 응답 |
+|:--|:--|:--|:--|
+| POST | `/api/cases` | `{theme_text: string(2~80자), options?: CreateOptions}` | `202 {job_id}` · 빈 문자열/너무 길면 `400 {detail}` |
+| GET | `/api/cases/{job_id}` | — | `CaseJob` (아래) · 없는 작업이면 `404` |
+
+```ts
+CaseJob = {
+  job_id: string
+  status: "running" | "ready" | "failed" | "rejected"
+  stage: number            // 1부터 total까지
+  total: number
+  stage_text: string       // 게임 안 말투. 예: "사건 파일 작성 중…", "용의자 명단 정리 중…"
+  preview: null | {        // 세계관·인물이 정해지면 채워짐 → 이때부터 브리핑을 보여 준다
+    title: string
+    incident_summary: string
+    characters: PublicCharacter[]   // location_id는 null
+  }
+  game_id: string | null   // status=ready 일 때만
+  view: PlayerView | null  // status=ready 일 때만 (바로 메인 화면 진입 가능)
+  message: string | null   // failed/rejected 사유 (플레이어용 문장)
+  fallback_theme_id: string | null  // failed일 때 대신 할 수 있는 기본 주제
+}
+```
+- 화면 흐름: "사건 생성 ▶" → 1초 간격으로 GET 폴링 → `preview`가 생기면 **브리핑 화면**(제목·요약·인물 카드)을 띄우고 아래에 `stage_text` 진행 표시 → `ready`면 "수사 시작" 버튼 활성화.
+- `rejected`: 부적절한 주제. `message`를 보여 주고 시작 화면으로. `failed`: `message`와 함께 `fallback_theme_id`로 바로 시작하는 버튼.
+- 자유 주제 카드에는 "실험실" 표시(결과가 들쭉날쭉할 수 있음). 생성에는 1~3분 걸린다.
+
 - `phase`는 첫 행동이 들어오면 서버가 `briefing` → `day`로 바꾼다. 화면은 "수사 시작" 버튼으로 넘어가도 된다.
 - **인물 목록 순서는 서버가 판마다 섞어 보낸다**(범인이 앞이나 뒤에 몰리면 순서로 추측 가능). 화면은 받은 순서를 쓴다.
 - `ShareCard`: `{emoji_line: "🔍🔍❌🔍✅", share_text: string, theme_color: "#RRGGBB"}`. 실패한 판에는 `card`가 `null`.

@@ -1,6 +1,6 @@
 import { useCallback, useReducer, useRef } from 'react'
 import { api } from '../api/client'
-import type { Action, AgEvent, ClearHistory, CreateOptions, FinaleStep, ShareCard } from '../api/types'
+import type { Action, AgEvent, ClearHistory, CreateOptions, FinaleStep, PlayerView, ShareCard } from '../api/types'
 import { addSave } from '../util/saves'
 import { clientReducer, initialClientState } from './reducer'
 
@@ -67,6 +67,13 @@ export function useGame() {
     },
     [fail],
   )
+
+  // 사건 생성 작업이 끝나 이미 만들어진 게임으로 들어간다
+  const adoptGame = useCallback((gameId: string, view: PlayerView) => {
+    dispatch({ kind: 'reset' })
+    gameIdRef.current = gameId
+    dispatch({ kind: 'set_view', view })
+  }, [])
 
   const act = useCallback(
     (action: Action) => {
@@ -163,7 +170,7 @@ export function useGame() {
     dispatch({ kind: 'reset' })
   }, [])
 
-  return { state, dispatch, startGame, act, endDay, finaleStep, save, load, openGame, fetchSources, clearGame, resetAll, resync, gameIdRef }
+  return { state, dispatch, startGame, act, endDay, finaleStep, save, load, openGame, fetchSources, clearGame, resetAll, resync, adoptGame, gameIdRef }
 }
 
 export type GameApi = ReturnType<typeof useGame>

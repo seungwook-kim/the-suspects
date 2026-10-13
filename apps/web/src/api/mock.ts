@@ -19,6 +19,8 @@ import type {
   PublicEvidence,
   ShareCard,
   Theme,
+  CaseJob,
+  CasePreview,
 } from './types'
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
@@ -164,6 +166,56 @@ function newView(gameId: string): PlayerView {
     actions_total: MAX_ACTIONS,
     max_days: 5,
   }
+}
+
+function startMockGame(preview?: CasePreview): { game_id: string; view: PlayerView } {
+  const id = nid('game')
+  const g: MockGame = { view: newView(id), questions: 0, startedAt: Date.now(), nonsense: 0, asked: {}, feedIdx: 0, actionCount: 0, finale: null }
+  if (preview) {
+    g.view.case_title = preview.title
+    g.view.incident_summary = preview.incident_summary
+  }
+  g.view.chips = makeChips(g)
+  games.set(id, g)
+  return { game_id: id, view: structuredClone(g.view) }
+}
+
+// ---- 자유 주제 사건 생성 작업 (경과 시간으로 단계가 올라간다)
+const JOB_STAGES = ['사건 파일 작성 중…', '인물 소개서 정리 중…', '용의자 명단 정리 중…', '증거와 알리바이 맞추는 중…', '마지막 검수 중…']
+const JOB_STAGE_MS = 1400
+const BAD_WORDS = ['야한', '성인물']
+interface MockJob {
+  text: string
+  startedAt: number
+  game: { game_id: string; view: PlayerView } | null
+}
+const caseJobs = new Map<string, MockJob>()
+
+function mockPreview(text: string): CasePreview {
+  const short = text.length > 16 ? `${text.slice(0, 16)}…` : text
+  return {
+    title: `${short} 사건`,
+    incident_summary: `"${text}" — 소문은 순식간에 퍼졌고, 그 자리에 있던 다섯 사람은 저마다 할 말이 있다. 누군가는 분명 거짓말을 하고 있다.`,
+    characters: CHARACTERS.map((c) => ({ ...structuredClone(c), location_id: null })),
+  }
+}
+
+function mockJobState(jobId: string, j: MockJob): CaseJob {
+  const base = { job_id: jobId, total: JOB_STAGES.length, preview: null, game_id: null, view: null, message: null, fallback_theme_id: null }
+  const elapsed = Date.now() - j.startedAt
+  if (BAD_WORDS.some((w) => j.text.includes(w))) {
+    return { ...base, status: 'rejected', stage: 1, stage_text: JOB_STAGES[0], message: '이 주제로는 사건을 만들 수 없어요. 다른 소재로 다시 시도해 주세요.' }
+  }
+  const stage = Math.min(JOB_STAGES.length, Math.floor(elapsed / JOB_STAGE_MS) + 1)
+  const preview = stage >= 3 ? mockPreview(j.text) : null
+  if (j.text.includes('실패') && stage >= 4) {
+    return { ...base, status: 'failed', stage, stage_text: JOB_STAGES[stage - 1], preview, message: '사건을 끝까지 만들지 못했어요. 기본 사건으로 시작할 수 있습니다.', fallback_theme_id: 'demo_db_deleted' }
+  }
+  if (elapsed >= JOB_STAGE_MS * JOB_STAGES.length) {
+    j.game ??= startMockGame(mockPreview(j.text))
+    return { ...base, status: 'ready', stage: JOB_STAGES.length, stage_text: '수사 준비 완료', preview: mockPreview(j.text), game_id: j.game.game_id, view: structuredClone(j.game.view) }
+  }
+  return { ...base, status: 'running', stage, stage_text: JOB_STAGES[stage - 1], preview }
 }
 
 function makeChips(g: MockGame): PlayerView['chips'] {
@@ -529,11 +581,20 @@ export const mockApi: Api = {
     void themeId // 목은 항상 같은 사건
     void options // 목은 옵션을 무시한다
     await sleep(500)
-    const id = nid('game')
-    const g: MockGame = { view: newView(id), questions: 0, startedAt: Date.now(), nonsense: 0, asked: {}, feedIdx: 0, actionCount: 0, finale: null }
-    g.view.chips = makeChips(g)
-    games.set(id, g)
-    return { game_id: id, view: structuredClone(g.view) }
+    return startMockGame()
+  },
+  async createCase(themeText) {
+    const text = themeText.trim()
+    if (text.length < 2 || text.length > 80) throw new Error('요청 실패 (400) 주제는 2~80자여야 합니다.')
+    await sleep(150)
+    const job_id = nid('job')
+    caseJobs.set(job_id, { text, startedAt: Date.now(), game: null })
+    return { job_id }
+  },
+  async caseJob(jobId) {
+    const j = caseJobs.get(jobId)
+    if (!j) throw new Error('요청 실패 (404) 없는 작업입니다.')
+    return mockJobState(jobId, j)
   },
   async listGames() {
     const out = new Map<string, { game_id: string; case_title: string; day: number; last_seen: string }>()

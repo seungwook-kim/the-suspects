@@ -10,6 +10,7 @@ interface Props {
   busy: boolean
   error: string | null
   onStart: (themeId: string, options: CreateOptions) => void
+  onCreateCase: (themeText: string, options: CreateOptions) => void
   onOpenGame: (gameId: string) => void
   onLoadSlot: (gameId: string, slotId: string) => void
   onHistory: () => void
@@ -18,10 +19,13 @@ interface Props {
 const TONE: Record<Mood, NonNullable<CreateOptions['tone']>> = { 코믹: 'comic', 보통: 'balanced', 진지: 'serious' }
 const DIFF: Record<Difficulty, NonNullable<CreateOptions['difficulty']>> = { 쉬움: 'easy', 보통: 'normal', 어려움: 'hard' }
 
-export function Start({ busy, error, onStart, onOpenGame, onLoadSlot, onHistory }: Props) {
+export const CUSTOM_MAX = 80
+
+export function Start({ busy, error, onStart, onCreateCase, onOpenGame, onLoadSlot, onHistory }: Props) {
   const [themes, setThemes] = useState<Theme[] | null>(null)
   const [loadErr, setLoadErr] = useState('')
   const [theme, setTheme] = useState<string | null>(null)
+  const [custom, setCustom] = useState('')
   const [mood, setMood] = useState<Mood>(() => getPref('mood', '보통'))
   const [diff, setDiff] = useState<Difficulty>(() => getPref('diff', '보통'))
   const [minutes, setMinutes] = useState<number>(() => getPref('minutes', 40))
@@ -67,6 +71,8 @@ export function Start({ busy, error, onStart, onOpenGame, onLoadSlot, onHistory 
     setPref(key, v)
   }
 
+  const opts: CreateOptions = { tone: TONE[mood], difficulty: DIFF[diff], play_minutes: minutes as 20 | 40 | 60 }
+
   return (
     <div className="screen start">
       <h1>The Suspects</h1>
@@ -77,7 +83,7 @@ export function Start({ busy, error, onStart, onOpenGame, onLoadSlot, onHistory 
         {!themes && !loadErr && <p className="muted">주제를 불러오는 중…</p>}
         {loadErr && <p className="warn">{loadErr}</p>}
         {themes?.map((t) => (
-          <button key={t.id} className={`theme-card${theme === t.id ? ' on' : ''}`} onClick={() => setTheme(t.id)}>
+          <button key={t.id} className={`theme-card${theme === t.id ? ' on' : ''}`} onClick={() => { setTheme(t.id); setCustom('') }}>
             <span className="emoji">{t.emoji}</span>
             <strong>{t.title}</strong>
             <span className="muted small">{t.description}</span>
@@ -86,10 +92,28 @@ export function Start({ busy, error, onStart, onOpenGame, onLoadSlot, onHistory 
       </div>
 
       <div className="custom-box">
-        <label>
-          ✏️ 직접 만들기 <span className="lab">실험실 — 준비 중</span>
+        <label htmlFor="custom-theme">
+          ✏️ 직접 만들기 <span className="lab">실험실</span>
+          <span className="muted small"> — 결과가 들쭉날쭉할 수 있어요</span>
         </label>
-        <input disabled placeholder="예: 고등학교 축제 날 사라진 상장" aria-label="자유 주제 (준비 중)" />
+        <div className="custom-row">
+          <input
+            id="custom-theme"
+            value={custom}
+            maxLength={CUSTOM_MAX}
+            disabled={busy}
+            onChange={(e) => {
+              setCustom(e.target.value)
+              if (e.target.value) setTheme(null)
+            }}
+            placeholder="예: 고등학교 축제 날 사라진 상장"
+            aria-label="자유 주제"
+          />
+          <button className="primary" disabled={busy || custom.trim().length < 2} onClick={() => onCreateCase(custom.trim(), opts)}>
+            사건 생성 ▶
+          </button>
+        </div>
+        <span className="muted small char-count" aria-live="polite">{CUSTOM_MAX - custom.length}자 남음</span>
       </div>
 
       <div className="options">
@@ -100,7 +124,7 @@ export function Start({ busy, error, onStart, onOpenGame, onLoadSlot, onHistory 
 
       {error && <p className="warn" role="alert">{error}</p>}
       <div className="start-actions">
-        <button className="primary big" disabled={!theme || busy} onClick={() => theme && onStart(theme, { tone: TONE[mood], difficulty: DIFF[diff], play_minutes: minutes as 20 | 40 | 60 })}>
+        <button className="primary big" disabled={!theme || busy} onClick={() => theme && onStart(theme, opts)}>
           {busy ? '사건 파일 작성 중…' : '사건 시작 ▶'}
         </button>
         <button disabled={busy} onClick={() => void toggleSaves()}>이어하기</button>

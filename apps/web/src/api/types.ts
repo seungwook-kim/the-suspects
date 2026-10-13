@@ -141,6 +141,25 @@ export interface CreateOptions {
   play_minutes?: 20 | 40 | 60
 }
 
+export interface CasePreview {
+  title: string
+  incident_summary: string
+  characters: PublicCharacter[] // location_id 는 null
+}
+
+export interface CaseJob {
+  job_id: string
+  status: 'running' | 'ready' | 'failed' | 'rejected'
+  stage: number
+  total: number
+  stage_text: string
+  preview: CasePreview | null
+  game_id: string | null
+  view: PlayerView | null
+  message: string | null
+  fallback_theme_id: string | null
+}
+
 export interface GameSummary {
   game_id: string
   case_title: string
