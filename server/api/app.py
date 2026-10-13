@@ -101,6 +101,28 @@ def list_games() -> list[dict]:
     return _service().list_games()
 
 
+class NewCase(BaseModel):
+    theme_text: str
+    options: dict | None = None
+
+
+@app.post("/api/cases", status_code=202)
+async def create_case(req: NewCase) -> dict:
+    """자유 주제 사건 생성 시작 (백그라운드, 1~3분). 진행 상황은 GET /api/cases/{job_id}."""
+    try:
+        return {"job_id": _service().create_case_job(req.theme_text, req.options)}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/cases/{job_id}")
+def case_job(job_id: str) -> dict:
+    try:
+        return _service().case_job(job_id)
+    except KeyError:
+        raise HTTPException(404, "없는 생성 작업입니다")
+
+
 @app.get("/api/games/{game_id}/saves")
 def list_saves(game_id: str) -> list[dict]:
     try:

@@ -41,6 +41,11 @@ CREATE TABLE IF NOT EXISTS clear_history (
     data_json   TEXT NOT NULL,
     cleared_at  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS generated_cases (
+    case_id     TEXT PRIMARY KEY,       -- 자유 주제로 만든 사건 원본 (그 판을 클리어하면 삭제)
+    data_json   TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_slots_game ON slots(game_id);
 CREATE INDEX IF NOT EXISTS idx_history_player ON clear_history(player_id);
 """
@@ -62,6 +67,27 @@ class GameStore:
         with self._lock:
             self._conn.executescript(_SCHEMA)
             self._conn.commit()
+
+    # ------------------------------------------------------------------ generated cases
+    def save_case(self, case_id: str, data_json: str) -> None:
+        with self._lock:
+            self._conn.execute("INSERT OR REPLACE INTO generated_cases VALUES (?, ?, ?)",
+                               (case_id, data_json, datetime.now().isoformat()))
+            self._conn.commit()
+
+    def load_cases(self) -> list[tuple[str, str]]:
+        with self._lock:
+            rows = self._conn.execute("SELECT case_id, data_json FROM generated_cases").fetchall()
+        return [(r["case_id"], r["data_json"]) for r in rows]
+
+    def delete_case(self, case_id: str) -> None:
+        with self._lock:
+            self._conn.execute("DELETE FROM generated_cases WHERE case_id = ?", (case_id,))
+            self._conn.commit()
+
+    def count_generated_case(self, case_id: str) -> int:
+        with self._lock:
+            return int(self._conn.execute("SELECT COUNT(*) FROM generated_cases WHERE case_id = ?", (case_id,)).fetchone()[0])
 
     # ------------------------------------------------------------------ games
     def create_game(self, state: GameState, player_id: str = "player") -> None:

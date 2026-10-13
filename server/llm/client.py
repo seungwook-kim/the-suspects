@@ -47,7 +47,7 @@ def _load_models_config(path: Path | None = None) -> dict:
     with p.open(encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
     local = p.with_name("models.local.yaml")
-    if path is None and local.exists():
+    if path is None and local.exists() and not os.getenv("THE_SUSPECTS_NO_LOCAL_MODELS"):  # 테스트는 로컬 연결을 읽지 않음
         with local.open(encoding="utf-8") as f:
             cfg = _deep_merge(cfg, yaml.safe_load(f) or {})
     return cfg

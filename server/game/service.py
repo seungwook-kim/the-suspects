@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import uuid
 from datetime import datetime
@@ -16,6 +17,7 @@ from typing import AsyncIterator
 from pydantic import BaseModel
 
 from server.agents.router import SemanticRouter
+from server.cases.generate import STAGE_TEXT, TOTAL_STAGES, generate_case
 from server.cases.loader import list_case_ids, load_case_by_id
 from server.config import load_game_config
 from server.game import content as C
@@ -96,12 +98,19 @@ class GameService:
                                          vector_weight=hybrid.get("vector_weight", 0.6))
         self.relations = RelationGraph(self.rag)
         self.router = SemanticRouter()
-        self.cases: dict[str, CaseBible] = {cid: load_case_by_id(cid) for cid in list_case_ids()}
+        self.presets: list[str] = list_case_ids()
+        self.cases: dict[str, CaseBible] = {cid: load_case_by_id(cid) for cid in self.presets}
+        for cid, data in self.store.load_cases():  # 자유 주제로 만든 사건 (진행 중인 판이 있는 것만 남아 있다)
+            self.cases[cid] = CaseBible.model_validate_json(data)
         for case in self.cases.values():
-            tpl = self._template_slot(case.case_id)
-            if not self.rag.count_slot(tpl):
-                index_case(self.rag, case, tpl)
-                self.relations.seed_from_case(case, tpl)
+            self._index_template(case)
+        self.jobs: dict[str, dict] = {}  # 사건 생성 작업 (메모리, 서버 재시작 시 사라짐)
+
+    def _index_template(self, case: CaseBible) -> None:
+        tpl = self._template_slot(case.case_id)
+        if not self.rag.count_slot(tpl):
+            index_case(self.rag, case, tpl)
+            self.relations.seed_from_case(case, tpl)
 
     # ================================================================= 공통
     @staticmethod
@@ -145,8 +154,65 @@ class GameService:
 
     # ================================================================= 목록·생성
     def themes(self) -> list[dict]:
-        return [{"id": cid, "title": c.title, "preset": True, **THEMES.get(cid, {"emoji": "🔍", "description": c.theme})}
-                for cid, c in self.cases.items()]
+        return [{"id": cid, "title": self.cases[cid].title, "preset": True,
+                 **THEMES.get(cid, {"emoji": "🔍", "description": self.cases[cid].theme})} for cid in self.presets]
+
+    # ================================================================= 사건 직접 만들기 (PRD §4.1·§4.2·§5.2)
+    _JOB_PUBLIC = ("job_id", "status", "stage", "total", "stage_text", "preview", "game_id", "view", "message",
+                   "fallback_theme_id")
+
+    def create_case_job(self, theme_text: str, options: dict | None = None) -> str:
+        """자유 주제 사건 생성을 백그라운드로 시작한다. 실행 중인 이벤트 루프 안에서 불러야 한다."""
+        text = " ".join((theme_text or "").split())
+        if not 2 <= len(text) <= 80:
+            raise ValueError("주제는 2~80자로 적어 주세요.")
+        job_id = f"job_{uuid.uuid4().hex[:12]}"
+        job = {"job_id": job_id, "status": "running", "stage": 1, "total": TOTAL_STAGES, "stage_text": STAGE_TEXT[1],
+               "preview": None, "game_id": None, "view": None, "message": None, "fallback_theme_id": None}
+        self.jobs[job_id] = job
+        job["_task"] = asyncio.get_running_loop().create_task(self._run_case_job(job, text, options or {}))
+        return job_id
+
+    def case_job(self, job_id: str) -> dict:
+        job = self.jobs.get(job_id)
+        if job is None:
+            raise KeyError(job_id)
+        return {k: job[k] for k in self._JOB_PUBLIC}
+
+    async def _run_case_job(self, job: dict, text: str, options: dict) -> None:
+        def progress(stage: int, stage_text: str, preview: dict | None) -> None:
+            job["stage"], job["stage_text"] = stage, stage_text
+            if preview is not None:
+                job["preview"] = preview
+
+        case_id = f"gen_{uuid.uuid4().hex[:10]}"
+        try:
+            res = await generate_case(self.llm, case_id, text, options, progress)
+            if res.outcome == "rejected":
+                job.update(status="rejected", message=res.message)
+                return
+            if res.outcome != "ok" or res.case is None:
+                job.update(status="failed", message=(res.message or "사건을 만들지 못했어요.") + " 기본 사건으로 해 볼까요?",
+                           fallback_theme_id=self.presets[0] if self.presets else None)
+                return
+            progress(TOTAL_STAGES, STAGE_TEXT[TOTAL_STAGES], None)
+            case = res.case
+            self.store.save_case(case.case_id, case.model_dump_json())
+            self.cases[case.case_id] = case
+            self._index_template(case)
+            game_id, view = self.new_game(case.case_id, options)
+            job.update(status="ready", game_id=game_id, view=view.model_dump(mode="json"))
+        except Exception as e:  # 생성 실패가 서버를 멈추지 않게
+            job.update(status="failed", message=f"사건을 만들다 문제가 생겼어요({type(e).__name__}). 기본 사건으로 해 볼까요?",
+                       fallback_theme_id=self.presets[0] if self.presets else None)
+
+    def _forget_generated(self, case: CaseBible) -> None:
+        """자유 주제 사건은 그 판이 끝나면 사건 원본·색인까지 지운다 (배경·스토리 재사용 금지, PRD §10.2)."""
+        if case.case_id in self.presets:
+            return
+        self.rag.delete_slot(self._template_slot(case.case_id))
+        self.store.delete_case(case.case_id)
+        self.cases.pop(case.case_id, None)
 
     def new_game(self, theme_id: str, options: dict | None = None) -> tuple[str, PlayerView]:
         if theme_id not in self.cases:
@@ -770,6 +836,7 @@ class GameService:
         # 삭제: 배경·NPC 기억·대화·사건 상태. 남는 것은 클리어 이력뿐 (PRD §10.2)
         for slot in self.store.delete_game(game_id):
             self.rag.delete_slot(slot)
+        self._forget_generated(case)
         return {"history": history.model_dump(mode="json"), "card": card.model_dump() if card else None}
 
     def history(self) -> list[ClearHistory]:

@@ -118,13 +118,16 @@ def relevant_lies(case: CaseBible, npc_id: str, question: str, min_overlap: int 
 
 
 # ---------------------------------------------------------------------------- 추천 칩
-_BASE_QUESTIONS = [
-    "어젯밤 사건 시각쯤 어디 계셨어요?",
-    "그날 밤 이상한 걸 보거나 들으신 건 없어요?",
-    "누구랑 같이 있었어요?",
-    "서버실에 들어간 적 있으세요?",
-    "요즘 회사에 불만 같은 건 없었어요?",
-]
+def base_questions(case: CaseBible) -> list[str]:
+    """어느 사건에나 통하는 기본 질문. 현장 이름만 사건에서 가져온다."""
+    scene = next((l.name for l in case.locations if l.id == case.incident.location_id), "현장")
+    return [
+        "어젯밤 사건 시각쯤 어디 계셨어요?",
+        "그날 밤 이상한 걸 보거나 들으신 건 없어요?",
+        "누구랑 같이 있었어요?",
+        f"{scene}에 들어간 적 있으세요?",
+        "요즘 불만이나 걱정거리 같은 건 없었어요?",
+    ]
 
 
 def build_chips(case: CaseBible, state: GameState, out_evidence) -> tuple[list[Chip], dict[str, dict]]:
@@ -138,9 +141,10 @@ def build_chips(case: CaseBible, state: GameState, out_evidence) -> tuple[list[C
     here = [c for c in case.characters
             if (ns := state.npc_states.get(c.id)) and ns.visible and ns.location_id == state.player_location]
     n = 0
+    questions = base_questions(case)
     for ch in here:
         done = set(asked.get(ch.id, []))
-        for q in [q for q in _BASE_QUESTIONS if q not in done][:2]:
+        for q in [q for q in questions if q not in done][:2]:
             n += 1
             cid = f"chip_{state.action_no}_{n}"
             label = f"{ch.name}: {q}" if len(here) > 1 else q  # 여러 명이면 누구에게 묻는지 보이게

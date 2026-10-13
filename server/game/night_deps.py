@@ -152,7 +152,8 @@ def build_night_deps(svc: "GameService", case: CaseBible) -> NightDeps:
                 innocents = [c for c in case_.characters if not bluff_rules.is_guilty(case_, c.id) and c.tier == "main"]
                 pick = C.stable_pick(innocents, case_.case_id, game.day, "tip")
                 if pick:
-                    item = _feed(game, "제보", "익명", f"{pick.name} 씨가 그날 밤 서버실 근처에서 서성이는 걸 봤어요.")
+                    scene = next((l.name for l in case_.locations if l.id == case_.incident.location_id), "현장")
+                    item = _feed(game, "제보", "익명", f"{pick.name} 씨가 그날 밤 {scene} 근처에서 서성이는 걸 봤어요.")
                     events.append({"type": "CUSTOM", "name": "feed", "value": item.model_dump()})
             # hide_evidence: 흔적은 반드시 남으므로(PRD §3.4) MVP에서는 기록만 남기고 증거는 지우지 않는다
         for npc, loc in game.director_state.get("night_locs", {}).items():
