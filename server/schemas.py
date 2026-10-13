@@ -453,6 +453,7 @@ class PublicCharacter(BaseModel):
     location_id: str | None  # 플레이어가 위치를 아는 경우만
     emotion: Emotion = "neutral"
     one_liner: str = ""  # 인물 카드 한 줄 특징 (공개 정보)
+    portrait_url: str | None = None  # 그 판을 위해 새로 그린 AI 초상화 (없으면 절차적 SVG)
 
 
 class PublicLocation(BaseModel):

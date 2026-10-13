@@ -55,8 +55,10 @@ def build_view(
     chips: list[Chip] | None = None,
     bands: list[tuple[int, str]] | None = None,
     actions_total: int = 12,
+    portraits: dict[str, str] | None = None,  # 인물 id → AI 초상화 주소 (없으면 화면이 절차적 SVG로 그림)
 ) -> PlayerView:
     unlocked = set(state.unlocked_locations)
+    portraits = portraits or {}
     locations = [
         PublicLocation(
             id=loc.id,
@@ -89,6 +91,7 @@ def build_view(
                 location_id=ns.location_id if ns.location_id in unlocked else None,
                 emotion=ns.emotion,
                 one_liner=_first_sentence(ch.personality),  # 이름·직업·나이는 카드에 따로 보인다
+                portrait_url=portraits.get(ch.id),
             )
         )
 

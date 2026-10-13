@@ -14,7 +14,7 @@ from typing import AsyncIterator
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from server.game.events import EventBuilder, sse
@@ -88,12 +88,21 @@ def themes() -> list[dict]:
 
 
 @app.post("/api/games")
-def new_game(req: NewGame) -> dict:
+async def new_game(req: NewGame) -> dict:
+    # async: 초상화 그리기를 같은 이벤트 루프의 백그라운드 작업으로 시작하기 위해
     try:
         game_id, view = _service().new_game(req.theme_id, req.options)
     except KeyError:
         raise HTTPException(404, "없는 주제입니다")
     return {"game_id": game_id, "view": view.model_dump(mode="json")}
+
+
+@app.get("/api/portraits/{key}/{filename}")
+def portrait(key: str, filename: str) -> FileResponse:
+    path = _service().portraits.path(key, filename)
+    if path is None:
+        raise HTTPException(404, "초상화가 없습니다")
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "private, max-age=86400"})
 
 
 @app.get("/api/games")

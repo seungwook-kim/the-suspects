@@ -24,10 +24,12 @@ from server.game import content as C
 from server.game.events import EventBuilder
 from server.game.masking import IdMasker, new_salt
 from server.game.night_deps import build_night_deps
+from server.game.portraits import PortraitStore
 from server.game.view import build_view
 from server.graphs.night import run_night
 from server.graphs.turn import TurnDeps, run_turn
 from server.llm.client import LLMClient
+from server.llm.images import ImageClient
 from server.llm.tracing import Tracer
 from server.rag.embedding import CachedEmbedding, HashEmbedding
 from server.rag.indexer import index_case
@@ -100,11 +102,23 @@ class GameService:
         self.router = SemanticRouter()
         self.presets: list[str] = list_case_ids()
         self.cases: dict[str, CaseBible] = {cid: load_case_by_id(cid) for cid in self.presets}
-        for cid, data in self.store.load_cases():  # 자유 주제로 만든 사건 (진행 중인 판이 있는 것만 남아 있다)
-            self.cases[cid] = CaseBible.model_validate_json(data)
+        for cid, case_json in self.store.load_cases():  # 자유 주제로 만든 사건 (진행 중인 판이 있는 것만 남아 있다)
+            self.cases[cid] = CaseBible.model_validate_json(case_json)
         for case in self.cases.values():
             self._index_template(case)
         self.jobs: dict[str, dict] = {}  # 사건 생성 작업 (메모리, 서버 재시작 시 사라짐)
+        self.portraits = PortraitStore(data / "portraits", ImageClient(tracer=self.llm.tracer))
+
+    # ================================================================= 초상화 (AI, 없으면 화면이 SVG로)
+    def _portrait_key(self, state: GameState) -> str:
+        return state.game_id if state.case_id in self.presets else state.case_id
+
+    @staticmethod
+    def _public_people(chars) -> list[dict]:
+        """그림 요청에 넣는 공개 정보만 (범인 여부·비밀·성격 제외)."""
+        return [{"id": c["id"] if isinstance(c, dict) else c.id,
+                 **{k: (c[k] if isinstance(c, dict) else getattr(c, k)) for k in ("role", "age", "gender", "appearance")}}
+                for c in chars]
 
     def _index_template(self, case: CaseBible) -> None:
         tpl = self._template_slot(case.case_id)
@@ -137,7 +151,7 @@ class GameService:
     def _view(self, case: CaseBible, state: GameState, masker: IdMasker) -> PlayerView:
         self._refresh(case, state)
         return build_view(case, state, masker, chips=self._chips(case, state, masker), bands=self._bands(),
-                          actions_total=self.cfg.day_actions)
+                          actions_total=self.cfg.day_actions, portraits=self.portraits.urls(self._portrait_key(state)))
 
     def _obtain(self, case: CaseBible, state: GameState, evidence_ids: list[str]) -> list[str]:
         """증거를 수첩에 넣는다. 새로 얻은 것만 돌려준다."""
@@ -177,17 +191,28 @@ class GameService:
         job = self.jobs.get(job_id)
         if job is None:
             raise KeyError(job_id)
-        return {k: job[k] for k in self._JOB_PUBLIC}
+        out = {k: job[k] for k in self._JOB_PUBLIC}
+        if out["preview"]:  # 초상화는 생성 도중에 하나씩 채워진다
+            urls = self.portraits.urls(job["_case_id"])
+            out["preview"] = {**out["preview"], "characters": [{**c, "portrait_url": urls.get(c["id"])}
+                                                                for c in out["preview"]["characters"]]}
+        return out
 
     async def _run_case_job(self, job: dict, text: str, options: dict) -> None:
+        case_id = f"gen_{uuid.uuid4().hex[:10]}"
+        job["_case_id"] = case_id
+
         def progress(stage: int, stage_text: str, preview: dict | None) -> None:
             job["stage"], job["stage_text"] = stage, stage_text
             if preview is not None:
                 job["preview"] = preview
+                # 인물이 정해지는 순간부터 초상화를 동시에 그린다 (PRD §5.2 ③: 이미지 생성 병렬)
+                self.portraits.start(case_id, self._public_people(preview["characters"]), setting=text)
 
-        case_id = f"gen_{uuid.uuid4().hex[:10]}"
         try:
             res = await generate_case(self.llm, case_id, text, options, progress)
+            if res.outcome != "ok":
+                self.portraits.delete(case_id)  # 못 쓰게 된 사건의 그림은 바로 지움
             if res.outcome == "rejected":
                 job.update(status="rejected", message=res.message)
                 return
@@ -240,6 +265,9 @@ class GameService:
         )
         self.rag.copy_slot(self._template_slot(case.case_id), slot)
         self.store.create_game(state)
+        # 초상화: 판마다 새로 그린다 (자유 주제 사건은 생성 중에 이미 그리기 시작함 — 같은 key면 무시)
+        self.portraits.start(self._portrait_key(state), self._public_people(case.characters), setting=case.theme,
+                             game_id=game_id)
         return game_id, self._persist_view(case, state)
 
     def _persist_view(self, case: CaseBible, state: GameState) -> PlayerView:
@@ -836,6 +864,7 @@ class GameService:
         # 삭제: 배경·NPC 기억·대화·사건 상태. 남는 것은 클리어 이력뿐 (PRD §10.2)
         for slot in self.store.delete_game(game_id):
             self.rag.delete_slot(slot)
+        self.portraits.delete(self._portrait_key(state))
         self._forget_generated(case)
         return {"history": history.model_dump(mode="json"), "card": card.model_dump() if card else None}
 

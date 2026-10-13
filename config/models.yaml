@@ -25,6 +25,7 @@ profiles:
       verifier:   { model: "<cheap-fast-model>", effort: medium, max_tokens: 1500 }
       detective:  { model: "<cheap-fast-model>", effort: medium, max_tokens: 600 }
       judge:      { model: "<cheap-fast-model>", effort: low,    max_tokens: 400 }
+      portrait:   { model: "<image-model>", aspect_ratio: "3:4" }   # 인물 초상화 (OpenRouter 이미지 출력 모델, 키 필요)
     fallbacks: []
   prod:
     provider: openrouter
