@@ -1,0 +1,252 @@
+# config/game.yaml: 게임 수치의 단일 출처 (PRD 부록 B + 부록 F)
+# 코드에 숫자를 박지 않는다(AGENTS.md 규칙 8). 키 이름은 부록 F 표를 따른다.
+
+# ---------------------------------------------------------------- 부록 B
+play_time_options: [20, 40, 60]
+default_play_time: 40
+investigation_days: { easy: 4, normal: 3, hard: 2 }
+day_actions: 12
+suspects: { min: 5, max: 10, main_tier: [3, 5] }
+initial_visible_characters: [3, 4]
+locations: { initial: 3, max: 10 }
+background_prefetch: 2
+night: { max_encounters: 5, turns_per_conversation: [4, 6] }
+npc_reply_sentences: [1, 3]
+offtopic_steps: { chips_again: 3, turn_away: 4, rumor: 6 }
+bluff:
+  confession_sufficiency: 0.7
+  confession_score: 0.75
+  shaken_score: 0.5
+  weights: { E: 0.45, P: 0.20, V: 0.15, R: 0.10, F: 0.10 }
+  evidence_weight: { key: 0.4, aux: 0.2, testimony: 0.1 }   # E 계산용 (F.5)
+  temperament_v: { timid: 0.8, normal: 0.5, cold: 0.2 }     # V
+  failure_step: 0.25                                        # F = min(1, 실패수 x step)
+  alertness_on_fail: 20
+  contaminate_confidence_below: 0.5
+  contaminate_probability: 0.5
+gm: 
+  max_regenerations: 2
+  llm_check: conditional
+  time_window_hours: 2
+  fallback_lines:
+    timid: "그, 그건… 잘 모르겠어요."
+    blunt: "기억 안 납니다."
+    chatty: "어머, 그 얘긴 나중에 해요~"
+    cold: "그 질문엔 답하지 않겠습니다."
+    default: "글쎄요, 잘 모르겠네요."
+case_gen:
+  max_verify_retries: 3
+  similarity_threshold: &sim 0.85
+  dedup:
+    history_size: 50
+    similarity_threshold: *sim
+    fingerprint_keys: [motive_type, trick_type, culprit_role]
+limits:
+  confrontation_per_game: 2
+  stakeout_per_game: 2
+  input_tokens_per_day: { soft: 2000000, hard: 4000000 }
+  output_tokens_per_day: { soft: 150000, hard: 300000 }
+  case_gen_default_per_day: { soft: 5, hard: 10 }
+  case_gen_free_per_day: { soft: 3, hard: 6 }
+  mcp_calls_per_token_per_day: { soft: 200, hard: 400 }
+  mcp_concurrent_games: 3
+speed:
+  speculative_chips: true
+  speculative_chip_count: 3
+  speculative_auto_off: { window: 20, min_hit_rate: 0.5 }
+  prefetch_retrieval_on_enter: true
+  latency_budget_ms: { router: 500, retrieval: 200, npc_first_token: 1500, gm_code: 50, gm_llm: 1000 }
+modes: { role_reversal: true, broadcast: false }
+rag:
+  top_k: 5
+  hybrid: { enabled: true, keyword_weight: 0.4, vector_weight: 0.6 }
+  rerank: { enabled: false, apply_to: ["main_npc", "partner_doc_search", "complex_query"] }
+  query_rewrite: { enabled: false, trigger: "pronoun_or_ellipsis" }
+  compression: { enabled: true }
+  parent_child: { enabled: true, parent_max_tokens: 800 }
+  chunking:
+    manual_wiki: { strategy: section, max_tokens: 500, overlap: 0.12 }
+    chat_log: { strategy: time_window, window_minutes: 10, max_tokens: 400 }
+    narrative_log: { strategy: entry }
+    statement_diary_email: { strategy: document_or_paragraph, max_tokens: 400 }
+    meeting_minutes: { strategy: agenda_item }
+    law: { strategy: article }
+    job: { strategy: job_task }
+  retrieval_eval: { questions_per_case: 80, k: [1, 3, 5, 10] }
+  embedding_cache: true
+  contextual_retrieval: { case_docs: "inline_at_generation", kb: "offline" }
+router:
+  mode: semantic_first
+  similarity_threshold: 0.8
+  min_margin: 0.05
+guardrails:
+  pii: { engine: regex, korean_patterns: true }
+  input_classifier: { enabled: true, run_parallel_with_retrieval: true }
+  output_check: { granularity: sentence }
+streaming: { protocol: ag-ui, state_updates: delta }
+skills_learning:
+  enabled: true
+  max_tokens_per_skill: 1500
+  rollback_on_regression: true
+  min_clears_between_updates: 10
+  eval_sets: { detective_cases: 20, writer_attempts: 30 }
+  max_rate_drop: 0.02          # 2%p
+  max_cost_increase: 0.10      # 10%
+mcp:
+  spec_version: "2026-07-28"
+  sdk: official_python_v2
+  apps: true
+  apps_declare_extension_capability: true
+  elicitation: if_client_supports
+  tasks: false
+  skills_over_mcp: false
+  a2a_external: false
+tracing: { format: opentelemetry_genai, exporter: langfuse }
+retention: { abandoned_days: 30 }
+reputation_range: [-100, 100]
+grades: ["S", "A", "B", "C"]
+
+# ---------------------------------------------------------------- 부록 F
+# F.1 행동 비용
+actions:
+  default: 1
+  warrant: 2
+  confrontation: 3
+  report: 1
+  stakeout: 0
+  hint: 0
+
+# F.2 형사 평판
+reputation:
+  start: 0
+  clue_found: 1
+  clue_found_daily_cap: 5
+  offtopic_turnaway: -3
+  offtopic_rumor: -5
+  meta: -3
+  rude: -10
+  bluff_fail: -4
+  bluff_fail_rumor_count: 2      # 하루 이 횟수 이상 실패하면 "허세 형사" 소문 후보
+  stakeout_caught: -8
+  deal_exposed: -10
+  apology: 5
+  subquest: 8
+  daily_recovery: 3
+  rumor_threshold:               # 이하면 그날 밤 소문 count개 (큰 개수 우선)
+    - { at: -20, count: 1 }
+    - { at: -50, count: 2 }
+  titles:                        # min 이상이면 해당 칭호. 위에서부터 첫 일치
+    - { min: 40, name: "믿음직한 형사" }
+    - { min: -19, name: null }
+    - { min: -49, name: "동네 괴짜 형사" }
+    - { min: -100, name: "말썽꾼 형사" }
+
+# F.3 NPC 신뢰도
+trust:
+  min: 0
+  max: 100
+  start_main: 50
+  start_minor: 40
+  personality_offset: 10         # 수다쟁이 +, 무뚝뚝 - (보통 0)
+  small_talk_chatty: 3
+  small_talk_blunt: -1
+  small_talk_normal: 0
+  lie_exposed: -15
+  cleared: 5
+  rude: -15
+  bluff_fail: -10
+  apology: 5
+  uncooperative_below: 20
+  min_disclosure: true
+  turnaway_actions: 2
+
+# 엉뚱한 입력 (§4.7, F.3)
+offtopic:
+  decay_per_normal: 1
+  partner_interject_at: 5        # 연속 이 횟수 이상이면 파트너 형사가 끼어듦
+
+# F.5 블러핑 -> bluff 섹션 (위)
+
+# F.6 증거 충분도
+sufficiency:
+  key: 0.30
+  motive: 0.15
+  means: 0.15
+  opportunity: 0.15
+  contradiction: 0.20
+  testimony: 0.05
+  max: 1.0
+  gauge_cells: 5
+
+# F.7 영장
+warrant:
+  weights: { direct: 0.3, motive: 0.2, contradiction: 0.3, other: 0.1 }
+  threshold: { bank: 0.6, call: 0.6, cctv: 0.4, access_log: 0.4, server_log: 0.4, messenger: 0.6, delivery: 0.4 }
+  scope_hours: 24
+
+# F.8 기억 확신도
+memory:
+  initial: { direct: 0.9, heard: 0.6, guess: 0.3 }
+  decay: { detail: 0.93, core: 0.97 }
+  floor: 0.2
+  contaminate_below: 0.6
+  contaminate_min_source_trust: 0.5
+  contaminated_confidence: 0.5
+  speech_bands:                  # min 이상이면 해당 구간. 위에서부터 첫 일치
+    - { min: 0.75, band: assertive, prefix: "" }
+    - { min: 0.5, band: hedged, prefix: "아마…" }
+    - { min: 0.0, band: uncertain, prefix: "확실하진 않은데…" }
+
+# F.9 AI 연출 감독
+director:
+  no_clue: { hint_after: 6, event_after: 10 }
+  same_place_limit: 4
+  early_progress: 0.6
+  early_progress_before_day: 2   # 이 일차 전
+  late_struggle: 0.4
+  cooldown_actions: 5
+  max_per_day: 3
+
+# F.10 범인 경계 수준
+alertness:
+  min: 0
+  max: 100
+  start: 30
+  heard_suspicion: 10
+  bluff_fail: 20
+  repeat_visit: 15
+  repeat_visit_count: 2          # 하루 이 횟수 이상 찾아오면
+  columbo_divisor: 5
+  hide_evidence_at: 60
+  contact_accomplice_at: 80
+  threat_sufficiency: 0.5
+
+# F.12 최종 추리 쇼
+finale:
+  stages: [opportunity, means, motive]
+  lives: { easy: 5, normal: 3, hard: 2 }
+  bluff_enabled: false
+
+# F.13 해결 등급
+grade:
+  base: 100
+  par_questions: { easy: 50, normal: 40, hard: 30 }
+  question_penalty: 1
+  hint_penalty: 8
+  wrong_penalty: 10
+  par_days: 2
+  day_penalty: 5
+  confession_bonus: 5
+  bands: { S: 90, A: 75, B: 60 }
+
+# F.14 역할 반전
+reversal:
+  contradiction_weight: 0.2
+  arrest_threshold: 0.85
+  frame_threshold: 0.6
+
+# F.19 법 조문 인용 검증
+citation:
+  min_quote_chars: 20
+  max_rewrites: 2
+  relevance_sample: 0.2
