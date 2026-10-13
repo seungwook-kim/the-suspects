@@ -9,6 +9,7 @@ import type {
   FinaleStep,
   GameSummary,
   PlayerView,
+  PortraitStatus,
   SaveSlotInfo,
   ShareCard,
   SourceItem,
@@ -24,6 +25,7 @@ export interface Api {
   listSaves(gameId: string): Promise<SaveSlotInfo[]>
   sources(gameId: string, statementId: string): Promise<SourceItem[]>
   getGame(gameId: string): Promise<PlayerView>
+  portraits(gameId: string): Promise<PortraitStatus>
   action(gameId: string, action: Action): AsyncIterable<AgEvent>
   night(gameId: string): AsyncIterable<AgEvent>
   finale(gameId: string, step: FinaleStep): AsyncIterable<AgEvent>
@@ -84,6 +86,7 @@ export const httpApi: Api = {
   listSaves: (id) => fetch(`${BASE}/games/${id}/saves`).then((r) => json<SaveSlotInfo[]>(r)),
   sources: (id, st) => fetch(`${BASE}/games/${id}/sources/${encodeURIComponent(st)}`).then((r) => json<SourceItem[]>(r)),
   getGame: (id) => fetch(`${BASE}/games/${id}`).then((r) => json<PlayerView>(r)),
+  portraits: (id) => fetch(`${BASE}/games/${id}/portraits`).then((r) => json<PortraitStatus>(r)),
   action: (id, action) => stream(`/games/${id}/actions`, action),
   night: (id) => stream(`/games/${id}/night`),
   finale: (id, step) => stream(`/games/${id}/finale`, step),

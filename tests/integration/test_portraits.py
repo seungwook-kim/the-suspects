@@ -16,6 +16,7 @@ from PIL import Image
 
 from server.game.portrait_library import PortraitLibrary, job_group
 from server.game.portraits import PortraitStore, compact, image_ext, portrait_prompt
+from server.cases.loader import load_case_by_id
 from server.game.service import GameService
 from server.llm.images import ImageClient
 
@@ -106,6 +107,65 @@ async def test_generated_case_portraits_start_during_generation(svc):
     assert all(c.portrait_url for c in svc.view(job["game_id"]).characters)
 
 
+async def test_portrait_status_while_drawing(tmp_path):
+    s = GameService(tmp_path, in_memory=True)
+    gate = asyncio.Event()
+
+    async def fake(prompt: str):
+        await gate.wait()
+        return real_image()
+
+    s.portraits = PortraitStore(tmp_path / "portraits", ImageClient(tracer=s.llm.tracer, generator=fake))
+    game_id, view = s.new_game("demo_db_deleted")
+    assert s.portrait_status(game_id) == {"pending": True, "urls": {}}  # 화면은 이걸 보고 계속 묻는다
+    gate.set()
+    await s.portraits.wait(game_id)
+    st = s.portrait_status(game_id)
+    assert st["pending"] is False and set(st["urls"]) == {c.id for c in view.characters}
+
+    service_mod._SERVICE = s
+    try:
+        with TestClient(app) as c:
+            r = c.get(f"/api/games/{game_id}/portraits")
+            assert r.status_code == 200 and r.json()["pending"] is False and r.json()["urls"] == st["urls"]
+            assert c.get("/api/games/g_nope/portraits").status_code == 404
+    finally:
+        service_mod._SERVICE = None
+
+
+async def test_missing_portraits_redrawn_once_when_asked(tmp_path):
+    """그리던 작업이 끊기거나 실패해 빠진 사람이 있으면, 상태를 물을 때 빠진 사람만 한 번 더 그린다(상한 있음)."""
+    s = GameService(tmp_path, in_memory=True)
+    calls = []
+
+    async def flaky(prompt: str):
+        calls.append(prompt)
+        return None if len(calls) <= 2 else real_image()  # 처음 두 장 실패
+
+    s.portraits = PortraitStore(tmp_path / "portraits", ImageClient(tracer=s.llm.tracer, generator=flaky))
+    game_id, view = s.new_game("demo_db_deleted")
+    await s.portraits.wait(game_id)
+    n = len(view.characters)
+    assert len(s.portrait_status(game_id)["urls"]) == n - 2  # 두 명 빠짐 → 다시 그리기 시작
+    await s.portraits.wait(game_id)
+    assert len(calls) == n + 2  # 빠진 두 명만 다시 그림
+    st = s.portrait_status(game_id)
+    assert st["pending"] is False and len(st["urls"]) == n
+
+    # 계속 실패해도 무한히 다시 그리지 않는다
+    async def broken(prompt: str):
+        calls.append(prompt)
+        return None
+
+    s.portraits = PortraitStore(tmp_path / "portraits2", ImageClient(tracer=s.llm.tracer, generator=broken))
+    game2, _ = s.new_game("demo_db_deleted")
+    await s.portraits.wait(game2)
+    for _ in range(5):
+        s.portrait_status(game2)
+        await s.portraits.wait(game2)
+    assert len(calls) == n + 2 + 2 * n  # 처음 1번 + 다시 1번에서 멈춤
+
+
 def test_portrait_endpoint_and_path_safety(tmp_path, svc):
     service_mod._SERVICE = svc
     try:
@@ -183,7 +243,7 @@ async def test_library_keeps_photos_after_clear_by_job_group(tmp_path):
         rec = json.loads(line)
         # 직업군/성별_나이대/파일 — 직업군은 옷차림으로 정한다
         group, bucket, _ = rec["file"].split("/")
-        assert group == rec["group"] == job_group(rec["appearance"].get("outfit"))
+        assert group == rec["group"] == job_group(rec["role"], rec["appearance"])
         assert bucket == f"{rec['gender']}_{rec['age'] // 10 * 10}s"
         assert image_ext((library / rec["file"]).read_bytes()) == "webp"
         assert rec["kind"] == "base" and isinstance(rec["seed"], int)
@@ -227,10 +287,22 @@ def test_library_find_by_outfit_gender_age(tmp_path):
     g55 = add("security_uniform", "F", 55)
     add("security_uniform", "M", 57)  # 성별 다름
     add("security_uniform", "F", 30)  # 나이 차이 큼
-    add("chef", "F", 56)              # 옷차림 다름
-    assert [h["file"] for h in lib.find(outfit="security_uniform", gender="F", age=56)] == [g55, g58]  # 나이 가까운 순
-    assert [h["file"] for h in lib.find(outfit="security_uniform", gender="F", age=56, exclude={g55})] == [g58]
-    assert g58.startswith("security/F_50s/") and job_group("hoodie") == "general"
+    add("chef", "F", 56)              # 직업군 다름
+    assert [h["file"] for h in lib.find(group="security", gender="F", age=56)] == [g55, g58]  # 나이 가까운 순
+    assert [h["file"] for h in lib.find(group="security", gender="F", age=56, exclude={g55})] == [g58]
+    assert g58.startswith("security/F_50s/") and job_group("", {"outfit": "hoodie"}) == "general"
+
+
+def test_free_text_appearance_used_in_prompt_and_group():
+    """기본 사건처럼 외모가 한글 자유 서술이면 그대로 그림 요청에 넣고, 직업 이름·옷 설명 낱말로 직업군을 정한다."""
+    case = load_case_by_id("demo_db_deleted")
+    by_id = {c.id: c for c in case.characters}
+    guard = by_id["npc_guard"]
+    p = portrait_prompt(role=guard.role, age=guard.age, gender=guard.gender, appearance=guard.appearance)
+    assert guard.appearance["outfit"] in p and guard.appearance["hair"] in p and "casual clothes" not in p
+    groups = {cid: job_group(c.role, c.appearance) for cid, c in by_id.items()}
+    assert groups["npc_guard"] == "security" and groups["npc_chu"] == "cleaning"
+    assert groups["npc_dba"] == groups["npc_dowon"] == groups["npc_pm"] == "office"
 
 
 def test_image_ext():

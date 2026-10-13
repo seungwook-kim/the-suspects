@@ -619,6 +619,9 @@ export const mockApi: Api = {
     const who = g!.view.characters.find((c) => c.id === st.npc_id)?.name ?? '진술자'
     return [{ kind: 'statement', title: `${who}의 진술 원문`, content: `"${st.content}" (게임 시각 ${Math.floor(st.game_time / 60) % 24}시경, 심문 중)` }]
   },
+  async portraits() {
+    return { pending: false, urls: {} } // 목 모드는 AI 사진 없이 절차적 SVG
+  },
   async getGame(id) {
     let g = games.get(id)
     if (!g) {

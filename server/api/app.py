@@ -149,6 +149,16 @@ def get_view(game_id: str) -> dict:
         raise HTTPException(404, str(e))
 
 
+@app.get("/api/games/{game_id}/portraits")
+async def portrait_status(game_id: str) -> dict:
+    """그리는 중인 초상화 확인용: {pending, urls}. 화면은 pending 동안 몇 초마다 묻고 주소를 채운다.
+    (async: 빠진 그림을 다시 그릴 때 이벤트 루프가 있어야 한다)"""
+    try:
+        return _service().portrait_status(game_id)
+    except StorageError as e:
+        raise HTTPException(404, str(e))
+
+
 @app.post("/api/games/{game_id}/actions")
 def act(game_id: str, action: dict) -> StreamingResponse:
     return _sse_response(_service().act(game_id, action))

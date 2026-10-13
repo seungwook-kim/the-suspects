@@ -288,6 +288,17 @@ class GameService:
         case, state, _ = self._load(game_id)
         return self._persist_view(case, state)
 
+    def portrait_status(self, game_id: str) -> dict:
+        """화면이 사진 완성을 기다리며 가볍게 묻는 용도: 지금까지 그린 사진 주소와 아직 그리는 중인지.
+        빠진 사람이 있는데 그리는 중이 아니면(서버 재시작으로 작업이 끊김 등) 빠진 사람만 다시 그린다(상한 있음)."""
+        state = self.store.load_live(game_id)
+        key = self._portrait_key(state)
+        urls = self.portraits.urls(key)
+        case = self.cases.get(state.case_id)
+        if case and not self.portraits.pending(key) and any(c.id not in urls for c in case.characters):
+            self.portraits.start(key, self._public_people(case.characters), setting=case.theme, game_id=game_id)
+        return {"pending": self.portraits.pending(key), "urls": urls}
+
     # ================================================================= 행동
     async def act(self, game_id: str, action: dict) -> AsyncIterator[dict]:
         case, state, masker = self._load(game_id)

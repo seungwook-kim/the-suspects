@@ -149,6 +149,12 @@ export interface CasePreview {
   characters: PublicCharacter[] // location_id 는 null
 }
 
+/** GET /api/games/{id}/portraits — 그리는 중인 초상화 확인 */
+export interface PortraitStatus {
+  pending: boolean
+  urls: Record<string, string> // 인물 id → 사진 주소
+}
+
 export interface CaseJob {
   job_id: string
   status: 'running' | 'ready' | 'failed' | 'rejected'

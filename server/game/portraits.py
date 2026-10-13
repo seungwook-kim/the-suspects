@@ -25,6 +25,7 @@ from server.llm.images import ImageClient
 
 _SAFE = re.compile(r"^[A-Za-z0-9_\-]+$")
 EXTS = ("png", "jpg", "webp")
+MAX_STARTS = 2  # 처음 1번 + 빠진 그림 다시 그리기 1번 (서버 재시작으로 끊긴 경우 등)
 
 # 옷과 소품은 글자가 없는 민무늬로 묘사한다 (이름표·패치·사원증에 엉터리 글자가 찍히는 것 방지, 2026-10-13 시안 1차)
 OUTFIT_EN = {
@@ -42,15 +43,24 @@ ACCESSORY_EN = {"glasses": "wearing glasses", "cap": "wearing a plain cap", "bad
                 "radio": "with a two-way radio clipped on", "apron": "wearing a plain apron", "laptop": "", "mop": ""}
 
 
+def _look(table: dict[str, str], value: object, default: str) -> str:
+    """정해진 값(생성 사건)이면 영어 묘사, 자유 서술(기본 사건의 "남색 경비복과 모자" 등)이면 그대로 넣는다.
+    그림 모델의 글 해석기는 한국어도 읽는다(2026-10-13 확인: 자유 서술을 버리면 경비원이 평상복으로 그려짐)."""
+    if isinstance(value, str) and value in table:
+        return table[value]
+    return value.strip() if isinstance(value, str) and value.strip() else default
+
+
 def portrait_prompt(*, role: str, age: int, gender: str, appearance: dict, setting: str = "") -> str:
     who = {"M": "man", "F": "woman"}.get(gender, "person")
-    look = [OUTFIT_EN.get(appearance.get("outfit", ""), "casual clothes"),
-            HAIR_EN.get(appearance.get("hair", ""), "natural hair")]
-    if acc := ACCESSORY_EN.get(appearance.get("accessory", "")):
-        look.append(acc)
+    look = [_look(OUTFIT_EN, appearance.get("outfit"), "casual clothes"),
+            _look(HAIR_EN, appearance.get("hair"), "natural hair"),
+            _look(ACCESSORY_EN, appearance.get("accessory"), ""),
+            _look({}, appearance.get("build"), "")]
+    extra = "".join(f", {x}" for x in look[2:] if x)
     return (
         f"Photorealistic close-up head-and-shoulders portrait photo of a fictional {age}-year-old Korean {who} "
-        f"who works as {role}, wearing {look[0]}, with {look[1]}{', ' + look[2] if len(look) > 2 else ''}. "
+        f"who works as {role}, wearing {look[0]}, with {look[1]}{extra}. "
         "The face and shoulders fill the frame, cropped at the chest, eyes in the upper third. "
         "Relaxed neutral expression with closed lips, looking straight at the camera, natural soft daylight, "
         f"modern present-day South Korea, softly blurred background{(' suggesting ' + setting) if setting else ''}. "
@@ -93,6 +103,7 @@ class PortraitStore:
         self.library = library
         self._sem = asyncio.Semaphore(concurrency or images.concurrency)
         self._tasks: dict[str, asyncio.Task] = {}
+        self._starts: dict[str, int] = {}  # 판마다 그리기 시작 횟수 (빠진 그림 다시 그리기 상한용)
 
     @property
     def enabled(self) -> bool:
@@ -119,14 +130,20 @@ class PortraitStore:
                 for p in d.iterdir() if p.suffix[1:] in EXTS}
 
     def start(self, key: str, people: list[dict], *, setting: str = "", game_id: str | None = None) -> None:
-        """people: [{id, role, age, gender, appearance}] — 공개 정보만. 이미 그리는 중이면 무시."""
-        if not self.enabled or key in self._tasks:
+        """people: [{id, role, age, gender, appearance}] — 공개 정보만. 이미 그리는 중이면 무시.
+        이미 있는 그림은 건너뛰므로 다시 부르면 빠진 사람만 그린다. 한 판에 MAX_STARTS번까지(계속 실패할 때 무한 반복 방지)."""
+        if not self.enabled or self.pending(key) or self._starts.get(key, 0) >= MAX_STARTS:
             return
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:  # 이벤트 루프 밖(동기 호출)에서는 그리지 않는다 → SVG
             return
+        self._starts[key] = self._starts.get(key, 0) + 1
         self._tasks[key] = loop.create_task(self._draw_all(key, people, setting, game_id))
+
+    def pending(self, key: str) -> bool:
+        t = self._tasks.get(key)
+        return bool(t and not t.done())
 
     async def wait(self, key: str) -> None:
         t = self._tasks.get(key)
@@ -161,6 +178,7 @@ class PortraitStore:
     def delete(self, key: str) -> None:
         """판 그림만 지운다. 보관함 사진은 남는다."""
         t = self._tasks.pop(key, None)
+        self._starts.pop(key, None)
         if t and not t.done():
             t.cancel()
         if _SAFE.match(key):

@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useReducer, useRef } from 'react'
 import { api } from '../api/client'
 import type { Action, AgEvent, ClearHistory, CreateOptions, FinaleStep, PlayerView, ShareCard } from '../api/types'
 import { addSave } from '../util/saves'
@@ -9,12 +9,41 @@ export interface GameResult {
   card: ShareCard | null
 }
 
+// 초상화는 게임을 만든 뒤 서버가 백그라운드로 그린다(한 판 약 40초). 그동안 몇 초마다 주소만 받아 채운다.
+export const PORTRAIT_POLL_MS = 3000
+export const PORTRAIT_POLL_MAX_MS = 180_000
+
 export function useGame() {
   const [state, dispatch] = useReducer(clientReducer, initialClientState)
   const gameIdRef = useRef<string | null>(null)
   const busyRef = useRef(false)
   const viewRef = useRef(state.view)
   viewRef.current = state.view
+
+  const viewGameId = state.view?.game_id || null
+  const missingPortrait = !!state.view?.characters.some((c) => !c.portrait_url)
+  useEffect(() => {
+    if (!viewGameId || !missingPortrait) return
+    let alive = true
+    let timer: number | undefined
+    const started = Date.now()
+    const poll = async () => {
+      try {
+        const st = await api.portraits(viewGameId)
+        if (!alive) return
+        dispatch({ kind: 'portraits', urls: st.urls })
+        if (!st.pending) return // 다 그렸거나(실패분은 SVG로 남음) 그리지 않는 중 → 멈춤
+      } catch {
+        /* 일시 오류는 다음 차례에 다시 */
+      }
+      if (alive && Date.now() - started < PORTRAIT_POLL_MAX_MS) timer = window.setTimeout(() => void poll(), PORTRAIT_POLL_MS)
+    }
+    void poll()
+    return () => {
+      alive = false
+      window.clearTimeout(timer)
+    }
+  }, [viewGameId, missingPortrait])
 
   const fail = useCallback((e: unknown) => {
     dispatch({ kind: 'error', message: e instanceof Error ? e.message : '알 수 없는 오류가 났습니다.' })

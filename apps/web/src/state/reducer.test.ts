@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AgEvent, PlayerView } from '../api/types'
+import type { AgEvent, PlayerView, PublicCharacter } from '../api/types'
 import { applyEvent, clientReducer, initialClientState, type ClientState } from './reducer'
 
 const view = (): PlayerView => ({
@@ -116,5 +116,16 @@ describe('AG-UI 리듀서', () => {
     expect(s.turnAway.n1).toBe(1)
     s = clientReducer(s, { kind: 'tick_turn_away' })
     expect(s.turnAway.n1).toBeUndefined()
+  })
+
+  it('나중에 완성된 초상화 주소만 채우고, 바뀐 게 없으면 같은 상태를 돌려준다', () => {
+    const ch = (id: string): PublicCharacter => ({
+      id, name: id, role: 'r', age: 30, gender: 'F', appearance: {}, face_seed: 1, location_id: null, emotion: 'neutral', one_liner: '',
+    })
+    let s = clientReducer(initialClientState, { kind: 'set_view', view: { ...view(), characters: [ch('a'), ch('b')] } })
+    s = clientReducer(s, { kind: 'portraits', urls: { a: '/api/portraits/g1/a.webp?v=1' } })
+    expect(s.view!.characters.map((c) => c.portrait_url ?? null)).toEqual(['/api/portraits/g1/a.webp?v=1', null])
+    const same = clientReducer(s, { kind: 'portraits', urls: { a: '/api/portraits/g1/a.webp?v=1' } })
+    expect(same).toBe(s)
   })
 })

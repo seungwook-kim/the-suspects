@@ -177,6 +177,7 @@ function applyCustom(s: ClientState, name: string, value: unknown): ClientState 
 export type UiAction =
   | { kind: 'event'; ev: AgEvent }
   | { kind: 'set_view'; view: PlayerView }
+  | { kind: 'portraits'; urls: Record<string, string> }
   | { kind: 'clear_cutin' }
   | { kind: 'clear_director' }
   | { kind: 'clear_overheard' }
@@ -193,6 +194,12 @@ export function clientReducer(s: ClientState, a: UiAction): ClientState {
       return applyEvent(s, a.ev)
     case 'set_view':
       return { ...s, view: a.view, emotions: {}, needsResync: false }
+    case 'portraits': {
+      // 나중에 완성된 초상화 주소만 채운다 (바뀐 게 없으면 같은 상태 → 다시 그리지 않음)
+      if (!s.view || !s.view.characters.some((c) => a.urls[c.id] && a.urls[c.id] !== c.portrait_url)) return s
+      const characters = s.view.characters.map((c) => (a.urls[c.id] ? { ...c, portrait_url: a.urls[c.id] } : c))
+      return { ...s, view: { ...s.view, characters } }
+    }
     case 'clear_cutin':
       return { ...s, cutin: null }
     case 'clear_director':
