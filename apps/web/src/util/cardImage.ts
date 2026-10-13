@@ -1,7 +1,6 @@
 // 결과 카드를 캔버스로 PNG 로 만든다. 서버에는 아무것도 보내지 않는다.
 import type { ClearHistory } from '../api/types'
 import { renderPortraitSvg } from '../character/faceRender'
-import { shortName } from './format'
 
 function loadSvg(svg: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -95,7 +94,7 @@ export async function renderCardPng(h: ClearHistory, themeColor = '#3b6ea5'): Pr
   ctx.font = `600 20px ${font}`
   if (h.success) {
     const c = h.culprit
-    ctx.fillText(`🔍 범인: ${c.role ?? ''} ${shortName(c.name ?? '')}`, pad, y)
+    ctx.fillText(`🔍 범인: ${c.role ?? ''} ${c.name ?? ''}`, pad, y)
     y += 34
     if (h.titles.length) {
       ctx.fillText(`🏅 칭호: ${h.titles[0]}`, pad, y)

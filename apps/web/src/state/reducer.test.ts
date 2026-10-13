@@ -6,7 +6,7 @@ const view = (): PlayerView => ({
   game_id: 'g1', case_title: 't', incident_summary: 's', day: 1, phase: 'day', clock: 540, actions_left: 12,
   player_location: 'a', locations: [], characters: [], evidence: [],
   notebook: { evidence_ids: [], statements: [], contradictions: [], relations_known: [], board_links: [], sufficiency: {} },
-  sufficiency_gauge: {}, reputation_band: '', chips: [], feed: [], bluff_claims: [], ending: 'none',
+  sufficiency_gauge: {}, reputation_band: '', chips: [], feed: [], bluff_claims: [], ending: 'none', actions_total: 12, max_days: 5,
 })
 
 const run = (events: AgEvent[], s: ClientState = initialClientState) => events.reduce(applyEvent, s)
@@ -102,6 +102,12 @@ describe('AG-UI 리듀서', () => {
     const s = run([{ type: 'RUN_STARTED' }, { type: 'RUN_ERROR', message: '문제', code: 'x' }])
     expect(s.error).toBe('문제')
     expect(s.running).toBe(false)
+  })
+
+  it('finale 이벤트의 last 는 {result, evidence_id} 객체', () => {
+    const s = run([{ type: 'CUSTOM', name: 'finale', value: { accused_id: 'n1', stage: 'means', lives: 2, filled: ['opportunity'], last: { result: 'wrong', evidence_id: 'e1' } } }])
+    expect(s.finale?.last?.result).toBe('wrong')
+    expect(s.finale?.lives).toBe(2)
   })
 
   it('turn_away 는 행동할 때마다 줄어든다', () => {

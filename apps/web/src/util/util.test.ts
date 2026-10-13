@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ClearHistory } from '../api/types'
-import { buildShareText, dayPeriod, formatDayTime, shortName } from './format'
+import { buildShareText, dayPeriod, formatDayTime } from './format'
 import { layoutGraph } from './layout'
 
 describe('시간·공유 문구', () => {
@@ -12,12 +12,9 @@ describe('시간·공유 문구', () => {
 
   const h = { case_title: '사라진 운영 DB', question_count: 23, success: true, game_days: 3, grade: 'A' } as ClearHistory
   it('텍스트 복사 형식', () => {
-    expect(buildShareText(h, { emoji_line: '🔍🔍❌🔍✅' }).startsWith('🔍🔍❌🔍✅ 23질문 만에 해결')).toBe(true)
+    expect(buildShareText(h, { emoji_line: '🔍🔍❌🔍✅', share_text: '🔍🔍❌🔍✅ 23질문 만에 해결', theme_color: '#3b6ea5' })).toBe('🔍🔍❌🔍✅ 23질문 만에 해결')
     expect(buildShareText(h)).toContain('🔍🔍🔍✅ 23질문 만에 해결')
     expect(buildShareText({ ...h, success: false }, null)).toContain('❌')
-  })
-  it('이름 가림', () => {
-    expect(shortName('박순자')).toBe('박○○')
   })
 })
 

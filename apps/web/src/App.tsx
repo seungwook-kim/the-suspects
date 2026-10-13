@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ClearHistory, ShareCard } from './api/types'
+import type { ClearHistory, CreateOptions, ShareCard } from './api/types'
 import { Briefing } from './screens/Briefing'
 import { Finale } from './screens/Finale'
 import { History } from './screens/History'
@@ -7,7 +7,7 @@ import { Main } from './screens/Main'
 import { Result } from './screens/Result'
 import { Start } from './screens/Start'
 import { useGame } from './state/useGame'
-import { getPref, setPref, type SaveRef } from './util/saves'
+import { getPref, setPref } from './util/saves'
 
 type Screen = 'start' | 'briefing' | 'main' | 'finale' | 'result' | 'history'
 type Theme = 'light' | 'dark'
@@ -16,7 +16,7 @@ export default function App() {
   const g = useGame()
   const [screen, setScreen] = useState<Screen>('start')
   const [creating, setCreating] = useState(false)
-  const [result, setResult] = useState<{ history: ClearHistory; card: ShareCard } | null>(null)
+  const [result, setResult] = useState<{ history: ClearHistory; card: ShareCard | null } | null>(null)
   const [theme, setTheme] = useState<Theme>(() =>
     getPref<Theme>('theme', window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
   )
@@ -33,19 +33,26 @@ export default function App() {
     if (needsResync && !running) void resync()
   }, [needsResync, running, resync])
 
-  const start = async (themeId: string) => {
+  const start = async (themeId: string, options: CreateOptions) => {
     setCreating(true)
     setScreen('briefing') // 사건 생성 중에도 빈 로딩 대신 브리핑 장면을 보여 준다
-    const ok = await g.startGame(themeId)
+    const ok = await g.startGame(themeId, options)
     setCreating(false)
     if (!ok) setScreen('start')
   }
 
-  const resume = async (s: SaveRef) => {
-    setCreating(true)
-    const view = await g.load(s.game_id, s.slot_id)
-    setCreating(false)
+  const enter = (view: { phase: string } | null) => {
     if (view) setScreen(view.phase === 'finale' ? 'finale' : view.phase === 'briefing' ? 'briefing' : 'main')
+  }
+  const openGame = async (gameId: string) => {
+    setCreating(true)
+    enter(await g.openGame(gameId))
+    setCreating(false)
+  }
+  const loadSlot = async (gameId: string, slotId: string) => {
+    setCreating(true)
+    enter(await g.load(gameId, slotId))
+    setCreating(false)
   }
 
   const toResult = async () => {
@@ -77,7 +84,8 @@ export default function App() {
           busy={creating}
           error={g.state.error}
           onStart={start}
-          onResume={resume}
+          onOpenGame={openGame}
+          onLoadSlot={loadSlot}
           onHistory={() => setScreen('history')}
         />
       )}

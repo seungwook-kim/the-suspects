@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ClearHistory, ShareCard } from '../api/types'
 import { Portrait } from '../character/Portrait'
 import { downloadBlob, renderCardPng } from '../util/cardImage'
-import { buildShareText, shortName } from '../util/format'
+import { buildShareText } from '../util/format'
 
 export function ResultCard({ h, card }: { h: ClearHistory; card?: ShareCard | null }) {
   const color = card?.theme_color ?? '#3b6ea5'
@@ -23,7 +23,7 @@ export function ResultCard({ h, card }: { h: ClearHistory; card?: ShareCard | nu
       </div>
       {h.success ? (
         <>
-          <p className="culprit">🔍 범인: {h.culprit.role} {shortName(h.culprit.name ?? '')}</p>
+          <p className="culprit">🔍 범인: {h.culprit.role} {h.culprit.name}</p>
           {h.titles[0] && <p>🏅 칭호: {h.titles[0]}</p>}
         </>
       ) : (
@@ -36,7 +36,7 @@ export function ResultCard({ h, card }: { h: ClearHistory; card?: ShareCard | nu
 
 interface Props {
   h: ClearHistory
-  card: ShareCard
+  card: ShareCard | null
   onNew: () => void
   onHistory: () => void
 }
@@ -49,7 +49,7 @@ export function Result({ h, card, onNew, onHistory }: Props) {
   }
   const savePng = async () => {
     try {
-      const blob = await renderCardPng(h, card.theme_color)
+      const blob = await renderCardPng(h, card?.theme_color)
       downloadBlob(blob, `the-suspects-${h.id}.png`)
       flash('이미지를 저장했습니다')
     } catch (e) {

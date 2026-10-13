@@ -28,13 +28,6 @@ export function buildShareText(h: ClearHistory, card?: ShareCard | null): string
   return `${head}\n${tail}`
 }
 
-export function shortName(name: string): string {
-  // 범인 공개 카드에서 쓰는 가림 표기: 박순자 -> 박○○
-  if (!name) return ''
-  const chars = [...name]
-  return chars[0] + '○'.repeat(Math.max(0, chars.length - 1))
-}
-
 const ENDING_TEXT: Record<string, { title: string; body: string }> = {
   success: { title: '사건 해결', body: '모든 증거가 맞아떨어졌다. 범인은 무너졌다.' },
   escaped: { title: '범인 도주', body: '증거가 모자랐다. 범인은 유유히 사라졌다…' },

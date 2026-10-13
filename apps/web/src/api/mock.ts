@@ -161,6 +161,8 @@ function newView(gameId: string): PlayerView {
     feed: [{ id: 'feed_0', channel: '사내 메신저', author: '총무팀', text: '[공지] 어젯밤 시스템 장애와 관련해 형사님이 방문하셨습니다. 협조 부탁드립니다.', game_time: DAY_START }],
     bluff_claims: structuredClone(BLUFF_CLAIMS),
     ending: 'none',
+    actions_total: MAX_ACTIONS,
+    max_days: 5,
   }
 }
 
@@ -242,7 +244,7 @@ function addEvidence(g: MockGame, e: PublicEvidence): AgEvent[] {
 async function* runAction(g: MockGame, a: Action): AsyncGenerator<AgEvent> {
   const v = g.view
   yield { type: 'RUN_STARTED', runId: nid('run') }
-  if (v.actions_left <= 0 && a.type !== 'end_day' && a.type !== 'hint') {
+  if (v.actions_left <= 0 && a.type !== 'hint') {
     yield* speak('narrator', null, '오늘 쓸 수 있는 행동을 모두 썼다. 하루를 마무리해야 한다.')
     yield { type: 'RUN_FINISHED' }
     return
@@ -319,9 +321,6 @@ async function* runAction(g: MockGame, a: Action): AsyncGenerator<AgEvent> {
       break
     case 'hint':
       yield* speak('partner', null, '선배, 서버실 출입 기록부터 확인해 보죠. 그리고 탕비실 게시판도요.')
-      break
-    case 'end_day':
-      yield* speak('narrator', null, '하단의 "하루 끝내기" 버튼으로 밤을 보낼 수 있다.')
       break
   }
   yield { type: 'RUN_FINISHED' }
@@ -476,12 +475,12 @@ async function* runFinale(g: MockGame, step: FinaleStep): AsyncGenerator<AgEvent
       const done = f.filled.length === 3
       yield* speak('npc', f.accused, done ? '…더는 숨길 수가 없네요.' : '그건… 그건 우연이에요!', done ? 'sad' : 'flustered')
       const nextStage = (['opportunity', 'means', 'motive'] as FinaleStage[]).find((s) => !f.filled.includes(s)) ?? 'done'
-      yield emit(f.accused, nextStage, f.lives, [...f.filled], 'correct')
+      yield emit(f.accused, nextStage, f.lives, [...f.filled], { result: 'correct', evidence_id: step.evidence_id })
     } else {
       f.lives -= 1
       yield* speak('npc', f.accused, '그게 증거라고요? 어림도 없어요.', 'angry')
       const nextStage = (['opportunity', 'means', 'motive'] as FinaleStage[]).find((s) => !f.filled.includes(s)) ?? 'done'
-      yield emit(f.accused, nextStage, f.lives, [...f.filled], 'wrong')
+      yield emit(f.accused, nextStage, f.lives, [...f.filled], { result: 'wrong', evidence_id: step.evidence_id })
       if (f.lives <= 0) {
         yield* end(f.accused === CULPRIT ? 'escaped' : 'wrong_accusation')
       }
@@ -526,8 +525,9 @@ export const mockApi: Api = {
     await sleep(150)
     return THEMES
   },
-  async createGame(themeId) {
+  async createGame(themeId, options) {
     void themeId // 목은 항상 같은 사건
+    void options // 목은 옵션을 무시한다
     await sleep(500)
     const id = nid('game')
     const g: MockGame = { view: newView(id), questions: 0, startedAt: Date.now(), nonsense: 0, asked: {}, feedIdx: 0, actionCount: 0, finale: null }
@@ -535,15 +535,44 @@ export const mockApi: Api = {
     games.set(id, g)
     return { game_id: id, view: structuredClone(g.view) }
   },
-  async getGame(id) {
+  async listGames() {
+    const out = new Map<string, { game_id: string; case_title: string; day: number; last_seen: string }>()
+    for (const [id, g] of games) out.set(id, { game_id: id, case_title: g.view.case_title, day: g.view.day, last_seen: new Date().toISOString() })
+    const saves = lsGet<Record<string, { view: PlayerView; at?: string }>>(LS_SAVES, {})
+    for (const sv of Object.values(saves)) {
+      const id = sv.view.game_id
+      if (!out.has(id)) out.set(id, { game_id: id, case_title: sv.view.case_title, day: sv.view.day, last_seen: sv.at ?? new Date().toISOString() })
+    }
+    return [...out.values()]
+  },
+  async listSaves(id) {
+    const saves = lsGet<Record<string, { view: PlayerView; name?: string; at?: string }>>(LS_SAVES, {})
+    return Object.entries(saves)
+      .filter(([, sv]) => sv.view.game_id === id)
+      .map(([slot_id, sv]) => ({ slot_id, name: sv.name || `${sv.view.day}일차 저장`, kind: 'manual', saved_at: sv.at ?? new Date().toISOString() }))
+  },
+  async sources(id, statementId) {
     const g = games.get(id)
-    if (!g) throw new Error('게임을 찾을 수 없습니다 (404)')
+    const st = g?.view.notebook.statements.find((x) => x.id === statementId)
+    if (!st) return []
+    const who = g!.view.characters.find((c) => c.id === st.npc_id)?.name ?? '진술자'
+    return [{ kind: 'statement', title: `${who}의 진술 원문`, content: `"${st.content}" (게임 시각 ${Math.floor(st.game_time / 60) % 24}시경, 심문 중)` }]
+  },
+  async getGame(id) {
+    let g = games.get(id)
+    if (!g) {
+      // 새로고침 뒤: 가장 최근 세이브로 되살린다(목 모드 전용)
+      const saves = lsGet<Record<string, { view: PlayerView; questions: number; asked: Record<string, number>; at?: string }>>(LS_SAVES, {})
+      const mine = Object.values(saves).filter((x) => x.view.game_id === id).sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''))[0]
+      if (!mine) throw new Error('게임을 찾을 수 없습니다 (404)')
+      g = { view: mine.view, questions: mine.questions, startedAt: Date.now(), nonsense: 0, asked: mine.asked ?? {}, feedIdx: 0, actionCount: 0, finale: null }
+      games.set(id, g)
+    }
     return structuredClone(g.view)
   },
   async *action(id, a) {
     const g = games.get(id)
     if (!g) return yield { type: 'RUN_ERROR', message: '게임을 찾을 수 없습니다.', code: '404' }
-    if (a.type === 'end_day') return yield* runNight(g)
     yield* runAction(g, a)
   },
   async *night(id) {
@@ -561,7 +590,7 @@ export const mockApi: Api = {
     if (!g) throw new Error('게임을 찾을 수 없습니다 (404)')
     const slot_id = nid('slot')
     const saves = lsGet<Record<string, unknown>>(LS_SAVES, {})
-    saves[slot_id] = { view: g.view, questions: g.questions, asked: g.asked, name: slotName ?? '' }
+    saves[slot_id] = { view: g.view, questions: g.questions, asked: g.asked, name: slotName ?? '', at: new Date().toISOString() }
     lsSet(LS_SAVES, saves)
     return { slot_id, saved_at: new Date().toISOString() }
   },
@@ -601,7 +630,10 @@ export const mockApi: Api = {
     }
     const hist = lsGet<ClearHistory[]>(LS_HIST, [])
     lsSet(LS_HIST, [history, ...hist].slice(0, 30))
-    const card: ShareCard = { theme_color: '#3b6ea5' }
+    const line = '🔍'.repeat(Math.min(history.game_days, 4)) + (success ? '✅' : '❌')
+    const card: ShareCard | null = success
+      ? { emoji_line: line, share_text: `${line} ${history.question_count}질문 만에 해결`, theme_color: '#3b6ea5' }
+      : null
     games.delete(id)
     return { history, card }
   },

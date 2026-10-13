@@ -98,6 +98,8 @@ export interface PlayerView {
   feed: FeedItem[]
   bluff_claims: BluffClaim[]
   ending: string // none | success | escaped | wrong_accusation
+  actions_total: number // 하루 전체 행동 수
+  max_days: number // 수사 기한(일)
 }
 
 export interface Theme {
@@ -127,11 +129,36 @@ export interface ClearHistory {
   fingerprint: Record<string, unknown>
 }
 
-// 계약에 모양이 정의되지 않은 값. 최소한만 가정한다(제안 참고).
 export interface ShareCard {
-  emoji_line?: string // 예: "🔍🔍❌🔍✅"
-  share_text?: string // 서버가 문구를 만들어 주면 우선 사용
-  theme_color?: string
+  emoji_line: string // 예: "🔍🔍❌🔍✅"
+  share_text: string
+  theme_color: string // #RRGGBB
+}
+
+export interface CreateOptions {
+  tone?: 'comic' | 'balanced' | 'serious'
+  difficulty?: 'easy' | 'normal' | 'hard'
+  play_minutes?: 20 | 40 | 60
+}
+
+export interface GameSummary {
+  game_id: string
+  case_title: string
+  day: number
+  last_seen: string
+}
+
+export interface SaveSlotInfo {
+  slot_id: string
+  name: string
+  kind: string
+  saved_at: string
+}
+
+export interface SourceItem {
+  kind: string
+  title: string
+  content: string
 }
 
 export type Action =
@@ -150,7 +177,6 @@ export type Action =
   | { type: 'warrant'; system: string; target_id: string; basis_evidence_ids: string[] }
   | { type: 'apologize'; npc_id: string }
   | { type: 'hint' }
-  | { type: 'end_day' }
 
 export type FinaleStage = 'opportunity' | 'means' | 'motive'
 export const FINALE_STAGES: FinaleStage[] = ['opportunity', 'means', 'motive']
@@ -220,5 +246,5 @@ export interface FinaleValue {
   stage: FinaleStage | 'done'
   lives: number
   filled: FinaleStage[]
-  last?: 'correct' | 'wrong' | null
+  last?: { result: 'correct' | 'wrong' | 'rebutted'; evidence_id?: string } | null
 }

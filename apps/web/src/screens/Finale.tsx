@@ -81,7 +81,7 @@ export function Finale({ g, onBack, onResult }: Props) {
       </div>
 
       {accused && (
-        <div className={`finale-stage${f?.last === 'wrong' ? ' hit' : ''}`}>
+        <div className={`finale-stage${f?.last?.result === 'wrong' ? ' hit' : ''}`}>
           <Portrait seed={accused.face_seed} appearance={accused.appearance} emotion={emotion} speaking={typing} width={220} />
           <div>
             <div className="nameplate"><strong>{accused.name}</strong> <span>{accused.role}</span></div>
@@ -94,8 +94,8 @@ export function Finale({ g, onBack, onResult }: Props) {
         </div>
       )}
 
-      {f?.last === 'correct' && !ending && <p className="ok-note">✔ 맞다! 다음 단계로.</p>}
-      {f?.last === 'wrong' && !ending && <p className="warn">✖ 증거가 맞지 않는다. 목숨이 하나 줄었다.</p>}
+      {f?.last?.result === 'correct' && !ending && <p className="ok-note">✔ 맞다! 다음 단계로.</p>}
+      {(f?.last?.result === 'wrong' || f?.last?.result === 'rebutted') && !ending && <p className="warn">✖ 증거가 맞지 않는다. 목숨이 하나 줄었다.</p>}
 
       {!ending && stage !== 'done' && (
         <section className="finale-ev">

@@ -21,11 +21,8 @@ export function Main({ g, onFinale, onHome }: Props) {
   const [selected, setSelected] = useState<string | null>(null)
   const [bluffing, setBluffing] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
-  const maxRef = useRef({ day: view.day, max: view.actions_left })
   const feedEnd = useRef<HTMLDivElement>(null)
 
-  if (maxRef.current.day !== view.day) maxRef.current = { day: view.day, max: view.actions_left }
-  if (view.actions_left > maxRef.current.max) maxRef.current.max = view.actions_left
 
   // NPC 가 말하면 그 사람과의 심문 장면으로 전환
   const speakerId = state.dialogue?.role === 'npc' ? state.dialogue.speakerId : null
@@ -109,6 +106,7 @@ export function Main({ g, onFinale, onHome }: Props) {
           selectedEvidence={selected}
           onSelectEvidence={setSelected}
           onSeen={() => dispatch({ kind: 'clear_new_contradictions' })}
+          loadSources={g.fetchSources}
         />
       </aside>
 
@@ -144,10 +142,10 @@ export function Main({ g, onFinale, onHome }: Props) {
           <div ref={feedEnd} />
         </div>
         <div className="status">
-          <span>{view.day}일차</span>
+          <span>{view.day}일차{view.max_days > 0 && ` · 남은 ${Math.max(0, view.max_days - view.day)}일`}</span>
           <span>{dayPeriod(view.clock)} {formatTime(view.clock)}</span>
           <span className={view.actions_left <= 2 ? 'low' : ''}>
-            행동 {view.actions_left}/{maxRef.current.max}
+            행동 {view.actions_left}/{view.actions_total}
           </span>
           <button onClick={() => void endDay()} disabled={busy}>🌙 하루 끝내기</button>
           <button className="primary" onClick={onFinale} disabled={busy}>🔎 최종 추리</button>

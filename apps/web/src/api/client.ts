@@ -4,22 +4,29 @@ import type {
   Action,
   AgEvent,
   ClearHistory,
+  CreateOptions,
   FinaleStep,
+  GameSummary,
   PlayerView,
+  SaveSlotInfo,
   ShareCard,
+  SourceItem,
   Theme,
 } from './types'
 
 export interface Api {
   themes(): Promise<Theme[]>
-  createGame(themeId: string): Promise<{ game_id: string; view: PlayerView }>
+  createGame(themeId: string, options?: CreateOptions): Promise<{ game_id: string; view: PlayerView }>
+  listGames(): Promise<GameSummary[]>
+  listSaves(gameId: string): Promise<SaveSlotInfo[]>
+  sources(gameId: string, statementId: string): Promise<SourceItem[]>
   getGame(gameId: string): Promise<PlayerView>
   action(gameId: string, action: Action): AsyncIterable<AgEvent>
   night(gameId: string): AsyncIterable<AgEvent>
   finale(gameId: string, step: FinaleStep): AsyncIterable<AgEvent>
   save(gameId: string, slotName?: string): Promise<{ slot_id: string; saved_at: string }>
   load(gameId: string, slotId: string): Promise<PlayerView>
-  clear(gameId: string): Promise<{ history: ClearHistory; card: ShareCard }>
+  clear(gameId: string): Promise<{ history: ClearHistory; card: ShareCard | null }>
   history(): Promise<ClearHistory[]>
 }
 
@@ -67,7 +74,10 @@ async function* stream(path: string, body?: unknown): AsyncGenerator<AgEvent> {
 
 export const httpApi: Api = {
   themes: () => fetch(`${BASE}/themes`).then((r) => json<Theme[]>(r)),
-  createGame: async (themeId) => json(await post('/games', { theme_id: themeId })),
+  createGame: async (themeId, options) => json(await post('/games', { theme_id: themeId, options })),
+  listGames: () => fetch(`${BASE}/games`).then((r) => json<GameSummary[]>(r)),
+  listSaves: (id) => fetch(`${BASE}/games/${id}/saves`).then((r) => json<SaveSlotInfo[]>(r)),
+  sources: (id, st) => fetch(`${BASE}/games/${id}/sources/${encodeURIComponent(st)}`).then((r) => json<SourceItem[]>(r)),
   getGame: (id) => fetch(`${BASE}/games/${id}`).then((r) => json<PlayerView>(r)),
   action: (id, action) => stream(`/games/${id}/actions`, action),
   night: (id) => stream(`/games/${id}/night`),

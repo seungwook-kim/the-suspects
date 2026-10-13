@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { PlayerView } from '../api/types'
+import type { PlayerView, SourceItem } from '../api/types'
 import { formatDayTime } from '../util/format'
 
 type Tab = 'evidence' | 'statements' | 'contradictions' | 'gauge'
@@ -10,13 +10,26 @@ interface Props {
   selectedEvidence: string | null
   onSelectEvidence: (id: string | null) => void
   onSeen: () => void
+  loadSources: (statementId: string) => Promise<SourceItem[]>
 }
 
-export function NotebookPanel({ view, newContradictions, selectedEvidence, onSelectEvidence, onSeen }: Props) {
+export function NotebookPanel({ view, newContradictions, selectedEvidence, onSelectEvidence, onSeen, loadSources }: Props) {
   const [tab, setTab] = useState<Tab>('evidence')
   const [openStatement, setOpenStatement] = useState<string | null>(null)
   const [openEvidence, setOpenEvidence] = useState<string | null>(null)
+  const [sources, setSources] = useState<Record<string, SourceItem[] | 'loading' | 'error'>>({})
   const nb = view.notebook
+
+  const toggleStatement = (id: string) => {
+    const open = openStatement === id
+    setOpenStatement(open ? null : id)
+    if (!open && !Array.isArray(sources[id])) {
+      setSources((m) => ({ ...m, [id]: 'loading' }))
+      loadSources(id)
+        .then((list) => setSources((m) => ({ ...m, [id]: list })))
+        .catch(() => setSources((m) => ({ ...m, [id]: 'error' })))
+    }
+  }
   const nameOf = (id: string) => view.characters.find((c) => c.id === id)?.name ?? id
   const evOf = (id: string) => view.evidence.find((e) => e.id === id)
   const stOf = (id: string) => nb.statements.find((s) => s.id === id)
@@ -78,7 +91,7 @@ export function NotebookPanel({ view, newContradictions, selectedEvidence, onSel
                 <article
                   key={s.id}
                   className={`st-card${contra ? ' contra' : ''}`}
-                  onClick={() => setOpenStatement(open ? null : s.id)}
+                  onClick={() => toggleStatement(s.id)}
                 >
                   <header>
                     <strong>{nameOf(s.npc_id)}</strong>
@@ -89,17 +102,20 @@ export function NotebookPanel({ view, newContradictions, selectedEvidence, onSel
                   {open && (
                     <div className="source">
                       <b>출처</b>
-                      <p>
-                        {nameOf(s.npc_id)}의 진술 원문: &ldquo;{s.content}&rdquo;
-                      </p>
-                      {s.source_ids.length > 0 && (
-                        <ul>
-                          {s.source_ids.map((id) => (
-                            <li key={id}>{evOf(id)?.name ?? id}</li>
-                          ))}
-                        </ul>
+                      {sources[s.id] === 'loading' && <p className="muted">원문을 불러오는 중…</p>}
+                      {sources[s.id] === 'error' && <p className="warn">원문을 불러오지 못했습니다.</p>}
+                      {Array.isArray(sources[s.id]) && (sources[s.id] as SourceItem[]).length === 0 && (
+                        <p className="muted">열람할 수 있는 원문이 없습니다.</p>
                       )}
-                      {s.memory_id && <p className="muted small">기록 번호 {s.memory_id}</p>}
+                      {Array.isArray(sources[s.id]) &&
+                        (sources[s.id] as SourceItem[]).map((it, i) => (
+                          <div key={i} className="source-item">
+                            <p>
+                              <span className="kind">{it.kind}</span> <strong>{it.title}</strong>
+                            </p>
+                            <p>{it.content}</p>
+                          </div>
+                        ))}
                       {nb.contradictions
                         .filter((c) => c.statement_id === s.id)
                         .map((c) => (

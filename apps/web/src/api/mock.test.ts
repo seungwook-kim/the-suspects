@@ -12,6 +12,8 @@ describe('목 모드 한 판', () => {
   it('조사 -> 질문 -> 증거 제시(모순) -> 밤 -> 최종 추리 -> 결과 카드', { timeout: 30000 }, async () => {
     const { game_id, view } = await mockApi.createGame('demo_db_deleted')
     let s: ClientState = applyEvent(initialClientState, { type: 'STATE_SNAPSHOT', snapshot: view })
+    expect(s.view!.actions_total).toBe(12)
+    expect(s.view!.max_days).toBeGreaterThan(0)
     expect(s.view!.characters).toHaveLength(5)
     expect(s.view!.locations).toHaveLength(6)
 
@@ -26,6 +28,14 @@ describe('목 모드 한 판', () => {
     expect(s.view!.notebook.contradictions).toHaveLength(1)
     expect(s.cutin?.text).toBe('이의 있음!')
     expect(s.view!.actions_left).toBeLessThan(12)
+
+    // 진술 출처 원문, 게임 목록
+    const stId = s.view!.notebook.statements[0].id
+    const src = await mockApi.sources(game_id, stId)
+    expect(src[0].content).toContain(s.view!.notebook.statements[0].content)
+    expect((await mockApi.listGames()).some((x) => x.game_id === game_id)).toBe(true)
+    const slot = await mockApi.save(game_id, '테스트')
+    expect((await mockApi.listSaves(game_id)).map((x) => x.slot_id)).toContain(slot.slot_id)
 
     s = await drain(s, mockApi.night(game_id))
     expect(s.view!.day).toBe(2)
@@ -45,8 +55,21 @@ describe('목 모드 한 판', () => {
     s = await drain(s, mockApi.finale(game_id, { type: 'confirm' }))
     expect(s.ending?.ending).toBe('success')
 
-    const { history } = await mockApi.clear(game_id)
+    const { history, card } = await mockApi.clear(game_id)
+    expect(card?.share_text).toContain('질문 만에 해결')
+    expect(card?.theme_color).toMatch(/^#[0-9a-f]{6}$/i)
     expect(history.success).toBe(true)
     expect(history.characters).toHaveLength(5)
+  })
+
+  it('실패한 판은 card 가 null', { timeout: 30000 }, async () => {
+    const { game_id } = await mockApi.createGame('demo_db_deleted', { tone: 'comic', difficulty: 'easy', play_minutes: 20 })
+    let s: ClientState = initialClientState
+    s = await drain(s, mockApi.finale(game_id, { type: 'start', accused_id: 'npc_cto' }))
+    for (let i = 0; i < 3; i++) s = await drain(s, mockApi.finale(game_id, { type: 'present', stage: 'opportunity', evidence_id: 'x' }))
+    expect(s.ending?.ending).toBe('wrong_accusation')
+    const { history, card } = await mockApi.clear(game_id)
+    expect(history.success).toBe(false)
+    expect(card).toBeNull()
   })
 })

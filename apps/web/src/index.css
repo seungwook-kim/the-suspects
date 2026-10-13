@@ -299,3 +299,9 @@ input, select {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+.save-row { display: flex; gap: 6px; }
+.save-row button:first-child { flex: 1; text-align: left; }
+.slot { display: block; width: 100%; text-align: left; margin: 0 0 6px 14px; width: calc(100% - 14px); background: var(--surface-2); }
+.source-item { margin-top: 4px; }
+.source-item .kind { font-size: 0.7rem; background: #ebe7dc; border-radius: 999px; padding: 0 8px; }

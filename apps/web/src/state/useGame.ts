@@ -1,12 +1,12 @@
 import { useCallback, useReducer, useRef } from 'react'
 import { api } from '../api/client'
-import type { Action, AgEvent, ClearHistory, FinaleStep, ShareCard } from '../api/types'
+import type { Action, AgEvent, ClearHistory, CreateOptions, FinaleStep, ShareCard } from '../api/types'
 import { addSave } from '../util/saves'
 import { clientReducer, initialClientState } from './reducer'
 
 export interface GameResult {
   history: ClearHistory
-  card: ShareCard
+  card: ShareCard | null
 }
 
 export function useGame() {
@@ -53,10 +53,10 @@ export function useGame() {
   )
 
   const startGame = useCallback(
-    async (themeId: string) => {
+    async (themeId: string, options?: CreateOptions) => {
       dispatch({ kind: 'reset' })
       try {
-        const r = await api.createGame(themeId)
+        const r = await api.createGame(themeId, options)
         gameIdRef.current = r.game_id
         dispatch({ kind: 'set_view', view: r.view })
         return true
@@ -140,12 +140,30 @@ export function useGame() {
     }
   }, [fail])
 
+  const openGame = useCallback(
+    async (gameId: string) => {
+      dispatch({ kind: 'reset' })
+      try {
+        const view = await api.getGame(gameId)
+        gameIdRef.current = gameId
+        dispatch({ kind: 'set_view', view })
+        return view
+      } catch (e) {
+        fail(e)
+        return null
+      }
+    },
+    [fail],
+  )
+
+  const fetchSources = useCallback((statementId: string) => api.sources(gameIdRef.current ?? '', statementId), [])
+
   const resetAll = useCallback(() => {
     gameIdRef.current = null
     dispatch({ kind: 'reset' })
   }, [])
 
-  return { state, dispatch, startGame, act, endDay, finaleStep, save, load, clearGame, resetAll, resync, gameIdRef }
+  return { state, dispatch, startGame, act, endDay, finaleStep, save, load, openGame, fetchSources, clearGame, resetAll, resync, gameIdRef }
 }
 
 export type GameApi = ReturnType<typeof useGame>
