@@ -24,19 +24,20 @@ from server.llm.images import ImageClient
 _SAFE = re.compile(r"^[A-Za-z0-9_\-]+$")
 EXTS = ("png", "jpg", "webp")
 
+# 옷과 소품은 글자가 없는 민무늬로 묘사한다 (이름표·패치·사원증에 엉터리 글자가 찍히는 것 방지, 2026-10-13 시안 1차)
 OUTFIT_EN = {
     "suit": "a dark business suit", "casual": "casual everyday clothes", "hoodie": "a plain hoodie",
-    "cleaner_uniform": "a cleaning staff uniform", "security_uniform": "a security guard uniform",
-    "chef": "a chef's white jacket", "doctor": "a white doctor's coat", "delivery": "a delivery worker's jacket",
-    "school_uniform": "a Korean school uniform", "work_clothes": "practical work clothes",
-    "office_lanyard": "office clothes with an ID lanyard",
+    "cleaner_uniform": "a plain cleaning staff uniform", "security_uniform": "a plain navy security guard uniform shirt",
+    "chef": "a plain white chef's jacket", "doctor": "a plain white doctor's coat",
+    "delivery": "a plain delivery worker's jacket", "school_uniform": "a Korean school uniform",
+    "work_clothes": "practical work clothes", "office_lanyard": "office clothes with a blank white ID card on a plain lanyard",
 }
 HAIR_EN = {
     "short": "short hair", "side": "side-parted hair", "long": "long hair", "bun": "hair tied in a bun",
     "curly": "curly hair", "buzz": "a buzz cut", "ponytail": "a ponytail", "bald": "a bald head",
 }
-ACCESSORY_EN = {"glasses": "wearing glasses", "cap": "wearing a cap", "badge": "with a name badge",
-                "radio": "with a two-way radio clipped on", "apron": "wearing an apron", "laptop": "", "mop": ""}
+ACCESSORY_EN = {"glasses": "wearing glasses", "cap": "wearing a plain cap", "badge": "with a blank ID badge",
+                "radio": "with a two-way radio clipped on", "apron": "wearing a plain apron", "laptop": "", "mop": ""}
 
 
 def portrait_prompt(*, role: str, age: int, gender: str, appearance: dict, setting: str = "") -> str:
@@ -46,12 +47,14 @@ def portrait_prompt(*, role: str, age: int, gender: str, appearance: dict, setti
     if acc := ACCESSORY_EN.get(appearance.get("accessory", "")):
         look.append(acc)
     return (
-        f"Photorealistic upper-body portrait photo of a fictional {age}-year-old Korean {who} who works as {role}, "
-        f"wearing {look[0]}, with {look[1]}{', ' + look[2] if len(look) > 2 else ''}. "
-        "Calm neutral expression, looking at the camera, natural soft daylight, modern present-day South Korea, "
-        f"plain softly blurred background{(' suggesting ' + setting) if setting else ''}, 3:4 vertical framing, head and shoulders centered. "
+        f"Photorealistic close-up head-and-shoulders portrait photo of a fictional {age}-year-old Korean {who} "
+        f"who works as {role}, wearing {look[0]}, with {look[1]}{', ' + look[2] if len(look) > 2 else ''}. "
+        "The face and shoulders fill the frame, cropped at the chest, eyes in the upper third. "
+        "Relaxed neutral expression with closed lips, looking straight at the camera, natural soft daylight, "
+        f"modern present-day South Korea, softly blurred background{(' suggesting ' + setting) if setting else ''}. "
         "An ordinary-looking person, not a celebrity and not resembling any real person. "
-        "No text, no watermark, no logo, no dramatic lighting."
+        "Clothing is plain and unmarked with no name tags, patches, logos or lettering; the background has no signs. "
+        "No text, no watermark, no dramatic lighting."
     )
 
 
