@@ -102,7 +102,8 @@ def portrait(key: str, filename: str) -> FileResponse:
     path = _service().portraits.path(key, filename)
     if path is None:
         raise HTTPException(404, "초상화가 없습니다")
-    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "private, max-age=86400"})
+    media = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp"}[path.suffix[1:]]
+    return FileResponse(path, media_type=media, headers={"Cache-Control": "private, max-age=86400"})
 
 
 @app.get("/api/games")

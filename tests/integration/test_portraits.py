@@ -1,17 +1,24 @@
-"""AI 초상화: 판마다 새로 그리고, 공개 정보만 요청에 넣고, 화면에 주소가 실리고, 클리어하면 지운다 (가짜 그림 생성기)."""
+"""AI 초상화: 판마다 새로 그리고, 공개 정보만 요청에 넣고, 화면에 주소가 실리고, 클리어하면 판 그림은 지우되
+보관함 사진은 남긴다 (가짜 그림 생성기 / 가짜 HTTP)."""
 
 import asyncio
+import base64
+import json
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 import server.game.service as service_mod
 from server.api.app import app
-from server.game.portraits import PortraitStore, portrait_prompt
+from server.game.portraits import PortraitStore, image_ext, portrait_prompt
 from server.game.service import GameService
 from server.llm.images import ImageClient
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+JPG = b"\xff\xd8\xff\xe0" + b"0" * 32
+CF_CONFIG = {"active_profile": "dev", "profiles": {"dev": {"roles": {"portrait": {
+    "provider": "cloudflare", "model": "@cf/black-forest-labs/flux-2-klein-4b", "width": 768, "height": 1024}}}}}
 
 
 @pytest.fixture
@@ -98,6 +105,90 @@ def test_portrait_endpoint_and_path_safety(tmp_path, svc):
                 assert c.get(bad).status_code == 404
     finally:
         service_mod._SERVICE = None
+
+
+async def test_cloudflare_request_and_response():
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["auth"] = request.headers["authorization"]
+        seen["type"] = request.headers["content-type"]
+        seen["body"] = request.content.decode("latin-1")
+        return httpx.Response(200, json={"success": True, "result": {"image": base64.b64encode(JPG).decode()}})
+
+    images = ImageClient(models_config=CF_CONFIG, api_key="tok", account_id="acc123",
+                         transport=httpx.MockTransport(handler))
+    assert images.enabled and images.provider == "cloudflare"
+    out = await images.generate("a portrait", seed=42)
+    assert out == JPG
+    assert seen["url"] == "https://api.cloudflare.com/client/v4/accounts/acc123/ai/run/@cf/black-forest-labs/flux-2-klein-4b"
+    assert seen["auth"] == "Bearer tok" and seen["type"].startswith("multipart/form-data")
+    for name, value in (("prompt", "a portrait"), ("width", "768"), ("height", "1024"), ("seed", "42")):
+        assert f'name="{name}"' in seen["body"] and value in seen["body"]
+
+
+async def test_cloudflare_quota_error_falls_back_to_svg():
+    images = ImageClient(models_config=CF_CONFIG, api_key="tok", account_id="acc123",
+                         transport=httpx.MockTransport(lambda r: httpx.Response(429, json={"success": False})))
+    assert await images.generate("a portrait") is None  # 할당량 초과 → 그림 없음 → 화면은 SVG
+    rec = images.tracer.records[-1]
+    assert rec.ok is False and rec.extra["errors"]
+
+
+def test_cloudflare_needs_both_account_and_token():
+    assert ImageClient(models_config=CF_CONFIG, api_key="tok", account_id="").enabled is False
+    assert ImageClient(models_config=CF_CONFIG, api_key="", account_id="acc").enabled is False
+
+
+async def test_library_keeps_photos_after_clear_without_case_links(tmp_path):
+    s = GameService(tmp_path, in_memory=True)
+
+    async def fake(prompt: str):
+        return JPG
+
+    library = tmp_path / "library"
+    s.portraits = PortraitStore(tmp_path / "portraits", ImageClient(tracer=s.llm.tracer, generator=fake), library=library)
+    game_id, _ = s.new_game("demo_db_deleted")
+    await s.portraits.wait(game_id)
+    case = s.cases["demo_db_deleted"]
+    assert all(u.split("?")[0].endswith(".jpg") for u in s.portraits.urls(game_id).values())
+
+    st = s.store.load_live(game_id)
+    st.ending, st.phase = "escaped", "ended"
+    s.store.save_live(st)
+    s.clear(game_id)
+    assert s.portraits.urls(game_id) == {}  # 판 그림은 지움
+
+    lines = (library / "index.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lines) == len(case.characters)  # 보관함 사진은 남음
+    for line in lines:
+        rec = json.loads(line)
+        assert (library / rec["file"]).read_bytes() == JPG
+        assert rec["kind"] == "base" and isinstance(rec["seed"], int)
+    blob = "\n".join(lines)
+    assert game_id not in blob and case.case_id not in blob  # 사건·판과 잇는 정보 없음
+    assert all(ch.id not in blob for ch in case.characters)
+    for ch in case.characters:
+        assert all(secret not in blob for secret in ch.secrets)
+
+
+def test_jpeg_portrait_served_with_jpeg_type(tmp_path, svc):
+    service_mod._SERVICE = svc
+    try:
+        d = tmp_path / "portraits" / "g_abc"
+        d.mkdir(parents=True)
+        (d / "npc_02.jpg").write_bytes(JPG)
+        with TestClient(app) as c:
+            r = c.get("/api/portraits/g_abc/npc_02.jpg")
+            assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
+    finally:
+        service_mod._SERVICE = None
+
+
+def test_image_ext():
+    assert image_ext(PNG) == "png" and image_ext(JPG) == "jpg"
+    assert image_ext(b"RIFF\x00\x00\x00\x00WEBPVP8 ") == "webp" and image_ext(b"<html>") is None
 
 
 def test_prompt_is_modern_photo_and_public_only():

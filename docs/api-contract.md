@@ -111,13 +111,14 @@ CaseJob = {
 
 ## 캐릭터 그림
 ### AI 초상화 (실사 사진 느낌, 2026-10-13 사용자 결정)
-- `PublicCharacter.portrait_url: string | null` — 서버가 그 판을 위해 새로 그린 초상화 주소(예: `/api/portraits/<key>/<id>.png?v=1`).
+- `PublicCharacter.portrait_url: string | null` — 서버가 그 판을 위해 새로 그린 초상화 주소(예: `/api/portraits/<key>/<id>.jpg?v=1`, 확장자는 png·jpg·webp 중 하나).
   `PlayerView.characters`와 `CaseJob.preview.characters` 모두에 있다. 그림은 백그라운드로 그려지므로 **처음엔 `null`이었다가 나중에 채워질 수 있다**
   (폴링 응답·`STATE_SNAPSHOT`·`STATE_DELTA`로 바뀐 값이 온다).
 - `null`이거나 이미지 로드에 실패하면 아래 절차적 SVG로 대신 그린다.
 - 초상화는 무표정 1장이다. 감정은 화면 효과로 보여 준다(PRD §9.3): 당황 흔들림+💦, 분노 붉은 색조+💢, 긴장 살짝 확대·떨림,
   슬픔 채도 낮춤·푸른 색조, 기쁨 밝게. 대사 중에는 미세하게 들썩인다.
-- `GET /api/portraits/{key}/{file}` → 이미지(`image/png` 등). 클리어하면 그 판의 초상화 파일은 삭제된다.
+- `GET /api/portraits/{key}/{file}` → 이미지(`image/png`·`image/jpeg`·`image/webp`). 클리어하면 그 판의 초상화 파일은 삭제된다
+  (서버의 사진 보관함에는 남지만 이 주소로는 다시 열 수 없다).
 
 ### 절차적 SVG (대체 그림)
 - `PublicCharacter.face_seed`(정수)와 `appearance`(예: `{"hair": "short", "hair_color": "#3b2f2f", "outfit": "cleaner_uniform", "accessory": "mop"}`)로 SVG를 그린다.

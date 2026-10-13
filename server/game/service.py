@@ -107,7 +107,8 @@ class GameService:
         for case in self.cases.values():
             self._index_template(case)
         self.jobs: dict[str, dict] = {}  # 사건 생성 작업 (메모리, 서버 재시작 시 사라짐)
-        self.portraits = PortraitStore(data / "portraits", ImageClient(tracer=self.llm.tracer))
+        self.portraits = PortraitStore(data / "portraits", ImageClient(tracer=self.llm.tracer),
+                                       library=None if in_memory else data / "portrait_library")
 
     # ================================================================= 초상화 (AI, 없으면 화면이 SVG로)
     def _portrait_key(self, state: GameState) -> str:
