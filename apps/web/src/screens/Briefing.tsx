@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Portrait } from '../character/Portrait'
+import { AI_PORTRAIT_NOTICE, Portrait } from '../character/Portrait'
 import type { PlayerView, PublicCharacter } from '../api/types'
 
 interface Props {
@@ -21,18 +21,21 @@ export function Cast({ characters, onShown }: { characters: PublicCharacter[]; o
   useEffect(() => onShown?.(shown), [shown, onShown])
 
   return (
-    <div className="cast">
-      {characters.map((c, i) => (
-        <article key={c.id} className={`cast-card${i < shown ? ' in' : ''}`} aria-hidden={i >= shown} data-testid="cast-card">
-          <Portrait seed={c.face_seed} appearance={c.appearance} emotion="neutral" width={110} still portraitUrl={c.portrait_url} name={c.name} />
-          <div>
-            <strong>{c.name}</strong>
-            <span className="muted"> · {c.role} · {c.age}세</span>
-            <p>{c.one_liner}</p>
-          </div>
-        </article>
-      ))}
-    </div>
+    <>
+      <p className="ai-notice" role="note" data-testid="ai-notice">🤖 {AI_PORTRAIT_NOTICE}</p>
+      <div className="cast">
+        {characters.map((c, i) => (
+          <article key={c.id} className={`cast-card${i < shown ? ' in' : ''}`} aria-hidden={i >= shown} data-testid="cast-card">
+            <Portrait seed={c.face_seed} appearance={c.appearance} emotion="neutral" width={110} still portraitUrl={c.portrait_url} name={c.name} />
+            <div>
+              <strong>{c.name}</strong>
+              <span className="muted"> · {c.role} · {c.age}세</span>
+              <p>{c.one_liner}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </>
   )
 }
 

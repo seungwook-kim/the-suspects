@@ -65,6 +65,7 @@ input, select {
 .screen { max-width: 920px; margin: 0 auto; padding: 28px 16px 48px; }
 .start { text-align: center; }
 .start .lead { font-size: 1.2rem; margin-bottom: 1em; }
+.ai-notice { display: inline-block; background: var(--surface-2); border: 1.5px solid var(--line); border-radius: 999px; padding: 3px 12px; font-size: 0.85rem; margin: 0 0 12px; }
 .mock-badge { display: inline-block; background: var(--surface-2); border: 1.5px dashed var(--line); padding: 2px 10px; border-radius: 999px; font-size: 0.8rem; }
 .theme-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 16px 0; text-align: left; }
 .theme-card {

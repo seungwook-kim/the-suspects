@@ -38,8 +38,10 @@ class ImageClient:
         self.provider: str = str(role.get("provider", "openrouter"))
         self.model: str = str(role.get("model", "<image-model>"))
         self.aspect_ratio: str = role.get("aspect_ratio", "3:4")
-        self.width: int = int(role.get("width", 768))
-        self.height: int = int(role.get("height", 1024))
+        self.width: int = int(role.get("width", 480))  # 그리는 크기 = 저장 최대 크기
+        self.height: int = int(role.get("height", 640))
+        self.concurrency: int = int(role.get("concurrency", 7))  # 한 판의 인물을 한꺼번에 (공급자 대기 시간이 대부분)
+        self.webp_quality: int = int(role.get("webp_quality", 80))
         if self.provider == "cloudflare":
             self.api_key = api_key if api_key is not None else os.getenv("CLOUDFLARE_API_TOKEN", "")
             self.account_id = account_id if account_id is not None else os.getenv("CLOUDFLARE_ACCOUNT_ID", "")

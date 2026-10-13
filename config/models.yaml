@@ -27,7 +27,9 @@ profiles:
       judge:      { model: "<cheap-fast-model>", effort: low,    max_tokens: 400 }
       # 인물 초상화. Cloudflare Workers AI 무료 할당량으로 그린다 (CLOUDFLARE_ACCOUNT_ID·CLOUDFLARE_API_TOKEN 필요, 없으면 SVG).
       # OpenRouter 이미지 모델로 바꾸려면: { provider: openrouter, model: "<image-model>", aspect_ratio: "3:4" }
-      portrait:   { provider: cloudflare, model: "@cf/black-forest-labs/flux-2-klein-4b", width: 768, height: 1024 }
+      # 480×640으로 그려 WebP(품질 80, 장당 약 15KB)로 저장. 한 판의 인물을 동시에 그림(동시 7장 ≈ 전체 37초 실측)
+      portrait:   { provider: cloudflare, model: "@cf/black-forest-labs/flux-2-klein-4b", width: 480, height: 640,
+                    concurrency: 7, webp_quality: 80 }
     fallbacks: []
   prod:
     provider: openrouter

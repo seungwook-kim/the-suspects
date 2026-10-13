@@ -21,6 +21,9 @@ interface Props {
   eager?: boolean
 }
 
+/** 시작 화면·등장인물 소개에 붙이는 안내 (인물 사진은 모두 AI 생성) */
+export const AI_PORTRAIT_NOTICE = '등장인물 사진은 모두 AI로 생성한 가상의 인물이며, 실존 인물과 관계없습니다.'
+
 const MOUTH_PATTERN = [0.25, 0.85, 0.45, 1, 0.15, 0.7, 0.35]
 
 // 한 번 실패한 주소는 기억해 다시 시도하지 않는다(그림이 깜빡이며 되돌아오지 않게)

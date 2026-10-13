@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, USE_MOCK } from '../api/client'
 import type { CreateOptions, GameSummary, SaveSlotInfo, Theme } from '../api/types'
+import { AI_PORTRAIT_NOTICE } from '../character/Portrait'
 import { getPref, getSaves, setPref } from '../util/saves'
 
 type Mood = '코믹' | '보통' | '진지'
@@ -77,6 +78,7 @@ export function Start({ busy, error, onStart, onCreateCase, onOpenGame, onLoadSl
     <div className="screen start">
       <h1>The Suspects</h1>
       <p className="lead">오늘은 어떤 사건을?</p>
+      <p className="ai-notice" role="note" data-testid="ai-notice">🤖 {AI_PORTRAIT_NOTICE}</p>
       {USE_MOCK && <p className="mock-badge">목(mock) 모드 · 가짜 데이터로 실행 중</p>}
 
       <div className="theme-grid">

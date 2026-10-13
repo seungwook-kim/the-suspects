@@ -79,6 +79,15 @@ describe('Start 자유 주제', () => {
     expect(onCreateCase).toHaveBeenCalledWith('도서관의 비밀', expect.any(Object))
   })
 
+  it('시작 화면에 인물 사진이 모두 AI 생성이라는 안내가 있다', async () => {
+    act(() => {
+      root.render(<Start busy={false} error={null} onStart={noop} onCreateCase={noop} onOpenGame={noop} onLoadSlot={noop} onHistory={noop} />)
+    })
+    await flush()
+    const notice = host.querySelector('[data-testid="ai-notice"]')
+    expect(notice?.textContent).toContain('AI로 생성한 가상의 인물')
+  })
+
   it('프리셋을 고르면 입력이 비워진다', async () => {
     act(() => {
       root.render(<Start busy={false} error={null} onStart={noop} onCreateCase={noop} onOpenGame={noop} onLoadSlot={noop} onHistory={noop} />)
@@ -110,6 +119,7 @@ describe('Generating', () => {
 
     await flush(1000)
     expect(host.querySelectorAll('[data-testid="cast-card"]')).toHaveLength(2)
+    expect(host.querySelector('[data-testid="ai-notice"]')?.textContent).toContain('AI로 생성한 가상의 인물')
     expect(host.textContent).toContain('문제의 사건')
     expect(host.textContent).toContain('용의자 명단 정리 중…')
     expect(btn('수사 시작')!.disabled).toBe(true)

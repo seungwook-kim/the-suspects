@@ -24,6 +24,7 @@ from server.game import content as C
 from server.game.events import EventBuilder
 from server.game.masking import IdMasker, new_salt
 from server.game.night_deps import build_night_deps
+from server.game.portrait_library import PortraitLibrary
 from server.game.portraits import PortraitStore
 from server.game.view import build_view
 from server.graphs.night import run_night
@@ -108,7 +109,7 @@ class GameService:
             self._index_template(case)
         self.jobs: dict[str, dict] = {}  # 사건 생성 작업 (메모리, 서버 재시작 시 사라짐)
         self.portraits = PortraitStore(data / "portraits", ImageClient(tracer=self.llm.tracer),
-                                       library=None if in_memory else data / "portrait_library")
+                                       library=None if in_memory else PortraitLibrary(data / "portrait_library"))
 
     # ================================================================= 초상화 (AI, 없으면 화면이 SVG로)
     def _portrait_key(self, state: GameState) -> str:

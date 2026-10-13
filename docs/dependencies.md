@@ -19,6 +19,8 @@
 | MCP Tasks | 사용 안 함 | 공식 Python SDK 미구현 | 2026-10-12 | `start_case` + `get_case_status` |
 | DB | SQLite (표준 라이브러리) | 정식판 | 2026-10-13 | 배포 시 Postgres + 벡터 확장으로 이전 (저장소 계층 분리) |
 | 임베딩 모델 | 미선정 | — | — | MVP는 키워드(BM25) + 해시 임베딩(테스트용) |
-| 이미지 생성 모델 | 미선정 | — | — | Phase 2. 임시 배경(장소 이름 + 아이콘) |
-| 프론트엔드 | Vite + React + TypeScript (Node 20.20.2, npm 10.8.2) | 정식판 | 2026-10-13 | — |
+| pillow | 12.3.0 | 정식판 | 2026-10-13 | 초상화 축소·WebP 압축. 실패하면 그 그림만 버리고 SVG로 대신 |
+| 인물 초상화 모델 | Cloudflare Workers AI `flux-2-klein-4b` (REST, httpx) | 정식판 | 2026-10-13 | 할당량 초과·키 없음 → 절차적 SVG. 설정으로 OpenRouter 이미지 모델 |
+| 배경 이미지 모델 | 미선정 | — | — | Phase 2. 임시 배경(장소 이름 + 아이콘) |
+| 프론트엔드 | Vite + React + TypeScript (Node 24.20.0 LTS, npm 11.19.0) | 정식판 | 2026-10-13 | — |
 | Docker / Postgres | 미설치 | — | 2026-10-13 | MVP는 SQLite로 충분. Postgres 이전 시 재판단 |

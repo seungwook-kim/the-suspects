@@ -1,8 +1,9 @@
-"""AI 초상화: 판마다 새로 그리고, 공개 정보만 요청에 넣고, 화면에 주소가 실리고, 클리어하면 판 그림은 지우되
-보관함 사진은 남긴다 (가짜 그림 생성기 / 가짜 HTTP)."""
+"""AI 초상화: 판마다 새로 그리고, 공개 정보만 요청에 넣고, 화면에 주소가 실리고, 작은 WebP로 저장하고,
+클리어하면 판 그림은 지우되 직업군별 보관함 사진은 남긴다 (가짜 그림 생성기 / 가짜 HTTP)."""
 
 import asyncio
 import base64
+import io
 import json
 
 import httpx
@@ -11,12 +12,25 @@ from fastapi.testclient import TestClient
 
 import server.game.service as service_mod
 from server.api.app import app
-from server.game.portraits import PortraitStore, image_ext, portrait_prompt
+from PIL import Image
+
+from server.game.portrait_library import PortraitLibrary, job_group
+from server.game.portraits import PortraitStore, compact, image_ext, portrait_prompt
 from server.game.service import GameService
 from server.llm.images import ImageClient
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
 JPG = b"\xff\xd8\xff\xe0" + b"0" * 32
+
+
+def real_image(fmt: str = "PNG", size: tuple[int, int] = (768, 1024)) -> bytes:
+    """공급자가 돌려주는 것 같은 진짜 그림 (그라데이션)."""
+    im = Image.linear_gradient("L").resize(size).convert("RGB")
+    buf = io.BytesIO()
+    im.save(buf, fmt)
+    return buf.getvalue()
+
+
 CF_CONFIG = {"active_profile": "dev", "profiles": {"dev": {"roles": {"portrait": {
     "provider": "cloudflare", "model": "@cf/black-forest-labs/flux-2-klein-4b", "width": 768, "height": 1024}}}}}
 
@@ -32,7 +46,7 @@ def svc(tmp_path, prompts):
 
     async def fake(prompt: str):
         prompts.append(prompt)
-        return PNG
+        return real_image()
 
     s.portraits = PortraitStore(tmp_path / "portraits", ImageClient(tracer=s.llm.tracer, generator=fake))
     return s
@@ -52,6 +66,7 @@ async def test_preset_game_draws_fresh_portraits(svc, prompts):
     case = svc.cases["demo_db_deleted"]
     v = svc.view(game_id)
     assert all(c.portrait_url and c.portrait_url.startswith(f"/api/portraits/{game_id}/") for c in v.characters)
+    assert all(c.portrait_url.split("?")[0].endswith(".webp") for c in v.characters)  # 작은 WebP로 저장
     assert len(prompts) == len(case.characters)
     # 그림 요청에 범인 여부·비밀·성격이 들어가면 안 된다 (수상해 보이게 그려지는 것 방지)
     blob = "\n".join(prompts)
@@ -141,18 +156,18 @@ def test_cloudflare_needs_both_account_and_token():
     assert ImageClient(models_config=CF_CONFIG, api_key="", account_id="acc").enabled is False
 
 
-async def test_library_keeps_photos_after_clear_without_case_links(tmp_path):
+async def test_library_keeps_photos_after_clear_by_job_group(tmp_path):
     s = GameService(tmp_path, in_memory=True)
 
     async def fake(prompt: str):
-        return JPG
+        return real_image("JPEG")
 
     library = tmp_path / "library"
-    s.portraits = PortraitStore(tmp_path / "portraits", ImageClient(tracer=s.llm.tracer, generator=fake), library=library)
+    s.portraits = PortraitStore(tmp_path / "portraits", ImageClient(tracer=s.llm.tracer, generator=fake),
+                                library=PortraitLibrary(library))
     game_id, _ = s.new_game("demo_db_deleted")
     await s.portraits.wait(game_id)
     case = s.cases["demo_db_deleted"]
-    assert all(u.split("?")[0].endswith(".jpg") for u in s.portraits.urls(game_id).values())
 
     st = s.store.load_live(game_id)
     st.ending, st.phase = "escaped", "ended"
@@ -162,9 +177,15 @@ async def test_library_keeps_photos_after_clear_without_case_links(tmp_path):
 
     lines = (library / "index.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(lines) == len(case.characters)  # 보관함 사진은 남음
+    outfits = sorted(ch.appearance.get("outfit", "") for ch in case.characters)
+    assert sorted(json.loads(x)["appearance"].get("outfit", "") for x in lines) == outfits
     for line in lines:
         rec = json.loads(line)
-        assert (library / rec["file"]).read_bytes() == JPG
+        # 직업군/성별_나이대/파일 — 직업군은 옷차림으로 정한다
+        group, bucket, _ = rec["file"].split("/")
+        assert group == rec["group"] == job_group(rec["appearance"].get("outfit"))
+        assert bucket == f"{rec['gender']}_{rec['age'] // 10 * 10}s"
+        assert image_ext((library / rec["file"]).read_bytes()) == "webp"
         assert rec["kind"] == "base" and isinstance(rec["seed"], int)
     blob = "\n".join(lines)
     assert game_id not in blob and case.case_id not in blob  # 사건·판과 잇는 정보 없음
@@ -184,6 +205,32 @@ def test_jpeg_portrait_served_with_jpeg_type(tmp_path, svc):
             assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
     finally:
         service_mod._SERVICE = None
+
+
+def test_compact_makes_small_webp():
+    big = real_image("PNG", (1200, 1600))
+    small = compact(big, max_size=(480, 640), quality=80)
+    assert small and image_ext(small) == "webp" and len(small) < len(big)
+    assert Image.open(io.BytesIO(small)).size == (480, 640)
+    assert compact(b"<html>not an image</html>", max_size=(480, 640), quality=80) is None
+
+
+def test_library_find_by_outfit_gender_age(tmp_path):
+    lib = PortraitLibrary(tmp_path / "lib")
+    img = compact(real_image(), max_size=(480, 640), quality=80)
+
+    def add(outfit, gender, age):
+        return lib.add(img, "webp", person={"role": "x", "age": age, "gender": gender, "appearance": {"outfit": outfit}},
+                       prompt="p", provider="fake", model="m", seed=1)["file"]
+
+    g58 = add("security_uniform", "F", 58)
+    g55 = add("security_uniform", "F", 55)
+    add("security_uniform", "M", 57)  # 성별 다름
+    add("security_uniform", "F", 30)  # 나이 차이 큼
+    add("chef", "F", 56)              # 옷차림 다름
+    assert [h["file"] for h in lib.find(outfit="security_uniform", gender="F", age=56)] == [g55, g58]  # 나이 가까운 순
+    assert [h["file"] for h in lib.find(outfit="security_uniform", gender="F", age=56, exclude={g55})] == [g58]
+    assert g58.startswith("security/F_50s/") and job_group("hoodie") == "general"
 
 
 def test_image_ext():

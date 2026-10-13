@@ -1,9 +1,10 @@
 """인물 초상화 (AI, 실사 사진 느낌 — 2026-10-13 사용자 결정).
 
-- 판마다 새로 그린다(얼굴 재사용 없음). 판 그림: var/portraits/<key>/<인물 id>.<png|jpg|webp>. 클리어하면 폴더째 삭제.
+- 판마다 새로 그린다(얼굴 재사용 없음). 판 그림: var/portraits/<key>/<인물 id>.webp. 클리어하면 폴더째 삭제.
   key = 자유 주제 사건이면 case_id(사건 생성 중 브리핑 단계에서 미리 그리기 시작), 기본 주제면 game_id.
-- 사진 보관함(var/portrait_library): 그린 사진은 클리어해도 남긴다(나중에 검사·보정·재사용용, 2026-10-13 사용자 결정).
-  보관함에는 사건·판 id를 적지 않는다. 공개 외모 정보와 요청 문구, 모델, 시드만 index.jsonl에 적는다.
+- 경량화(2026-10-13 사용자 결정): 480×640으로 그려 WebP로 압축한다(장당 약 15KB). 화면 최대 표시 폭 230px의 2배.
+  한 판의 인물을 한꺼번에 그린다(설정 concurrency, 기본 7). 시간은 대부분 공급자 쪽 대기라 동시에 보내야 빠르다.
+- 사진 보관함(portrait_library.py): 그린 사진은 클리어해도 직업군별로 남긴다(나중에 검사·보정·재활용용).
 - 그림 요청에는 역할·나이·성별·옷·머리만 넣는다. 범인 여부·비밀·성격은 넣지 않는다(PRD §3.6, 검수 규칙 7).
 - 그림이 없거나 늦으면 화면은 절차적 SVG로 대신 그린다.
 """
@@ -11,14 +12,15 @@
 from __future__ import annotations
 
 import asyncio
-import json
+import io
 import random
 import re
 import shutil
-import time
-import uuid
 from pathlib import Path
 
+from PIL import Image
+
+from server.game.portrait_library import PortraitLibrary
 from server.llm.images import ImageClient
 
 _SAFE = re.compile(r"^[A-Za-z0-9_\-]+$")
@@ -58,6 +60,20 @@ def portrait_prompt(*, role: str, age: int, gender: str, appearance: dict, setti
     )
 
 
+def compact(data: bytes, *, max_size: tuple[int, int], quality: int) -> bytes | None:
+    """받은 그림을 최대 크기 안으로 줄이고 WebP로 압축한다. 그림이 아니면 None (저장하지 않음)."""
+    try:
+        im = Image.open(io.BytesIO(data))
+        im.load()
+    except Exception:
+        return None
+    im = im.convert("RGB")  # 메타데이터·투명도 버림
+    im.thumbnail(max_size, Image.LANCZOS)
+    buf = io.BytesIO()
+    im.save(buf, "WEBP", quality=quality, method=6)
+    return buf.getvalue()
+
+
 def image_ext(data: bytes) -> str | None:
     """파일 머리로 형식 판별 (공급자마다 PNG·JPEG·WebP로 돌려준다)."""
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -70,11 +86,12 @@ def image_ext(data: bytes) -> str | None:
 
 
 class PortraitStore:
-    def __init__(self, root: Path, images: ImageClient, concurrency: int = 3, library: Path | None = None) -> None:
+    def __init__(self, root: Path, images: ImageClient, concurrency: int | None = None,
+                 library: PortraitLibrary | None = None) -> None:
         self.root = root
         self.images = images
         self.library = library
-        self._sem = asyncio.Semaphore(concurrency)
+        self._sem = asyncio.Semaphore(concurrency or images.concurrency)
         self._tasks: dict[str, asyncio.Task] = {}
 
     @property
@@ -127,34 +144,19 @@ class PortraitStore:
                                      appearance=p.get("appearance") or {}, setting=setting)
             seed = random.randrange(2**31)
             async with self._sem:
-                img = await self.images.generate(prompt, seed=seed, game_id=game_id)
-            ext = image_ext(img) if img else None
-            if not ext:
+                raw = await self.images.generate(prompt, seed=seed, game_id=game_id)
+            img = compact(raw, max_size=(self.images.width, self.images.height),
+                          quality=self.images.webp_quality) if raw else None
+            if not img:
                 return
             tmp = d / f"{p['id']}.tmp"
             tmp.write_bytes(img)
-            tmp.replace(d / f"{p['id']}.{ext}")  # 반쯤 쓴 파일이 서빙되지 않게
-            self._archive(img, ext, p, prompt, seed)
+            tmp.replace(d / f"{p['id']}.webp")  # 반쯤 쓴 파일이 서빙되지 않게
+            if self.library is not None:  # 사건·판·인물 id 없이 공개 외모 정보만
+                self.library.add(img, "webp", person=p, prompt=prompt, provider=self.images.provider,
+                                 model=self.images.model, seed=seed)
 
         await asyncio.gather(*(one(p) for p in people), return_exceptions=True)
-
-    def _archive(self, img: bytes, ext: str, person: dict, prompt: str, seed: int) -> None:
-        """사진 보관함에 한 장 더 남긴다. 사건·판과 잇는 정보(case_id, game_id, 인물 id)는 적지 않는다."""
-        if self.library is None:
-            return
-        now = time.time()
-        sub = self.library / time.strftime("%Y-%m", time.localtime(now))
-        sub.mkdir(parents=True, exist_ok=True)
-        name = f"{uuid.uuid4().hex}.{ext}"
-        (sub / name).write_bytes(img)
-        rec = {
-            "file": f"{sub.name}/{name}", "kind": "base", "created_at": round(now, 3),
-            "provider": self.images.provider, "model": self.images.model, "seed": seed,
-            "role": person["role"], "age": person["age"], "gender": person["gender"],
-            "appearance": person.get("appearance") or {}, "prompt": prompt,
-        }
-        with (self.library / "index.jsonl").open("a", encoding="utf-8") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
     def delete(self, key: str) -> None:
         """판 그림만 지운다. 보관함 사진은 남는다."""

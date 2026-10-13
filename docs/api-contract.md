@@ -111,7 +111,7 @@ CaseJob = {
 
 ## 캐릭터 그림
 ### AI 초상화 (실사 사진 느낌, 2026-10-13 사용자 결정)
-- `PublicCharacter.portrait_url: string | null` — 서버가 그 판을 위해 새로 그린 초상화 주소(예: `/api/portraits/<key>/<id>.jpg?v=1`, 확장자는 png·jpg·webp 중 하나).
+- `PublicCharacter.portrait_url: string | null` — 서버가 그 판을 위해 새로 그린 초상화 주소(예: `/api/portraits/<key>/<id>.webp?v=1`, 480×640 WebP. 확장자는 png·jpg·webp 중 하나일 수 있음).
   `PlayerView.characters`와 `CaseJob.preview.characters` 모두에 있다. 그림은 백그라운드로 그려지므로 **처음엔 `null`이었다가 나중에 채워질 수 있다**
   (폴링 응답·`STATE_SNAPSHOT`·`STATE_DELTA`로 바뀐 값이 온다).
 - `null`이거나 이미지 로드에 실패하면 아래 절차적 SVG로 대신 그린다.
