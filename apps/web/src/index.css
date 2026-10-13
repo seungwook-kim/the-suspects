@@ -149,14 +149,35 @@ input, select {
 .leave { align-self: flex-start; }
 .portrait { display: block; line-height: 0; }
 .portrait svg { width: 100%; height: auto; display: block; border-radius: 14px; }
+/* 사진 초상화 + 감정 효과 */
+.portrait-photo { position: relative; }
+.portrait-bob { position: relative; width: 100%; height: 100%; }
+.portrait-frame { position: relative; width: 100%; height: 100%; border-radius: 14px; overflow: hidden; background: var(--surface-2); }
+.portrait-ph { position: absolute; inset: 0; }
+.portrait-ph svg { height: 100%; }
+.portrait-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; opacity: 0; transition: opacity 0.5s ease, filter 0.3s ease, transform 0.3s ease; }
+.portrait-img.loaded { opacity: 1; }
+.portrait-tint { position: absolute; inset: 0; pointer-events: none; transition: background 0.3s; }
+.portrait-badge { position: absolute; top: 2%; right: 2%; line-height: 1; pointer-events: none; }
+.emo-angry .portrait-tint { background: rgba(220, 38, 30, 0.28); mix-blend-mode: multiply; }
+.emo-sad .portrait-tint { background: rgba(70, 110, 190, 0.2); mix-blend-mode: multiply; }
+.emo-sad .portrait-img { filter: saturate(0.6) brightness(0.96); }
+.emo-happy .portrait-img { filter: brightness(1.08) saturate(1.05); }
+.emo-nervous .portrait-img { transform: scale(1.05); }
+@keyframes shake { 0%, 40%, 100% { transform: translateX(0); } 8% { transform: translateX(-3px) rotate(-0.5deg); } 16% { transform: translateX(3px) rotate(0.5deg); } 24% { transform: translateX(-2px); } 32% { transform: translateX(2px); } }
+@keyframes tremble { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(0.6px, -0.4px); } 50% { transform: translate(-0.5px, 0.5px); } 75% { transform: translate(0.4px, 0.3px); } }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+@media (prefers-reduced-motion: no-preference) {
+  .portrait-frame.fx-shake { animation: shake 1.8s linear infinite; }
+  .portrait-frame.fx-tremble { animation: tremble 0.14s linear infinite; }
+  .portrait-bob.fx-bob { animation: bob 0.55s ease-in-out infinite; }
+}
+@media (prefers-reduced-motion: reduce) { .portrait-img { transition: none; } }
 .portrait-wrap { position: relative; padding: 4px; border: 2.5px dashed transparent; border-radius: 18px; }
 .portrait-wrap.dragover { border-color: var(--accent); background: rgba(228, 87, 46, 0.08); }
 .portrait-wrap.away .portrait { filter: grayscale(0.7) brightness(0.8); transform: scaleX(-1); }
 .drop-hint, .away-note { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
 .away-note { color: var(--accent); font-weight: 600; }
-.emo-angry .portrait svg, .portrait.emo-angry svg { animation: shake 0.45s linear infinite; }
-.portrait.emo-flustered svg { animation: shake 0.7s linear infinite; }
-@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-2px) rotate(-0.4deg); } 75% { transform: translateX(2px) rotate(0.4deg); } }
 .nameplate { background: var(--ink); color: var(--bg); padding: 2px 14px; border-radius: 6px; }
 .nameplate span { opacity: 0.75; font-size: 0.85rem; margin-left: 6px; }
 .dialogue {

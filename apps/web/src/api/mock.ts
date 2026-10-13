@@ -40,11 +40,11 @@ const THEMES: Theme[] = [
 ]
 
 const CHARACTERS: PublicCharacter[] = [
-  { id: 'npc_dba', name: '오민재', role: 'DBA', age: 41, gender: 'M', face_seed: 48211, appearance: { hair: 'short', hair_color: '#2f2a28', outfit: 'office_lanyard', accessory: 'glasses' }, location_id: 'loc_server_room', emotion: 'neutral', one_liner: '백업 담당. 말수가 적고 늘 야근한다.' },
-  { id: 'npc_cleaner', name: '박순자', role: '야간 청소 담당', age: 58, gender: 'F', face_seed: 90177, appearance: { hair: 'bun', hair_color: '#8a8a8a', outfit: 'cleaner_uniform', accessory: 'mop' }, location_id: 'loc_pantry', emotion: 'neutral', one_liner: '10년째 이 건물의 밤을 지켜 온 사람.' },
-  { id: 'npc_newbie', name: '정하늘', role: '신입 개발자', age: 26, gender: 'F', face_seed: 31337, appearance: { hair: 'long', hair_color: '#3b2a20', outfit: 'hoodie', accessory: 'laptop' }, location_id: 'loc_office', emotion: 'neutral', one_liner: '입사 3개월 차. 오픈 전날까지 코드를 고치고 있었다.' },
-  { id: 'npc_cto', name: '최강진', role: 'CTO', age: 47, gender: 'M', face_seed: 7741, appearance: { hair: 'side', hair_color: '#1f1f24', outfit: 'suit', accessory: 'badge' }, location_id: 'loc_cto_room', emotion: 'neutral', one_liner: '오픈 일정에 모든 걸 걸었다.' },
-  { id: 'npc_freelancer', name: '윤태오', role: '외주 개발자', age: 34, gender: 'M', face_seed: 120934, appearance: { hair: 'curly', hair_color: '#5a3a22', outfit: 'casual', accessory: 'cap' }, location_id: 'loc_meeting', emotion: 'neutral', one_liner: '계약이 이번 달에 끝난다.' },
+  { id: 'npc_dba', name: '오민재', role: 'DBA', age: 41, gender: 'M', face_seed: 48211, appearance: { hair: 'short', hair_color: '#2f2a28', outfit: 'office_lanyard', accessory: 'glasses' }, location_id: 'loc_server_room', emotion: 'neutral', one_liner: '백업 담당. 말수가 적고 늘 야근한다.', portrait_url: null },
+  { id: 'npc_cleaner', name: '박순자', role: '야간 청소 담당', age: 58, gender: 'F', face_seed: 90177, appearance: { hair: 'bun', hair_color: '#8a8a8a', outfit: 'cleaner_uniform', accessory: 'mop' }, location_id: 'loc_pantry', emotion: 'neutral', one_liner: '10년째 이 건물의 밤을 지켜 온 사람.', portrait_url: null },
+  { id: 'npc_newbie', name: '정하늘', role: '신입 개발자', age: 26, gender: 'F', face_seed: 31337, appearance: { hair: 'long', hair_color: '#3b2a20', outfit: 'hoodie', accessory: 'laptop' }, location_id: 'loc_office', emotion: 'neutral', one_liner: '입사 3개월 차. 오픈 전날까지 코드를 고치고 있었다.', portrait_url: null },
+  { id: 'npc_cto', name: '최강진', role: 'CTO', age: 47, gender: 'M', face_seed: 7741, appearance: { hair: 'side', hair_color: '#1f1f24', outfit: 'suit', accessory: 'badge' }, location_id: 'loc_cto_room', emotion: 'neutral', one_liner: '오픈 일정에 모든 걸 걸었다.', portrait_url: null },
+  { id: 'npc_freelancer', name: '윤태오', role: '외주 개발자', age: 34, gender: 'M', face_seed: 120934, appearance: { hair: 'curly', hair_color: '#5a3a22', outfit: 'casual', accessory: 'cap' }, location_id: 'loc_meeting', emotion: 'neutral', one_liner: '계약이 이번 달에 끝난다.', portrait_url: null },
 ]
 
 const LOCATIONS = [

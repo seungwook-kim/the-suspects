@@ -39,7 +39,7 @@ export function Finale({ g, onBack, onResult }: Props) {
         <div className="suspect-grid">
           {suspects.map((c) => (
             <button key={c.id} className={`suspect${pick === c.id ? ' on' : ''}`} onClick={() => setPick(c.id)}>
-              <Portrait seed={c.face_seed} appearance={c.appearance} emotion={state.emotions[c.id] ?? c.emotion} width={120} still />
+              <Portrait seed={c.face_seed} appearance={c.appearance} emotion={state.emotions[c.id] ?? c.emotion} width={120} still portraitUrl={c.portrait_url} name={c.name} />
               <strong>{c.name}</strong>
               <span className="muted small">{c.role}</span>
             </button>
@@ -82,7 +82,7 @@ export function Finale({ g, onBack, onResult }: Props) {
 
       {accused && (
         <div className={`finale-stage${f?.last?.result === 'wrong' ? ' hit' : ''}`}>
-          <Portrait seed={accused.face_seed} appearance={accused.appearance} emotion={emotion} speaking={typing} width={220} />
+          <Portrait seed={accused.face_seed} appearance={accused.appearance} emotion={emotion} speaking={typing} width={220} portraitUrl={accused.portrait_url} name={accused.name} eager />
           <div>
             <div className="nameplate"><strong>{accused.name}</strong> <span>{accused.role}</span></div>
             {line ? (

@@ -54,6 +54,9 @@ export function Stage({ state, interrogeeId, busy, onTalk, onLeave, onInvestigat
             emotion={emotion}
             speaking={speaking}
             width={230}
+            portraitUrl={npc.portrait_url}
+            name={npc.name}
+            eager
             className={awayLeft ? 'turned' : ''}
           />
           {awayLeft ? (
@@ -95,7 +98,7 @@ export function Stage({ state, interrogeeId, busy, onTalk, onLeave, onInvestigat
         {here.length === 0 && <span className="muted">이곳에는 아무도 없다.</span>}
         {here.map((c) => (
           <button key={c.id} className="person" onClick={() => onTalk(c.id)} disabled={busy} title={`${c.name}에게 말 걸기`}>
-            <Portrait seed={c.face_seed} appearance={c.appearance} emotion={state.emotions[c.id] ?? c.emotion} width={64} still />
+            <Portrait seed={c.face_seed} appearance={c.appearance} emotion={state.emotions[c.id] ?? c.emotion} width={64} still portraitUrl={c.portrait_url} name={c.name} />
             <span style={{ borderColor: dotColor(c.face_seed) }}>{c.name}</span>
           </button>
         ))}

@@ -22,8 +22,8 @@ describe('절차적 초상화', () => {
     for (let s = 0; s < 30; s++) widths.add(faceParams(s).fw)
     expect(widths.size).toBe(30)
     const p = faceParams(99)
-    expect(p.fw).toBeGreaterThanOrEqual(52)
-    expect(p.fw).toBeLessThanOrEqual(74)
+    expect(p.fw).toBeGreaterThanOrEqual(54)
+    expect(p.fw).toBeLessThanOrEqual(66)
   })
 
   it('표정 6종은 같은 얼굴에서 서로 다른 그림이고 효과가 붙는다', () => {
@@ -50,6 +50,18 @@ describe('절차적 초상화', () => {
   it('NaN 같은 좌표가 SVG 에 섞이지 않는다', () => {
     for (let s = 0; s < 50; s++) {
       for (const e of EMOTIONS) expect(renderPortraitSvg(s * 7919, app, { emotion: e, mouthOpen: 0.5 })).not.toMatch(/NaN|undefined/)
+    }
+  })
+})
+
+describe('사람 비율', () => {
+  it('눈은 머리 세로 중앙 근처, 눈 폭은 얼굴 폭의 약 1/5', () => {
+    for (let s = 0; s < 40; s++) {
+      const p = faceParams(s * 131 + 7)
+      expect(Math.abs(p.ey - (p.ty + p.chinY) / 2)).toBeLessThan(4)
+      const ratio = (p.eyeW * 2) / (p.fw * 2)
+      expect(ratio).toBeGreaterThan(0.17)
+      expect(ratio).toBeLessThan(0.23)
     }
   })
 })

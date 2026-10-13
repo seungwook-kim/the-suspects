@@ -14,6 +14,8 @@ export interface PublicCharacter {
   location_id: string | null
   emotion: Emotion
   one_liner: string
+  /** AI 초상화 주소. 처음엔 null 이었다가 나중에 채워질 수 있다. 없으면 절차적 SVG 로 그린다. */
+  portrait_url?: string | null
 }
 
 export interface PublicLocation {
