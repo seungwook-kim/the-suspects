@@ -9,6 +9,7 @@ LLM은 대화 내용만 만들고, 무엇을 퍼뜨려도 되는지(왜곡 범�
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from typing import Any, Callable, TypedDict
 
@@ -73,10 +74,11 @@ def node_encounters(s: NightState) -> NightState:
 async def node_talks(s: NightState) -> NightState:
     d: NightDeps = s["deps"]
     case, game = s["case"], s["game"]
-    for a, b in s["pairs"]:
+
+    async def one(a: str, b: str) -> tuple[NightTalk, bool]:
         system, user = d.talk_prompt(case, game, a, b)
 
-        def validate(t: NightTalk, a=a, b=b) -> list[str]:
+        def validate(t: NightTalk) -> list[str]:
             problems: list[str] = []
             speakers = {a, b}
             if any(line.speaker_id not in speakers for line in t.lines):
@@ -85,12 +87,16 @@ async def node_talks(s: NightState) -> NightState:
                 problems += d.validate_rumor(case, r)
             return problems
 
-        talk, fb = await d.llm.structured(
+        return await d.llm.structured(
             role="night", bucket="night", schema=NightTalk, system=system, user=user,
-            fake=lambda a=a, b=b: d.fake_talk(case, game, a, b),
+            fake=lambda: d.fake_talk(case, game, a, b),
             fallback=lambda: NightTalk(),  # 실패하면 그 만남은 건너뛴다 (PRD §6.5)
             validate=validate, max_retries=2, game_id=game.game_id, node="night_talk",
         )
+
+    # 만남끼리는 서로 기다릴 이유가 없으니 LLM 호출은 동시에, 결과 반영은 순서대로 (밤 대기 시간 = 가장 느린 대화 1개)
+    results = await asyncio.gather(*(one(a, b) for a, b in s["pairs"]))
+    for (a, b), (talk, fb) in zip(s["pairs"], results):
         if not fb:
             d.apply_talk(game, a, b, talk)
             s["log"].append({"pair": [a, b], "lines": [l.model_dump() for l in talk.lines],

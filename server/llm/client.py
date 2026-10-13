@@ -68,11 +68,17 @@ class LLMClient:
         self._models: dict[str, Any] = {}
 
     @property
+    def provider(self) -> str:
+        return (self.cfg["profiles"].get(self.profile) or {}).get("provider", "openrouter")
+
+    @property
     def fake_mode(self) -> bool:
-        """키가 없거나, 모델 ID가 아직 자리표시자면 가짜 LLM."""
-        if not self.api_key:
+        """모델 ID가 아직 자리표시자거나, 부를 수단(API 키 또는 명령줄 설정)이 없으면 가짜 LLM."""
+        if str(self.role_config("npc").get("model", "")).startswith("<"):
             return True
-        return str(self.role_config("npc").get("model", "")).startswith("<")
+        if self.provider == "cli":
+            return not (self.cfg["profiles"][self.profile].get("cli") or {}).get("command")
+        return not self.api_key
 
     # ------------------------------------------------------------------ config
     def role_config(self, role: str) -> dict:
@@ -170,8 +176,6 @@ class LLMClient:
         return result, used_fallback
 
     async def _call(self, role: str, schema: type[T], system: str, user: str, prev_errors: list[str]):
-        from langchain_core.messages import HumanMessage, SystemMessage
-
         schema_hint = json.dumps(schema.model_json_schema(), ensure_ascii=False)
         sys = (
             f"{system}\n\n반드시 아래 JSON 스키마를 따르는 JSON 객체 하나만 출력한다. 설명 문장, 코드 블록 표시 금지.\n{schema_hint}"
@@ -179,6 +183,20 @@ class LLMClient:
         msg = user
         if prev_errors:
             msg += "\n\n[이전 출력의 문제 — 고쳐서 다시 출력]\n- " + "\n- ".join(prev_errors)
+        if self.provider == "cli":
+            from server.llm.cli_provider import call_cli
+
+            rc = self.role_config(role)
+            text, it, ot = await call_cli(self.cfg["profiles"][self.profile]["cli"], model=rc["model"],
+                                          effort=rc.get("effort"), system=sys, user=msg,
+                                          schema=schema.model_json_schema())
+            m = _JSON_RE.search(text)
+            if not m:
+                raise ValueError("JSON 객체가 없습니다")
+            return schema.model_validate_json(m.group(0)), text, it, ot
+
+        from langchain_core.messages import HumanMessage, SystemMessage
+
         resp = await self._chat_model(role).ainvoke([SystemMessage(content=sys), HumanMessage(content=msg)])
         text = resp.content if isinstance(resp.content, str) else json.dumps(resp.content, ensure_ascii=False)
         m = _JSON_RE.search(text)
