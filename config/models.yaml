@@ -1,0 +1,33 @@
+# 역할별 모델 설정 (PRD §12.2)
+# OPENROUTER_API_KEY가 없으면 모든 역할이 가짜 LLM(fake)으로 동작한다.
+# effort: 모델이 지원하면 추론 깊이로 전달, 지원하지 않으면 무시.
+#
+# 이 파일의 모델 이름은 자리표시자다. 실제 OpenRouter 모델 ID는 config/models.local.yaml에 적는다
+# (커밋하지 않는 파일. 같은 구조로 바꾸고 싶은 값만 적으면 이 파일 위에 덮어쓴다).
+#   예) profiles: { dev: { roles: { npc: { model: "<openrouter-model-id>" } } } }
+# 후보 모델과 선발 기준은 PRD §12.4.
+
+active_profile: dev
+
+profiles:
+  dev:
+    provider: openrouter
+    base_url: https://openrouter.ai/api/v1
+    roles:
+      npc:        { model: "<cheap-fast-model>", effort: low,    max_tokens: 200 }
+      npc_hard:   { model: "<mid-model>",        effort: low,    max_tokens: 250 }
+      npc_minor:  { model: "<cheap-fast-model>", effort: low,    max_tokens: 150 }
+      small_talk: { model: "<cheap-fast-model>", effort: low,    max_tokens: 120 }
+      router:     { model: "<cheap-fast-model>", effort: low,    max_tokens: 150 }
+      gm_check:   { model: "<cheap-fast-model>", effort: low,    max_tokens: 200 }
+      night:      { model: "<cheap-fast-model>", effort: low,    max_tokens: 400 }
+      writer:     { model: "<mid-model>",        effort: medium, max_tokens: 4000 }
+      verifier:   { model: "<cheap-fast-model>", effort: medium, max_tokens: 1500 }
+      detective:  { model: "<cheap-fast-model>", effort: medium, max_tokens: 600 }
+      judge:      { model: "<cheap-fast-model>", effort: low,    max_tokens: 400 }
+    fallbacks: []
+  prod:
+    provider: openrouter
+    base_url: https://openrouter.ai/api/v1
+    roles: {}   # 선발전 후 채움. 비어 있으면 dev 값을 쓴다.
+    fallbacks: []
