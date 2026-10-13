@@ -211,6 +211,8 @@ class PortraitStore:
 
         async def draw(prompt: str, seed: int, refs: list[bytes] | None = None) -> bytes | None:
             async with self._sem:
+                if not self.images.enabled:  # 그사이 할당량이 끝났으면 남은 요청은 보내지 않는다
+                    return None
                 raw = await self.images.generate(prompt, seed=seed, game_id=game_id, ref_images=refs)
             return compact(raw, max_size=(self.images.width, self.images.height),
                            quality=self.images.webp_quality) if raw else None

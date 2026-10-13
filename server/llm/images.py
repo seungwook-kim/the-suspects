@@ -58,9 +58,15 @@ class ImageClient:
     def enabled(self) -> bool:
         if self._generator is not None:
             return True
-        if not self.api_key or self.model.startswith("<"):
+        if not self.api_key or self.model.startswith("<") or time.time() < self.quota_until:
             return False
         return self.provider != "cloudflare" or bool(self.account_id)
+
+    quota_until: float = 0.0  # 할당량 초과(429)면 다음 UTC 0시까지 꺼 둔다 (실패할 요청을 계속 보내지 않게)
+
+    def _mark_quota_exhausted(self) -> None:
+        now = time.time()
+        self.quota_until = (now // 86400 + 1) * 86400  # Cloudflare 무료 할당량은 UTC 0시에 초기화
 
     async def generate(self, prompt: str, *, seed: int | None = None, node: str = "portrait",
                        game_id: str | None = None, ref_images: list[bytes] | None = None) -> bytes | None:
@@ -78,7 +84,11 @@ class ImageClient:
             else:
                 out = await self._call_openrouter(prompt, refs)
             ok = out is not None
-        except Exception as e:  # 그림 실패(할당량 초과 포함)는 게임을 멈추지 않는다 (SVG로 대신)
+        except httpx.HTTPStatusError as e:  # 그림 실패는 게임을 멈추지 않는다 (SVG로 대신). 거절 사유는 본문에 있다
+            err = f"HTTP {e.response.status_code}: {e.response.text[:300]}"
+            if e.response.status_code == 429:
+                self._mark_quota_exhausted()
+        except Exception as e:
             err = f"{type(e).__name__}: {str(e)[:200]}"
         extra: dict = {"provider": self.provider, "seed": seed, "refs": len(refs)}
         if err:

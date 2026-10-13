@@ -220,7 +220,10 @@ async def test_cloudflare_quota_error_falls_back_to_svg():
                          transport=httpx.MockTransport(lambda r: httpx.Response(429, json={"success": False})))
     assert await images.generate("a portrait") is None  # 할당량 초과 → 그림 없음 → 화면은 SVG
     rec = images.tracer.records[-1]
-    assert rec.ok is False and rec.extra["errors"]
+    assert rec.ok is False and rec.extra["errors"][0].startswith("HTTP 429")
+    assert images.enabled is False  # 다음 UTC 0시까지 꺼서 실패할 요청을 계속 보내지 않는다
+    assert images.quota_until % 86400 == 0
+    assert await images.generate("again") is None and len(images.tracer.records) == 1  # 요청 자체를 안 보냄
 
 
 def test_cloudflare_needs_both_account_and_token():
