@@ -115,10 +115,12 @@ CaseJob = {
   `PlayerView.characters`와 `CaseJob.preview.characters` 모두에 있다. 그림은 백그라운드로 그려지므로 **처음엔 `null`이었다가 나중에 채워질 수 있다**
   (폴링 응답·`STATE_SNAPSHOT`·`STATE_DELTA`로 바뀐 값이 온다).
 - `null`이거나 이미지 로드에 실패하면 아래 절차적 SVG로 대신 그린다.
-- `GET /api/games/{id}/portraits` → `{pending: boolean, urls: {인물 id: 주소}}`. 화면은 빠진 사진이 있으면 3초마다 묻고,
+- `GET /api/games/{id}/portraits` → `{pending: boolean, urls: {인물 id: 주소}, emotions: {인물 id: {표정: 주소}}}`. 화면은 빠진 사진이 있으면 3초마다 묻고,
   `pending=false`가 되면(다 그렸거나 그리지 않는 중) 멈춘다(최대 3분). 서버는 그리는 중이 아닌데 빠진 사람이 있으면
   (서버 재시작으로 끊김 등) 그 사람만 한 번 더 그린다(한 판에 최대 2번).
-- 초상화는 무표정 1장이다. 감정은 화면 효과로 보여 준다(PRD §9.3): 당황 흔들림+💦, 분노 붉은 색조+💢, 긴장 살짝 확대·떨림,
+- `PublicCharacter.portrait_emotions: {표정: 주소} | null` — 같은 얼굴의 표정 사진(그린 것만). 서버는 그 인물의 그 감정이 처음 나올 때 그린다(약 10초).
+  화면은 감정에 맞는 표정 사진이 있으면 그것을, 없으면 기본 사진(`portrait_url`)을 쓴다. 행동이 끝날 때마다 사진 상태를 다시 묻는다.
+- 감정 효과는 사진 위에 그대로 얹는다(PRD §9.3; 표정 사진일 때는 색조만 뺀다): 당황 흔들림+💦, 분노 붉은 색조+💢, 긴장 살짝 확대·떨림,
   슬픔 채도 낮춤·푸른 색조, 기쁨 밝게. 대사 중에는 미세하게 들썩인다.
 - `GET /api/portraits/{key}/{file}` → 이미지(`image/png`·`image/jpeg`·`image/webp`). 클리어하면 그 판의 초상화 파일은 삭제된다
   (서버의 사진 보관함에는 남지만 이 주소로는 다시 열 수 없다).
