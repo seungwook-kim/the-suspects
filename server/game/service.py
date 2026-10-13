@@ -1,0 +1,818 @@
+"""게임 서비스: 규칙 엔진·RAG·LangGraph 그래프·저장소를 한 판의 흐름으로 묶는다.
+
+- API 계층(server/api/app.py)만 이 모듈을 부른다.
+- 판정은 server.rules(코드), 대사·서술은 LLM(키가 없으면 가짜 LLM).
+- 클라이언트로는 build_view가 만든 PlayerView와 AG-UI 형식 이벤트만 나간다.
+"""
+
+from __future__ import annotations
+
+import os
+import uuid
+from datetime import datetime
+from pathlib import Path
+from typing import AsyncIterator
+
+from pydantic import BaseModel
+
+from server.agents.router import SemanticRouter
+from server.cases.loader import list_case_ids, load_case_by_id
+from server.config import load_game_config
+from server.game import content as C
+from server.game.events import EventBuilder
+from server.game.masking import IdMasker, new_salt
+from server.game.night_deps import build_night_deps
+from server.game.view import build_view
+from server.graphs.night import run_night
+from server.graphs.turn import TurnDeps, run_turn
+from server.llm.client import LLMClient
+from server.llm.tracing import Tracer
+from server.rag.embedding import CachedEmbedding, HashEmbedding
+from server.rag.indexer import index_case
+from server.rag.relations import RelationGraph
+from server.rag.retriever import HybridRetriever
+from server.rag.store import RagStore
+from server.rules import actions as act_rules
+from server.rules import bluff as bluff_rules
+from server.rules import director as dir_rules
+from server.rules import finale as fin_rules
+from server.rules import gm_rules
+from server.rules import grade as grade_rules
+from server.rules import offtopic as off_rules
+from server.rules import reputation as rep_rules
+from server.rules import sufficiency as suff_rules
+from server.rules import trust as trust_rules
+from server.rules import warrant as war_rules
+from server.schemas import (
+    BluffAction,
+    CaseBible,
+    ClearHistory,
+    Contradiction,
+    GameState,
+    GMVerdict,
+    MemoryDoc,
+    NotebookStatement,
+    NPCReply,
+    NPCState,
+    PlayerView,
+    RetrievalHit,
+    RouterOutput,
+    ShareCard,
+)
+from server.storage.db import GameStore, StorageError
+
+_ROOT = Path(__file__).resolve().parents[2]
+
+THEMES = {
+    "demo_db_deleted": {"emoji": "💾", "description": "서비스 오픈 전날 밤, 운영 DB와 감사 로그가 사라졌다."},
+}
+
+
+def _absorb(target: GameState, new: GameState) -> None:
+    """규칙 엔진은 새 상태를 돌려주므로(불변 스타일), 그래프가 들고 있는 객체에 값을 옮겨 담는다."""
+    if new is target:
+        return
+    for k in GameState.model_fields:
+        setattr(target, k, getattr(new, k))
+
+
+class GMCheck(BaseModel):
+    ok: bool
+    reason: str = ""
+
+
+class GameService:
+    def __init__(self, data_dir: str | Path | None = None, *, in_memory: bool = False, llm: LLMClient | None = None):
+        self.cfg = load_game_config()
+        mode = os.getenv("THE_SUSPECTS_MODE", "dev")
+        data = Path(data_dir) if data_dir else _ROOT / "var"
+        self.llm = llm or LLMClient(tracer=Tracer(path=None if in_memory else data / "traces.jsonl",
+                                                  mode="prod" if mode == "prod" else "dev"))
+        self.store = GameStore(":memory:" if in_memory else data / "game.sqlite3")
+        self.rag = RagStore(":memory:" if in_memory else str(data / "rag.sqlite3"),
+                            embedder=CachedEmbedding(HashEmbedding(256)))
+        hybrid = self.cfg.rag.get("hybrid", {})
+        self.retriever = HybridRetriever(self.rag, bm25_weight=hybrid.get("keyword_weight", 0.4),
+                                         vector_weight=hybrid.get("vector_weight", 0.6))
+        self.relations = RelationGraph(self.rag)
+        self.router = SemanticRouter()
+        self.cases: dict[str, CaseBible] = {cid: load_case_by_id(cid) for cid in list_case_ids()}
+        for case in self.cases.values():
+            tpl = self._template_slot(case.case_id)
+            if not self.rag.count_slot(tpl):
+                index_case(self.rag, case, tpl)
+                self.relations.seed_from_case(case, tpl)
+
+    # ================================================================= 공통
+    @staticmethod
+    def _template_slot(case_id: str) -> str:
+        return f"tpl_{case_id}"
+
+    def _load(self, game_id: str) -> tuple[CaseBible, GameState, IdMasker]:
+        state = self.store.load_live(game_id)
+        case = self.cases[state.case_id]
+        return case, state, IdMasker(case, state.id_salt)
+
+    def _bands(self) -> list[tuple[int, str]]:
+        return [(b.min, b.name or "") for b in self.cfg.reputation.titles]
+
+    def _refresh(self, case: CaseBible, state: GameState) -> None:
+        state.notebook.sufficiency = suff_rules.all_sufficiency(self.cfg, case, state.notebook)
+        C.apply_unlocks(case, state)
+
+    def _chips(self, case: CaseBible, state: GameState, masker: IdMasker):
+        chips, defs = C.build_chips(case, state, lambda eid: masker.out("evidence", eid))
+        state.director_state["chips"] = defs
+        return chips
+
+    def _view(self, case: CaseBible, state: GameState, masker: IdMasker) -> PlayerView:
+        self._refresh(case, state)
+        return build_view(case, state, masker, chips=self._chips(case, state, masker), bands=self._bands(),
+                          actions_total=self.cfg.day_actions)
+
+    def _obtain(self, case: CaseBible, state: GameState, evidence_ids: list[str]) -> list[str]:
+        """증거를 수첩에 넣는다. 새로 얻은 것만 돌려준다."""
+        new = [e for e in evidence_ids if e not in state.notebook.evidence_ids]
+        for e in new:
+            state.notebook.evidence_ids.append(e)
+            _absorb(state, rep_rules.apply_event(self.cfg, state, "clue_found"))
+        if new:
+            state.director_state["actions_since_clue"] = 0
+        return new
+
+    def _say(self, events: list[dict], eb: EventBuilder, role: str, speaker: str | None, text: str) -> None:
+        events.extend(eb.text(role, speaker, text))
+
+    # ================================================================= 목록·생성
+    def themes(self) -> list[dict]:
+        return [{"id": cid, "title": c.title, "preset": True, **THEMES.get(cid, {"emoji": "🔍", "description": c.theme})}
+                for cid, c in self.cases.items()]
+
+    def new_game(self, theme_id: str, options: dict | None = None) -> tuple[str, PlayerView]:
+        if theme_id not in self.cases:
+            raise KeyError(theme_id)
+        case = self.cases[theme_id]
+        opts = options or {}
+        difficulty = opts.get("difficulty") or case.difficulty
+        game_id = f"g_{uuid.uuid4().hex[:12]}"
+        slot = f"slot_{uuid.uuid4().hex[:12]}"
+        unlocked = [l.id for l in case.locations if not l.unlock_condition]
+        npc_states = {}
+        for ch in case.characters:
+            npc_states[ch.id] = NPCState(
+                npc_id=ch.id, location_id=C.day_location(case, ch, unlocked, 1),
+                trust=trust_rules.start_trust(self.cfg, ch), alertness=self.cfg.alertness.start,
+                visible=ch.initial_visible,
+            )
+        inv = self.cfg.investigation
+        state = GameState(
+            game_id=game_id, slot_id=slot, case_id=case.case_id, player_location=case.start_location_id,
+            unlocked_locations=unlocked, npc_states=npc_states, reputation=self.cfg.reputation.start,
+            difficulty=difficulty, max_days=act_rules.investigation_days(self.cfg, difficulty),
+            actions_left=act_rules.new_day_actions(self.cfg), clock=inv["day_start_minute"], id_salt=new_salt(),
+            phase="briefing",
+        )
+        self.rag.copy_slot(self._template_slot(case.case_id), slot)
+        self.store.create_game(state)
+        return game_id, self._persist_view(case, state)
+
+    def _persist_view(self, case: CaseBible, state: GameState) -> PlayerView:
+        view = self._view(case, state, IdMasker(case, state.id_salt))
+        self.store.save_live(state)
+        return view
+
+    def list_games(self) -> list[dict]:
+        out = []
+        for g in self.store.list_games():
+            case = self.cases.get(g["case_id"])
+            out.append({**g, "case_title": case.title if case else g["case_id"]})
+        return out
+
+    def view(self, game_id: str) -> PlayerView:
+        case, state, _ = self._load(game_id)
+        return self._persist_view(case, state)
+
+    # ================================================================= 행동
+    async def act(self, game_id: str, action: dict) -> AsyncIterator[dict]:
+        case, state, masker = self._load(game_id)
+        eb = EventBuilder()
+        yield eb.run_started()
+        before = self._view(case, state, masker)
+        events: list[dict] = []
+        kind = action.get("type")
+        if state.phase in ("ended", "finale"):
+            yield eb.run_error("지금은 할 수 없는 행동이에요.", code="phase")
+            yield eb.run_finished()
+            return
+        if state.phase == "briefing":
+            state.phase = "day"
+        cost_kind = {"move": "move", "investigate": "investigate", "ask": "ask", "chip": "ask",
+                     "present": "present_evidence", "bluff": "bluff", "warrant": "warrant",
+                     "hint": "hint", "apologize": "default"}.get(kind)
+        if cost_kind is None:
+            yield eb.run_error(f"모르는 행동입니다: {kind}", code="bad_action")
+            yield eb.run_finished()
+            return
+        ok, reason = act_rules.can_perform(self.cfg, state, cost_kind)
+        if not ok:
+            msg = "오늘은 더 움직일 수 없어요. 하루를 끝내세요." if reason == "no_actions_left" else "지금은 할 수 없어요."
+            yield eb.run_error(msg, code=reason)
+            yield eb.run_finished()
+            return
+        _absorb(state, act_rules.spend(self.cfg, state, cost_kind))
+        state.clock += self.cfg.investigation["minutes_per_action"] * act_rules.action_cost(self.cfg, cost_kind)
+        ds = state.director_state
+        ds["actions_since_clue"] = ds.get("actions_since_clue", 0) + 1
+        ds["actions_since_event"] = ds.get("actions_since_event", 10**6) + 1
+
+        try:
+            if kind == "move":
+                await self._do_move(case, state, action, events, eb)
+            elif kind == "investigate":
+                self._do_investigate(case, state, masker, events, eb)
+            elif kind in ("ask", "chip"):
+                await self._do_ask(case, state, masker, action, events, eb)
+            elif kind == "present":
+                await self._do_present(case, state, masker, action, events, eb)
+            elif kind == "bluff":
+                await self._do_bluff(case, state, masker, action, events, eb)
+            elif kind == "warrant":
+                self._do_warrant(case, state, masker, action, events, eb)
+            elif kind == "hint":
+                self._say(events, eb, "partner", "partner", C.hint_text(case, state))
+            elif kind == "apologize":
+                self._do_apologize(case, state, action, events, eb)
+        except _BadAction as e:
+            events.append(eb.run_error(str(e), code="bad_action"))
+
+        self._director(case, state, events, eb)
+        state.events_log.append({"type": "action", "day": state.day, "clock": state.clock, "kind": kind,
+                                 "npc": action.get("npc_id")})
+        after = self._view(case, state, masker)
+        self.store.save_live(state)
+        for ev in events:
+            yield ev
+        delta = eb.delta(before, after)
+        if delta:
+            yield delta
+        yield eb.custom("chips", {"chips": [c.model_dump() for c in after.chips]})
+        yield eb.run_finished()
+
+    # ----------------------------------------------------------------- 이동·조사
+    async def _do_move(self, case, state, action, events, eb) -> None:
+        loc = action.get("location_id")
+        if loc not in state.unlocked_locations:
+            raise _BadAction("아직 갈 수 없는 장소예요.")
+        ds = state.director_state
+        ds["same_place"] = 0 if loc != state.player_location else ds.get("same_place", 0) + 1
+        state.player_location = loc
+        name = next(l.name for l in case.locations if l.id == loc)
+        here = [C.char(case, n).name for n, ns in state.npc_states.items() if ns.visible and ns.location_id == loc]
+        self._say(events, eb, "narrator", None, f"{name}(으)로 왔다." + (f" {', '.join(here)}이(가) 있다." if here else ""))
+        # 범인의 경계: 형사가 하루에 자기 위치를 여러 번 찾아오면 경계가 오른다 (부록 F.10)
+        from server.rules import alertness as alert_rules
+        for n, ns in state.npc_states.items():
+            if ns.location_id == loc:
+                ns.visits_today += 1
+                if bluff_rules.is_guilty(case, n) and alert_rules.repeat_visit_triggered(self.cfg, ns.visits_today):
+                    ns.alertness = alert_rules.apply_event(self.cfg, ns.alertness, "repeat_visit")
+
+    def _do_investigate(self, case, state, masker, events, eb) -> None:
+        inv = self.cfg.investigation
+        state.director_state["same_place"] = state.director_state.get("same_place", 0) + 1
+        found = C.next_reveals(case, state, state.player_location, inv["reveal_per_action"], inv["key_evidence_last"])
+        new = self._obtain(case, state, found)
+        if not new:
+            self._say(events, eb, "narrator", None, "더 찾을 만한 건 없어 보인다.")
+            return
+        for e in new:
+            ev = C.evidence(case, e)
+            self._say(events, eb, "narrator", None, f"'{ev.name}'을(를) 찾았다. {ev.content}")
+        events.append(eb.custom("notebook", {"added": {"evidence_ids": [masker.out("evidence", e) for e in new]}}))
+
+    # ----------------------------------------------------------------- 대화
+    def _turn_deps(self, case: CaseBible, state: GameState) -> TurnDeps:
+        cfg, hold = self.cfg, {}
+
+        def retrieve(game: GameState, npc_id: str, q: str) -> list[RetrievalHit]:
+            hits = self._npc_search(case, game, npc_id, q)
+            hold["hits"] = hits
+            return hits
+
+        def gm_code_check(case_: CaseBible, game: GameState, npc_id: str, reply: NPCReply) -> GMVerdict:
+            v = gm_rules.check_reply(cfg, case_, npc_id, reply.text)
+            grounded = " ".join(h.content for h in hold.get("hits", []) if h.id in reply.used_ids or not reply.used_ids)
+            return _ground(case_, v, reply.text, grounded, hold.get("presented"))
+
+        async def gm_llm_check(case_, game, npc_id, reply, verdict) -> bool:
+            out, _ = await self.llm.structured(
+                role="gm_check", bucket="gm", schema=GMCheck,
+                system="추리 게임의 게임 마스터다. 인물의 대답이 그 인물이 알 수 있는 정보만 말했는지 판정한다.",
+                user=f"인물: {C.char(case_, npc_id).name}\n인물이 아는 것: {[h.content for h in hold.get('hits', [])]}\n"
+                     f"대답: {reply.text}\n문제 신호: {verdict.triggers}",
+                fake=lambda: GMCheck(ok=True), fallback=lambda: GMCheck(ok=False, reason="판정 실패"),
+                game_id=game.game_id, node="gm_llm",
+            )
+            return out.ok
+
+        def handle_offtopic(game: GameState, npc_id: str, route: RouterOutput) -> dict:
+            outcome = off_rules.register_offtopic(cfg, game.offtopic_streak)
+            game.offtopic_streak = outcome.streak
+            evs: list[dict] = []
+            if route.kind == "inappropriate":
+                _absorb(game, rep_rules.apply_event(cfg, game, "rude"))
+                game.npc_states[npc_id] = trust_rules.apply_event(cfg, game.npc_states[npc_id], "rude")
+            elif route.kind == "meta":
+                _absorb(game, rep_rules.apply_event(cfg, game, "meta"))
+            if outcome.reputation_event:
+                _absorb(game, rep_rules.apply_event(cfg, game, outcome.reputation_event))
+            if outcome.turn_away:
+                game.npc_states[npc_id] = trust_rules.turn_away(cfg, game.npc_states[npc_id], game.action_no)
+                evs.append(EventBuilder().custom("turn_away", {"npcId": npc_id, "untilActions": cfg.trust.turnaway_actions}))
+            if outcome.rumor_candidate:
+                game.director_state["rumor_candidates"] = game.director_state.get("rumor_candidates", 0) + 1
+            if outcome.partner_interject:
+                evs.extend(EventBuilder().text("partner", "partner", "선배, 시간 없어요. 사건 얘기부터 하죠."))
+            ch = C.char(case, npc_id)
+            line = {"gibberish": "네? 뭐라고 하셨어요?",
+                    "meta": "…형사님, 많이 피곤하신가 봐요.",
+                    "inappropriate": "말씀이 너무 심하시네요."}.get(route.kind, "네?")
+            if outcome.turn_away:
+                line = "바빠서요. 나중에 오세요."
+            return {"line": line, "events": evs, "chips_again": outcome.show_chips}
+
+        def on_small_talk(game: GameState, ch) -> None:
+            game.npc_states[ch.id] = trust_rules.apply_small_talk(cfg, game.npc_states[ch.id], ch.small_talk_style)
+            game.offtopic_streak = off_rules.register_normal(cfg, game.offtopic_streak)
+
+        def after_answer(game: GameState, npc_id: str, q: str, reply: NPCReply, hits: list[RetrievalHit]) -> dict:
+            game.offtopic_streak = off_rules.register_normal(cfg, game.offtopic_streak)
+            talked = game.director_state.setdefault("talked", [])
+            if npc_id not in talked:
+                talked.append(npc_id)
+            asked = game.director_state.setdefault("asked", {})
+            asked[npc_id] = asked.get(npc_id, 0) + 1
+            game.director_state.setdefault("asked_texts", {}).setdefault(npc_id, []).append(q)
+            self.rag.add_memory(MemoryDoc(
+                id=f"said_{uuid.uuid4().hex[:10]}", case_id=case.case_id, slot_id=game.slot_id, owner=npc_id,
+                visibility=[f"npc:{npc_id}"], doc_type="said", content=f"형사에게 이렇게 말했다: {reply.text}",
+                game_time=game.clock, source="direct", tags=["형사", "진술"],
+            ))
+            # 증언 증거: NPC가 그 증언 기억을 근거로 말했을 때만 얻는다
+            memo = {m.id: m for m, _ in self.rag.load_memories(case.case_id, game.slot_id)}
+            got = []
+            for hid in reply.used_ids:
+                m = memo.get(hid)
+                if m and m.evidence_id:
+                    ev = C.evidence(case, m.evidence_id)
+                    if ev.kind == "testimony" and "player" in ev.visibility:
+                        got.append(ev.id)
+            new = self._obtain(case, game, got)
+            masker = IdMasker(case, game.id_salt)
+            return {"evidence_ids": [masker.out("evidence", e) for e in new], "contradictions": []}
+
+        return TurnDeps(
+            llm=self.llm, router=self.router, retrieve=retrieve, gm_code_check=gm_code_check,
+            fallback_line=lambda ch: gm_rules.fallback_line(cfg, ch), handle_offtopic=handle_offtopic,
+            on_small_talk=on_small_talk, after_answer=after_answer,
+            lie_guidance=lambda case_, npc_id, q: C.relevant_lies(case_, npc_id, q),
+            case_brief=lambda case_, game: self._brief(case_, game), gm_llm_check=gm_llm_check,
+        )
+
+    def _npc_search(self, case: CaseBible, game: GameState, npc_id: str, q: str) -> list[RetrievalHit]:
+        """NPC는 자기 기억을 먼저 본다. 공용 문서(메신저 로그·매뉴얼 등)는 기억이 모자랄 때만 보탠다.
+        공용 문서가 위로 올라오면 NPC가 남의 대사를 자기 말처럼 하게 된다."""
+        k = self.cfg.rag.get("top_k", 5)
+        hits = self.retriever.search(q, case_id=case.case_id, slot_id=game.slot_id, scope=f"npc:{npc_id}",
+                                     k=k, kinds=("memory",))
+        if len(hits) < 3:
+            hits += self.retriever.search(q, case_id=case.case_id, slot_id=game.slot_id, scope=f"npc:{npc_id}",
+                                          k=3 - len(hits), kinds=("chunk",))
+        return hits
+
+    def _player_search(self, case: CaseBible, game: GameState, q: str, k: int = 5) -> list[RetrievalHit]:
+        """플레이어 시점 검색(파트너 문서 검색 등). 증거 청크는 수첩에 있는 것만 허용한다.
+        청크의 영장 검사는 시스템 단위라, 다른 사람 영장으로 남의 기록 청크가 보이는 것을 여기서 막는다."""
+        hits = self.retriever.search(q, case_id=case.case_id, slot_id=game.slot_id, scope="player",
+                                     warrants=game.warrants, k=k * 3, kinds=("chunk",))
+        owned = set(game.notebook.evidence_ids)
+        out = []
+        for h in hits:
+            ev = (h.meta.get("kb_meta") or {}).get("evidence_id") or h.meta.get("evidence_id")
+            if h.id.startswith("ev:") or ev:
+                if (ev or h.id.removeprefix("ev:").split("#")[0]) not in owned:
+                    continue
+            out.append(h)
+        return out[:k]
+
+    def _brief(self, case: CaseBible, game: GameState) -> str:
+        loc = next((l.name for l in case.locations if l.id == game.player_location), "")
+        return f"수사 {game.day}일차 {C.hhmm(game.clock)}, 장소: {loc}. 사건: {case.incident.summary}"
+
+    def _require_npc_here(self, state: GameState, npc_id: str | None) -> str:
+        ns = state.npc_states.get(npc_id or "")
+        if not ns or not ns.visible:
+            raise _BadAction("그런 사람은 없어요.")
+        if ns.location_id != state.player_location:
+            raise _BadAction("그 사람은 여기 없어요.")
+        return npc_id  # type: ignore[return-value]
+
+    async def _do_ask(self, case, state, masker, action, events, eb) -> None:
+        chip_route = None
+        if action.get("type") == "chip":
+            d = state.director_state.get("chips", {}).get(action.get("chip_id"))
+            if not d:
+                raise _BadAction("지난 추천 질문이에요.")
+            if d["kind"] == "present":
+                await self._do_present(case, state, masker, {"npc_id": d["npc"], "evidence_id": masker.out("evidence", d["evidence"])}, events, eb)
+                return
+            npc_id, text = d["npc"], d["text"]
+            chip_route = RouterOutput(kind="investigate", target_npc=npc_id, via="chip")
+        else:
+            npc_id, text = action.get("npc_id"), (action.get("text") or "").strip()[:300]
+        npc_id = self._require_npc_here(state, npc_id)
+        game, evs, _ = await run_turn(case, state, npc_id, text, self._turn_deps(case, state), chip_route=chip_route)
+        _absorb(state, game)
+        events.extend(evs)
+
+    async def _npc_react(self, case, state, npc_id, prompt_text, events, eb, *, forced_emotion=None, forced_reaction=None,
+                         presented: str | None = None) -> NPCReply:
+        """증거 제시·블러핑에 대한 NPC 반응 (핫 패스 LLM 1회)."""
+        from server.agents import npc as npc_agent
+
+        hits = self._npc_search(case, state, npc_id, prompt_text)
+        ch = C.char(case, npc_id)
+        ctx = npc_agent.NPCContext(
+            character=ch, state=state.npc_states[npc_id], question=prompt_text, hits=hits,
+            case_brief=self._brief(case, state), lie_guidance=C.relevant_lies(case, npc_id, prompt_text),
+            conversation_summary=state.conversation_summary, forced_emotion=forced_emotion, forced_reaction=forced_reaction,
+        )
+        reply, _, _ = await npc_agent.answer(
+            self.llm, ctx, role="npc_minor" if ch.tier == "minor" else "npc",
+            gm_code_check=lambda r: _ground(case, gm_rules.check_reply(self.cfg, case, npc_id, r.text), r.text,
+                                            " ".join(h.content for h in hits), presented),
+            fallback_line=lambda: gm_rules.fallback_line(self.cfg, ch), game_id=state.game_id,
+        )
+        if forced_emotion:
+            reply.emotion = forced_emotion
+        state.npc_states[npc_id].emotion = reply.emotion
+        events.append(eb.custom("emotion", {"npcId": npc_id, "emotion": reply.emotion}))
+        self._say(events, eb, "npc", npc_id, reply.text)
+        stmt = NotebookStatement(id=f"t_{uuid.uuid4().hex[:8]}", npc_id=npc_id, content=reply.text,
+                                 game_time=state.clock, source_ids=list(reply.used_ids))
+        state.notebook.statements.append(stmt)
+        state.question_count += 1
+        return reply
+
+    async def _do_present(self, case, state, masker, action, events, eb) -> None:
+        npc_id = self._require_npc_here(state, action.get("npc_id"))
+        eid = masker.inn(action.get("evidence_id", ""))
+        if not eid or eid not in state.notebook.evidence_ids:
+            raise _BadAction("가지고 있지 않은 증거예요.")
+        ev = C.evidence(case, eid)
+        lies = [l for l in case.lie_ledger if l.liar_id == npc_id and eid in l.rebuttal_evidence_ids]
+        if lies:
+            events.append(eb.custom("cutin", {"text": "이의 있음!", "style": "objection"}))
+            reply = await self._npc_react(case, state, npc_id, f"형사가 '{ev.name}'을(를) 내밀었다: {ev.content}", events, eb,
+                                          forced_emotion="flustered",
+                                          forced_reaction="증거 앞에서 당황한다. 앞서 한 말과 어긋난다는 걸 들킨 반응을 보인다.",
+                                          presented=ev.name)
+            stmt_id = state.notebook.statements[-1].id
+            new_c = []
+            for lie in lies:
+                if any(c.lie_id == lie.id for c in state.notebook.contradictions):
+                    continue
+                c = Contradiction(id=f"c_{uuid.uuid4().hex[:8]}", statement_id=stmt_id, evidence_id=eid, lie_id=lie.id,
+                                  note=f"{C.char(case, npc_id).name}: '{lie.topic}' 진술이 증거와 어긋남")
+                state.notebook.contradictions.append(c)
+                new_c.append(c.id)
+            if new_c:
+                state.npc_states[npc_id] = trust_rules.apply_event(self.cfg, state.npc_states[npc_id], "lie_exposed")
+                state.director_state["actions_since_clue"] = 0
+                events.append(eb.custom("notebook", {"added": {"contradictions": new_c}}))
+        else:
+            await self._npc_react(case, state, npc_id, f"형사가 '{ev.name}'을(를) 보여 주며 묻는다: {ev.content}", events, eb,
+                                  presented=ev.name)
+
+    async def _do_bluff(self, case, state, masker, action, events, eb) -> None:
+        npc_id = self._require_npc_here(state, action.get("npc_id"))
+        claim_id = masker.inn(action.get("claim_id", ""))
+        if not claim_id:
+            raise _BadAction("모르는 주장이에요.")
+        basis = [e for e in (masker.inn(x) for x in action.get("basis_evidence_ids", [])) if e]
+        ba = BluffAction(target_npc=npc_id, claim_id=claim_id, claim_subject=action.get("claim_subject") or None,
+                         basis_evidence_ids=basis)
+        claim = next(c for c in case.bluff_claims if c.id == claim_id)
+        knows_false = self.relations.knows_false(npc_id, claim, case_id=case.case_id, slot_id=state.slot_id)
+        result = bluff_rules.resolve_bluff(self.cfg, case, state, ba, npc_knows_false=knows_false)
+        _absorb(state, bluff_rules.apply_failure(self.cfg, case, state, ba, result))
+        state.events_log.append({"type": "bluff", "npc": npc_id, "claim": claim_id, "outcome": result.outcome})
+        reaction = {
+            "confession": ("sad", "버티지 못하고 무너진다. 자신이 한 일을 인정한다."),
+            "shaken": ("nervous", "흔들린다. 무심코 단서 하나를 흘린다."),
+            "rebutted": ("angry", "블러핑이 통하지 않는다. 근거가 없다며 반박한다."),
+            "instant_fail": ("angry", "거짓말인 걸 바로 알아챈다. 형사를 비웃는다."),
+        }[result.outcome]
+        await self._npc_react(case, state, npc_id, f"형사가 블러핑한다: '{claim.label}'", events, eb,
+                              forced_emotion=reaction[0], forced_reaction=reaction[1])
+        if result.outcome == "shaken" and result.leaked_hint_id:
+            new = self._obtain(case, state, [result.leaked_hint_id])
+            if new:
+                events.append(eb.custom("notebook", {"added": {"evidence_ids": [masker.out("evidence", e) for e in new]}}))
+        if result.outcome == "confession":
+            state.director_state["confession"] = npc_id
+            events.append(eb.custom("cutin", {"text": "자백!", "style": "confession"}))
+
+    def _do_warrant(self, case, state, masker, action, events, eb) -> None:
+        system, target = action.get("system"), action.get("target_id")
+        if target not in state.npc_states:
+            raise _BadAction("영장 대상이 없어요.")
+        basis = [e for e in (masker.inn(x) for x in action.get("basis_evidence_ids", [])) if e]
+        decision = war_rules.request_warrant(self.cfg, case, state, system, target, basis)
+        name = C.char(case, target).name
+        if not decision.needed:
+            self._say(events, eb, "chief", "chief", "그건 영장 없이도 볼 수 있는 기록이야.")
+            return
+        if not decision.approved or decision.warrant is None:
+            self._say(events, eb, "chief", "chief", f"근거가 부족해. {name}에 대한 영장은 아직 못 내줘.")
+            return
+        state.warrants.append(decision.warrant)
+        self._say(events, eb, "chief", "chief", f"좋아, {name}에 대한 영장이 나왔다.")
+        got = [e.id for e in case.evidence if f"warrant:{system}" in e.visibility and target in e.linked_suspects]
+        new = self._obtain(case, state, got)
+        for e in new:
+            ev = C.evidence(case, e)
+            self._say(events, eb, "narrator", None, f"'{ev.name}'을(를) 받았다. {ev.content}")
+        if new:
+            events.append(eb.custom("notebook", {"added": {"evidence_ids": [masker.out("evidence", e) for e in new]}}))
+
+    def _do_apologize(self, case, state, action, events, eb) -> None:
+        npc_id = self._require_npc_here(state, action.get("npc_id"))
+        before = state.reputation
+        _absorb(state, rep_rules.apply_event(self.cfg, state, "apology", npc_id=npc_id))
+        if state.reputation != before:
+            state.npc_states[npc_id] = trust_rules.apply_event(self.cfg, state.npc_states[npc_id], "apology")
+            self._say(events, eb, "npc", npc_id, "…알겠어요. 이번엔 넘어갈게요.")
+        else:
+            self._say(events, eb, "npc", npc_id, "오늘은 이미 사과받았어요.")
+
+    # ----------------------------------------------------------------- 연출 감독
+    def _director(self, case, state, events, eb) -> None:
+        ds = state.director_state
+        suff = state.notebook.sufficiency or suff_rules.all_sufficiency(self.cfg, case, state.notebook)
+        m = dir_rules.DirectorMetrics(
+            actions_since_clue=ds.get("actions_since_clue", 0), consecutive_same_place=ds.get("same_place", 0),
+            day=state.day, is_last_day=state.day >= state.max_days, max_sufficiency=max(suff.values(), default=0.0),
+            actions_since_last_event=ds.get("actions_since_event", 10**6), events_today=ds.get("events_today", 0),
+            hint_given_in_streak=ds.get("hint_in_streak", False), event_given_in_streak=ds.get("event_in_streak", False),
+            fired=ds.get("fired", []),
+        )
+        iv = dir_rules.decide(self.cfg, m)
+        if iv is None:
+            if ds.get("actions_since_clue", 0) == 0:
+                ds["hint_in_streak"] = ds["event_in_streak"] = False
+            return
+        ds["actions_since_event"] = 0
+        ds["events_today"] = ds.get("events_today", 0) + 1
+        if iv == "partner_hint":
+            ds["hint_in_streak"] = True
+            self._say(events, eb, "partner", "partner", C.hint_text(case, state))
+            return
+        if iv in ("early_progress", "escalate_crisis", "late_struggle", "report_nudge"):
+            ds.setdefault("fired", []).append({"escalate_crisis": "early_progress", "report_nudge": "late_struggle"}.get(iv, iv))
+        texts = {
+            "event": ("제보", "누군가 할 말이 있다며 형사를 찾는다고 한다."),
+            "call_elsewhere": ("호출", "다른 곳에서 형사님을 찾는 연락이 왔어요. 자리를 옮겨 보죠."),
+            "escalate_crisis": ("협박 문자", "모르는 번호: 더 이상 파고들지 마."),
+            "report_nudge": ("반장", "반장: 마지막 날이야. 지금까지 정리해서 보고해. " + C.hint_text(case, state)),
+        }
+        if iv == "event":
+            ds["event_in_streak"] = True
+        title, text = texts.get(iv, ("알림", ""))
+        events.append(eb.custom("director", {"eventId": f"d_{uuid.uuid4().hex[:6]}", "title": title, "text": text}))
+
+    # ================================================================= 밤
+    async def night(self, game_id: str) -> AsyncIterator[dict]:
+        case, state, masker = self._load(game_id)
+        eb = EventBuilder()
+        yield eb.run_started()
+        if state.phase not in ("day", "briefing"):
+            yield eb.run_error("지금은 하루를 끝낼 수 없어요.", code="phase")
+            yield eb.run_finished()
+            return
+        state.phase = "night"
+        deps = build_night_deps(self, case)
+        game, events = await run_night(case, state, deps)
+        _absorb(state, game)
+        for ev in events:
+            yield ev
+        yield eb.snapshot(self._view(case, state, masker))
+        if state.ending != "none":
+            yield eb.custom("ending", {"ending": state.ending, "replay": self._replay(case, state)})
+        self.store.save_live(state)
+        yield eb.run_finished()
+
+    # ================================================================= 최종 추리
+    async def finale(self, game_id: str, step: dict) -> AsyncIterator[dict]:
+        case, state, masker = self._load(game_id)
+        eb = EventBuilder()
+        yield eb.run_started()
+        events: list[dict] = []
+        t = step.get("type")
+        try:
+            if t == "start":
+                accused = step.get("accused_id")
+                if accused not in state.npc_states:
+                    raise _BadAction("지목할 사람이 없어요.")
+                if state.finale and state.phase == "finale":
+                    st = fin_rules.FinaleState.model_validate(state.finale)  # 지목을 무른 뒤 다시 지목
+                else:
+                    st = fin_rules.start_finale(self.cfg, state.difficulty)
+                    self._say(events, eb, "narrator", None, "모두를 회의실로 불러 모았다. 이제 증거로 말할 시간이다.")
+                st = fin_rules.accuse(self.cfg, case, st, accused)
+                state.phase = "finale"
+                if st.pending_confirmation:
+                    self._say(events, eb, "npc", accused, "제가요? 증거라도 있어요? 다시 생각해 보시죠.")
+            else:
+                if not state.finale:
+                    raise _BadAction("최종 추리를 먼저 시작하세요.")
+                st = fin_rules.FinaleState.model_validate(state.finale)
+                if t == "present":
+                    eid = masker.inn(step.get("evidence_id", ""))
+                    if not eid:
+                        raise _BadAction("가지고 있지 않은 증거예요.")
+                    res = fin_rules.present_evidence(self.cfg, case, st, step.get("stage", ""), eid,
+                                                     owned_evidence_ids=set(state.notebook.evidence_ids))
+                    st = res.state
+                    who = C.char(case, st.accused_id).name if st.accused_id else ""
+                    if res.correct:
+                        events.append(eb.custom("cutin", {"text": "이의 있음!", "style": "objection"}))
+                        self._say(events, eb, "npc", st.accused_id, "그, 그건…!")
+                    else:
+                        self._say(events, eb, "npc", st.accused_id, f"그게 저랑 무슨 상관이죠? ({who})")
+                    events.append(eb.custom("finale", {
+                        "accused_id": st.accused_id, "stage": step.get("stage"), "lives": st.lives, "filled": st.passed,
+                        "last": {"result": "correct" if res.correct else ("rebutted" if res.rebuttal else "wrong"),
+                                 "evidence_id": step.get("evidence_id")},
+                    }))
+                elif t == "confirm":
+                    st = fin_rules.confirm_accusation(st)
+                elif t == "retract":
+                    st = fin_rules.retract_accusation(st)  # 다시 지목할 수 있다 (최종 추리 단계는 유지)
+            state.finale = st.model_dump()
+            state.finale_wrong = st.wrong
+            ending = fin_rules.ending_of(st)
+            if ending in ("success", "escaped", "wrong_accusation"):
+                state.ending = ending  # type: ignore[assignment]
+                state.phase = "ended"
+                line = {"success": "결국 모든 게 드러났다.", "escaped": "증거가 모자랐다. 범인은 끝내 버텼다.",
+                        "wrong_accusation": "엉뚱한 사람을 지목하고 말았다…"}[ending]
+                self._say(events, eb, "narrator", None, line)
+                events.append(eb.custom("ending", {"ending": ending, "replay": self._replay(case, state)}))
+            elif t == "start":
+                events.append(eb.custom("finale", {"accused_id": st.accused_id, "stage": None, "lives": st.lives,
+                                                   "filled": st.passed, "last": None}))
+        except (_BadAction, ValueError) as e:
+            events.append(eb.run_error(str(e), code="bad_step"))
+        self.store.save_live(state)
+        for ev in events:
+            yield ev
+        yield eb.snapshot(self._view(case, state, masker))
+        yield eb.run_finished()
+
+    def _replay(self, case: CaseBible, state: GameState) -> dict:
+        """진실 리플레이: 사건 당일 타임라인 + 수사 기간 밤 행동. 엔딩 후에만 공개."""
+        name = {c.id: c.name for c in case.characters}
+        loc = {l.id: l.name for l in case.locations}
+        timeline = [{"time": C.hhmm(t.time), "who": name.get(t.character_id, t.character_id),
+                     "where": loc.get(t.location_id, t.location_id), "what": t.action} for t in case.timeline]
+        nights = [e for e in state.events_log if e.get("type") == "night"]
+        return {"culprit": [name[c] for c in case.culprit_ids], "trick": case.trick, "timeline": timeline,
+                "nights": nights}
+
+    # ================================================================= 저장
+    def save(self, game_id: str, slot_name: str | None) -> dict:
+        case, state, _ = self._load(game_id)
+        if state.phase in ("night", "finale"):
+            raise StorageError("지금은 저장할 수 없어요 (밤이나 최종 추리 중).")
+        slot = self.store.snapshot(state, name=slot_name or f"{state.day}일차 {C.hhmm(state.clock)}")
+        self.rag.copy_slot(state.slot_id, slot)
+        return {"slot_id": slot, "saved_at": datetime.now().isoformat()}
+
+    def list_saves(self, game_id: str) -> list[dict]:
+        self.store.live_slot_id(game_id)
+        return self.store.list_slots(game_id)
+
+    def load(self, game_id: str, slot_id: str) -> PlayerView:
+        if slot_id not in [s["slot_id"] for s in self.store.list_slots(game_id)]:
+            raise StorageError("이 게임의 저장 슬롯이 아니에요.")
+        old_live = self.store.live_slot_id(game_id)
+        new_live = f"slot_{uuid.uuid4().hex[:12]}"
+        self.rag.copy_slot(slot_id, new_live)
+        state = self.store.activate_slot(game_id, slot_id, new_live)
+        self.rag.delete_slot(old_live)
+        return self._persist_view(self.cases[state.case_id], state)
+
+    def sources(self, game_id: str, statement_id: str) -> list[dict]:
+        """진술 출처. NPC 기억 원문은 절대 내보내지 않는다(범인이 숨긴 진짜 기억이 샐 수 있음).
+        누가 언제 한 말인지 + 그 기억과 연결된 증거 중 플레이어가 이미 가진 것만."""
+        case, state, masker = self._load(game_id)
+        stmt = next((s for s in state.notebook.statements if s.id == statement_id), None)
+        if stmt is None:
+            raise StorageError("진술이 없어요.")
+        out = [{"kind": "statement", "title": f"{C.char(case, stmt.npc_id).name}의 진술 ({state.day}일차 {C.hhmm(stmt.game_time)})",
+                "content": stmt.content}]
+        memo = {m.id: m for m, _ in self.rag.load_memories(case.case_id, state.slot_id)}
+        for sid in stmt.source_ids:
+            m = memo.get(sid)
+            if m and m.evidence_id and m.evidence_id in state.notebook.evidence_ids:
+                ev = C.evidence(case, m.evidence_id)
+                out.append({"kind": "evidence", "title": ev.name, "content": ev.content})
+        return out
+
+    # ================================================================= 클리어
+    def clear(self, game_id: str) -> dict:
+        case, state, _ = self._load(game_id)
+        if state.ending == "none":
+            raise StorageError("아직 끝나지 않은 사건이에요.")
+        success = state.ending == "success"
+        score, grade = grade_rules.grade_game(self.cfg, state, state.difficulty,
+                                              confession_bonus=bool(state.director_state.get("confession")))
+        title = rep_rules.title_for(self.cfg, state.reputation)
+        culprit = C.char(case, case.culprit_ids[0])
+        bluffs = [e for e in state.events_log if e.get("type") == "bluff" and e.get("outcome") == "confession"]
+        if bluffs:
+            highlight = f"블러핑으로 {C.char(case, bluffs[-1]['npc']).name}의 자백을 받아냈다"
+        elif success:
+            highlight = f"증거 {len(state.notebook.evidence_ids)}개와 모순 {len(state.notebook.contradictions)}개로 진실을 밝혀냈다"
+        else:
+            highlight = "끝내 진실에 닿지 못했다"
+        history = ClearHistory(
+            id=f"h_{uuid.uuid4().hex[:10]}", player_id="player", case_title=case.title, theme=case.theme,
+            cleared_at=datetime.now(), success=success,
+            real_minutes=max(1, int((datetime.now() - state.started_at).total_seconds() // 60)),
+            game_days=state.day, question_count=state.question_count, grade=grade if success else None,
+            titles=[title] if title else [], reputation=state.reputation,
+            culprit={"name": culprit.name, "role": culprit.role},
+            characters=[{"name": c.name, "role": c.role, "face_seed": c.face_seed, "appearance": c.appearance}
+                        for c in case.characters if state.npc_states.get(c.id) and state.npc_states[c.id].visible],
+            highlight=highlight, fingerprint=case.fingerprint,
+        )
+        self.store.add_history(history)
+        emoji = "🔍" * max(1, state.day) + ("✅" if success else "❌")
+        card = ShareCard(
+            emoji_line=emoji,
+            share_text=f"The Suspects · {case.title} · {state.question_count}질문 {emoji}" + (f" · {grade}" if success else ""),
+            theme_color="#3B5BA5",
+        ) if success else None
+        # 삭제: 배경·NPC 기억·대화·사건 상태. 남는 것은 클리어 이력뿐 (PRD §10.2)
+        for slot in self.store.delete_game(game_id):
+            self.rag.delete_slot(slot)
+        return {"history": history.model_dump(mode="json"), "card": card.model_dump() if card else None}
+
+    def history(self) -> list[ClearHistory]:
+        return self.store.list_history()
+
+
+class _BadAction(Exception):
+    pass
+
+
+def _ground(case: CaseBible, v: GMVerdict, text: str, grounded_text: str, presented: str | None) -> GMVerdict:
+    """근거 있는 발언 면제 (PRD 부록 F.11 v1.7): 이번에 받은 검색 결과나 제시된 증거에 이미 있는 이름·시각·장소는
+    LLM 검사 대상에서 뺀다."""
+    if not v.triggers:
+        return v
+    keep = []
+    gt = grounded_text + " " + (presented or "")
+    for t in v.triggers:
+        if t == "incident_time":
+            times = gm_rules.extract_time_candidates(text)
+            src = {c for cands in gm_rules.extract_time_candidates(gt) for c in cands}
+            if times and all(any(abs(c - s) <= 15 for c in cands for s in src) for cands in times):
+                continue
+        elif t == "incident_location":
+            loc = next((l.name for l in case.locations if l.id == case.incident.location_id), "")
+            if loc and loc in gt:
+                continue
+        elif t == "key_evidence":
+            names = [e.name for e in case.evidence if e.is_key and e.name in text]
+            if names and all(n in gt for n in names):
+                continue
+        elif t == "culprit_name":
+            names = [c.name for c in case.characters if c.id in case.culprit_ids]
+            if all(n in gt or n[1:] in gt for n in names if n in text or n[1:] in text):
+                continue
+        keep.append(t)
+    return v.model_copy(update={"triggers": keep, "needs_llm_check": bool(keep) and v.needs_llm_check,
+                                "ok": not v.violations and not keep})
+
+
+_SERVICE: GameService | None = None
+
+
+def get_service() -> GameService:
+    global _SERVICE
+    if _SERVICE is None:
+        _SERVICE = GameService()
+    return _SERVICE

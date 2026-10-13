@@ -103,6 +103,12 @@ mcp:
   a2a_external: false
 tracing: { format: opentelemetry_genai, exporter: langfuse }
 retention: { abandoned_days: 30 }
+# 장소 조사로 증거가 드러나는 방식 (개발 중 추가: 한 번에 다 나오면 첫 행동으로 사건이 풀림)
+investigation:
+  reveal_per_action: 2      # 조사 한 번에 드러나는 증거 수
+  key_evidence_last: true   # 핵심 증거는 그 장소의 다른 증거를 다 찾은 뒤에 드러남
+  day_start_minute: 540     # 수사 하루 시작 시각 (09:00)
+  minutes_per_action: 30    # 행동 하나에 흐르는 게임 속 시간
 reputation_range: [-100, 100]
 grades: ["S", "A", "B", "C"]
 

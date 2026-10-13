@@ -26,6 +26,7 @@ load_dotenv(_ROOT / ".env")
 
 class NewGame(BaseModel):
     theme_id: str = "demo_db_deleted"
+    options: dict | None = None
 
 
 class SaveReq(BaseModel):
@@ -89,10 +90,23 @@ def themes() -> list[dict]:
 @app.post("/api/games")
 def new_game(req: NewGame) -> dict:
     try:
-        game_id, view = _service().new_game(req.theme_id)
+        game_id, view = _service().new_game(req.theme_id, req.options)
     except KeyError:
         raise HTTPException(404, "없는 주제입니다")
     return {"game_id": game_id, "view": view.model_dump(mode="json")}
+
+
+@app.get("/api/games")
+def list_games() -> list[dict]:
+    return _service().list_games()
+
+
+@app.get("/api/games/{game_id}/saves")
+def list_saves(game_id: str) -> list[dict]:
+    try:
+        return _service().list_saves(game_id)
+    except StorageError as e:
+        raise HTTPException(404, str(e))
 
 
 @app.get("/api/games/{game_id}")

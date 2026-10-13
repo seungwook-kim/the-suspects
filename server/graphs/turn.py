@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Any, Callable, TypedDict
+from typing import Any, Awaitable, Callable, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
@@ -53,6 +53,8 @@ class TurnDeps:
     # 그 NPC의 거짓말 지침 (범인·공범만)
     lie_guidance: Callable[[CaseBible, str, str], list[str]]
     case_brief: Callable[[CaseBible, GameState], str]
+    # 게임 마스터 LLM 검사: 코드 검사가 트리거만 남겼을 때(확정 위반 없음) 실행. True면 통과
+    gm_llm_check: Callable[[CaseBible, GameState, str, NPCReply, GMVerdict], Awaitable[bool]] | None = None
 
 
 class TurnState(TypedDict, total=False):
@@ -83,7 +85,7 @@ def _say(s: TurnState, speaker: str | None, text: str, role: str = "npc") -> Non
 # ---------------------------------------------------------------------------- nodes
 def node_turn_away_check(s: TurnState) -> TurnState:
     ns = s["game"].npc_states[s["npc_id"]]
-    if ns.turned_away_until is not None and s["game"].action_no <= ns.turned_away_until:
+    if ns.turned_away_until is not None and s["game"].action_no < ns.turned_away_until:  # server.rules.trust.is_turned_away와 같은 기준
         s["events"].append(s["eb"].custom("turn_away", {"npcId": s["npc_id"],
                                                          "untilActions": ns.turned_away_until - s["game"].action_no}))
         _say(s, s["npc_id"], "…지금은 얘기하고 싶지 않아요.")
@@ -167,6 +169,24 @@ async def node_npc_answer(s: TurnState) -> TurnState:
     return s
 
 
+def gm_branch(s: TurnState) -> str:
+    v = s.get("verdict")
+    if s.get("fallback_used") or v is None or not v.needs_llm_check or v.violations:
+        return "after_answer"
+    return "gm_llm" if s["deps"].gm_llm_check else "after_answer"
+
+
+async def node_gm_llm(s: TurnState) -> TurnState:
+    """핫 패스 LLM 1회 원칙의 허용 예외. 근거 없는 핵심 정보 언급일 때만 온다(PRD 부록 F.11)."""
+    deps: TurnDeps = s["deps"]
+    ok = await deps.gm_llm_check(s["case"], s["game"], s["npc_id"], s["reply"], s["verdict"])  # type: ignore[misc]
+    if not ok:
+        ch = _char(s["case"], s["npc_id"])
+        s["reply"] = NPCReply(text=deps.fallback_line(ch), emotion=s["reply"].emotion, used_ids=[])
+        s["fallback_used"] = True
+    return s
+
+
 def node_after_answer(s: TurnState) -> TurnState:
     deps: TurnDeps = s["deps"]
     game, npc_id, reply = s["game"], s["npc_id"], s["reply"]
@@ -226,6 +246,7 @@ def build_turn_graph():
     g.add_node("warrant_hint", node_warrant_hint)
     g.add_node("retrieve", node_retrieve)
     g.add_node("npc_answer", node_npc_answer)
+    g.add_node("gm_llm", node_gm_llm)
     g.add_node("after_answer", node_after_answer)
     g.add_node("small_talk", node_small_talk)
     g.add_node("offtopic", node_offtopic)
@@ -238,7 +259,8 @@ def build_turn_graph():
     g.add_edge("bluff_hint", "retrieve")
     g.add_edge("warrant_hint", END)
     g.add_edge("retrieve", "npc_answer")
-    g.add_edge("npc_answer", "after_answer")
+    g.add_conditional_edges("npc_answer", gm_branch, {"gm_llm": "gm_llm", "after_answer": "after_answer"})
+    g.add_edge("gm_llm", "after_answer")
     g.add_edge("after_answer", END)
     g.add_edge("small_talk", END)
     g.add_edge("offtopic", END)

@@ -82,9 +82,10 @@ def fake_reply(ctx: NPCContext) -> NPCReply:
     if ctx.lie_guidance and ctx.hits:
         text = _strip_end(ctx.lie_guidance[0].split("→")[-1].strip()) + "."
         return NPCReply(text=text, emotion=emotion if emotion != "neutral" else "nervous", used_ids=[ctx.hits[0].id])
-    if not ctx.hits:
+    own = [h for h in ctx.hits if h.kind == "memory"]  # 공용 문서 조각을 자기 말처럼 읽지 않는다
+    if not own:
         return NPCReply(text="글쎄요, 그건 잘 모르겠네요.", emotion=emotion, used_ids=[])
-    h = ctx.hits[0]
+    h = own[0]
     conf = h.meta.get("confidence")
     prefix = "확실하진 않은데, " if conf is not None and conf < 0.5 else "아마 " if conf is not None and conf < 0.75 else ""
     body = _strip_end(h.content)

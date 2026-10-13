@@ -312,6 +312,7 @@ class GameConfig(_Base):
     mcp: dict[str, Any]
     tracing: dict[str, Any]
     retention: dict[str, Any]
+    investigation: dict[str, Any]
     reputation_range: list[int]
     grades: list[str]
     # 부록 F

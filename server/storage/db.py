@@ -87,6 +87,21 @@ class GameStore:
             raise StorageError(f"진행 중 슬롯이 없습니다: {game_id}")
         return GameState.model_validate_json(srow["state_json"])
 
+    def list_games(self, player_id: str = "player") -> list[dict]:
+        """진행 중인 게임 목록 (이어하기)."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT g.game_id, g.case_id, g.last_seen, s.state_json FROM games g "
+                "JOIN slots s ON s.slot_id = g.live_slot WHERE g.player_id = ? ORDER BY g.last_seen DESC",
+                (player_id,),
+            ).fetchall()
+        out = []
+        for r in rows:
+            st = GameState.model_validate_json(r["state_json"])
+            out.append({"game_id": r["game_id"], "case_id": r["case_id"], "day": st.day,
+                        "phase": st.phase, "last_seen": r["last_seen"]})
+        return out
+
     def save_live(self, state: GameState) -> None:
         self._require_ids(state)
         with self._lock:
