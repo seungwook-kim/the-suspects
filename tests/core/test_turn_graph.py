@@ -76,6 +76,50 @@ async def test_bluff_text_redirects(mini_case, mini_state, router):
     assert starts[0]["role"] == "partner"  # 블러핑 버튼 안내
 
 
+@pytest.mark.parametrize(
+    "verdict, expect_llm_check",
+    [
+        (GMVerdict(ok=False, needs_llm_check=True, triggers=["incident_time"]), True),  # 근거 없는 핵심 정보
+        (GMVerdict(ok=True), False),  # 깨끗한 답
+    ],
+)
+async def test_gm_llm_check_only_when_triggers_remain(mini_case, mini_state, router, verdict, expect_llm_check):
+    calls = []
+    deps = _deps(router, calls)
+    deps.gm_code_check = lambda case, game, npc, r: verdict
+
+    async def gm_llm(case, game, npc, reply, v):
+        calls.append("gm_llm")
+        return True
+
+    deps.gm_llm_check = gm_llm
+    await run_turn(mini_case, mini_state, "npc_dba", "어젯밤 11시쯤 어디 계셨어요?", deps)
+    assert ("gm_llm" in calls) is expect_llm_check
+    assert calls[-1] == "after"
+
+
+async def test_gm_llm_rejects_reply_with_fallback_line(mini_case, mini_state, router):
+    calls = []
+    deps = _deps(router, calls)
+    deps.gm_code_check = lambda case, game, npc, r: GMVerdict(ok=False, needs_llm_check=True, triggers=["culprit_name"])
+
+    async def gm_llm(case, game, npc, reply, v):
+        return False  # 그 인물이 알 수 없는 정보를 말함
+
+    deps.gm_llm_check = gm_llm
+    _, events, _ = await run_turn(mini_case, mini_state, "npc_dba", "어젯밤 11시쯤 어디 계셨어요?", deps)
+    text = "".join(e.get("delta", "") for e in events if e["type"] == "TEXT_MESSAGE_CONTENT")
+    assert "모르겠어요." in text and "퇴근" not in text  # 걸린 답은 안전한 대체 대사로
+
+
+async def test_notebook_event_sends_public_statement(mini_case, mini_state, router):
+    _, events, _ = await run_turn(mini_case, mini_state, "npc_dba", "어젯밤 11시쯤 어디 계셨어요?", _deps(router, []))
+    nb = next(e for e in events if e.get("name") == "notebook")["value"]["added"]
+    stmt = nb["statements"][0]
+    assert isinstance(stmt, dict) and stmt["content"]  # 계약: 진술은 객체
+    assert "m1" not in stmt["source_ids"] and stmt["memory_id"] is None  # 근거 기억 ID는 가림
+
+
 async def test_turned_away_npc(mini_case, mini_state, router):
     calls = []
     mini_state.npc_states["npc_dba"].turned_away_until = mini_state.action_no + 2

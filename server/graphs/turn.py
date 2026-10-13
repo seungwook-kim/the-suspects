@@ -21,6 +21,7 @@ from langgraph.graph import END, START, StateGraph
 from server.agents import npc as npc_agent
 from server.agents.router import SemanticRouter
 from server.game.events import EventBuilder
+from server.game.view import public_statement
 from server.llm.client import LLMClient
 from server.schemas import (
     CaseBible,
@@ -198,7 +199,7 @@ def node_after_answer(s: TurnState) -> TurnState:
     game.notebook.statements.append(stmt)
     game.question_count += 1
     result = deps.after_answer(game, npc_id, s["text"], reply, s.get("hits", []))
-    added: dict[str, Any] = {"statements": [stmt.id]}
+    added: dict[str, Any] = {"statements": [public_statement(stmt).model_dump()]}  # 계약: 객체로, 근거 ID는 가림
     if result.get("evidence_ids"):
         added["evidence_ids"] = result["evidence_ids"]
     if result.get("contradictions"):

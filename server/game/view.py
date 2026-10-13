@@ -31,6 +31,18 @@ def reputation_band(reputation: int, bands: list[tuple[int, str]] | None = None)
     return ""
 
 
+def _first_sentence(text: str) -> str:
+    """성격 설명의 첫 문장만 공개한다. 뒤 문장일수록 비밀에 가까운 힌트가 붙기 쉽다."""
+    head = text.split(". ")[0].strip()
+    return head if head.endswith(".") else head + "."
+
+
+def public_statement(s: NotebookStatement) -> NotebookStatement:
+    """화면용 진술. 근거 기억 ID는 감추고 자리표시만 남긴다 (출처 원문은 별도 API로)."""
+    return NotebookStatement(id=s.id, npc_id=s.npc_id, content=s.content, game_time=s.game_time, memory_id=None,
+                             source_ids=[f"{s.id}:{i}" for i, _ in enumerate(s.source_ids)])
+
+
 def gauge(value: float, cells: int = 5) -> int:
     value = max(0.0, min(1.0, value))
     return min(cells, int(value * cells + 1e-9))
@@ -76,7 +88,7 @@ def build_view(
                 face_seed=ch.face_seed,
                 location_id=ns.location_id if ns.location_id in unlocked else None,
                 emotion=ns.emotion,
-                one_liner=f"{ch.age}세 · {ch.role}",
+                one_liner=_first_sentence(ch.personality),  # 이름·직업·나이는 카드에 따로 보인다
             )
         )
 
@@ -91,13 +103,7 @@ def build_view(
     nb = state.notebook
     public_nb = Notebook(
         evidence_ids=[masker.out("evidence", e) for e in nb.evidence_ids],
-        statements=[
-            NotebookStatement(
-                id=s.id, npc_id=s.npc_id, content=s.content, game_time=s.game_time, memory_id=None,
-                source_ids=[f"{s.id}:{i}" for i, _ in enumerate(s.source_ids)],  # 출처 원문은 별도 API로
-            )
-            for s in nb.statements
-        ],
+        statements=[public_statement(s) for s in nb.statements],
         contradictions=[
             Contradiction(id=c.id, statement_id=c.statement_id, evidence_id=masker.out("evidence", c.evidence_id),
                           lie_id="", note=c.note)

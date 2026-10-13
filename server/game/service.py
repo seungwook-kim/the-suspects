@@ -302,7 +302,7 @@ class GameService:
         def gm_code_check(case_: CaseBible, game: GameState, npc_id: str, reply: NPCReply) -> GMVerdict:
             v = gm_rules.check_reply(cfg, case_, npc_id, reply.text)
             grounded = " ".join(h.content for h in hold.get("hits", []) if h.id in reply.used_ids or not reply.used_ids)
-            return _ground(case_, v, reply.text, grounded, hold.get("presented"))
+            return ground_verdict(cfg, case_, v, reply.text, grounded)
 
         async def gm_llm_check(case_, game, npc_id, reply, verdict) -> bool:
             out, _ = await self.llm.structured(
@@ -449,8 +449,8 @@ class GameService:
         )
         reply, _, _ = await npc_agent.answer(
             self.llm, ctx, role="npc_minor" if ch.tier == "minor" else "npc",
-            gm_code_check=lambda r: _ground(case, gm_rules.check_reply(self.cfg, case, npc_id, r.text), r.text,
-                                            " ".join(h.content for h in hits), presented),
+            gm_code_check=lambda r: ground_verdict(self.cfg, case, gm_rules.check_reply(self.cfg, case, npc_id, r.text),
+                                                   r.text, " ".join(h.content for h in hits), presented),
             fallback_line=lambda: gm_rules.fallback_line(self.cfg, ch), game_id=state.game_id,
         )
         if forced_emotion:
@@ -489,7 +489,9 @@ class GameService:
             if new_c:
                 state.npc_states[npc_id] = trust_rules.apply_event(self.cfg, state.npc_states[npc_id], "lie_exposed")
                 state.director_state["actions_since_clue"] = 0
-                events.append(eb.custom("notebook", {"added": {"contradictions": new_c}}))
+                # 계약: 모순은 객체로 보낸다. 화면용 모양(가린 ID, 거짓말 ID 빈 값)은 build_view와 같게
+                public = [c.model_dump() for c in self._view(case, state, masker).notebook.contradictions if c.id in new_c]
+                events.append(eb.custom("notebook", {"added": {"contradictions": public}}))
         else:
             await self._npc_react(case, state, npc_id, f"형사가 '{ev.name}'을(를) 보여 주며 묻는다: {ev.content}", events, eb,
                                   presented=ev.name)
@@ -778,18 +780,27 @@ class _BadAction(Exception):
     pass
 
 
-def _ground(case: CaseBible, v: GMVerdict, text: str, grounded_text: str, presented: str | None) -> GMVerdict:
+def _minute_dist(a: int, b: int) -> int:
+    d = abs(a - b) % 1440
+    return min(d, 1440 - d)
+
+
+def ground_verdict(cfg, case: CaseBible, v: GMVerdict, text: str, grounded_text: str,
+                   presented: str | None = None) -> GMVerdict:
     """근거 있는 발언 면제 (PRD 부록 F.11 v1.7): 이번에 받은 검색 결과나 제시된 증거에 이미 있는 이름·시각·장소는
-    LLM 검사 대상에서 뺀다."""
+    LLM 검사 대상에서 뺀다. 시각은 ±15분이면 같은 시각으로 본다."""
     if not v.triggers:
         return v
     keep = []
     gt = grounded_text + " " + (presented or "")
     for t in v.triggers:
         if t == "incident_time":
-            times = gm_rules.extract_time_candidates(text)
-            src = {c for cands in gm_rules.extract_time_candidates(gt) for c in cands}
-            if times and all(any(abs(c - s) <= 15 for c in cands for s in src) for cands in times):
+            window = cfg.gm.time_window_hours * 60
+            inc = case.incident.time % 1440
+            near = [cands for cands in gm_rules.extract_time_candidates(text)
+                    if any(_minute_dist(c, inc) <= window for c in cands)]
+            src = [s for cands in gm_rules.extract_time_candidates(gt) for s in cands]
+            if near and all(any(_minute_dist(c, s) <= 15 for c in cands for s in src) for cands in near):
                 continue
         elif t == "incident_location":
             loc = next((l.name for l in case.locations if l.id == case.incident.location_id), "")
