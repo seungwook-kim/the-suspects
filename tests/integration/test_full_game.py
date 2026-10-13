@@ -157,6 +157,22 @@ async def test_sources_never_expose_npc_memory(svc):
             assert m.content not in blob  # 범인의 진짜 기억 원문이 출처로 새면 안 됨
 
 
+def test_player_search_only_returns_owned_evidence(svc):
+    """플레이어 시점 검색은 수첩에 있는 증거 청크만 (ADR-0006)."""
+    game_id, _ = svc.new_game("demo_db_deleted")
+    case = svc.cases["demo_db_deleted"]
+    ev = next(e for e in case.evidence if e.is_key and "player" in e.visibility)
+    st = svc.store.load_live(game_id)
+
+    def found(state):
+        hits = svc._player_search(case, state, ev.content, k=10)
+        return any(h.meta.get("evidence_id") == ev.id or h.id == f"ev:{ev.id}" for h in hits)
+
+    assert not found(st)  # 아직 못 찾은 증거는 검색에도 안 나온다
+    st.notebook.evidence_ids.append(ev.id)
+    assert found(st)
+
+
 async def test_cannot_present_unowned_or_forged(svc):
     game_id, _ = svc.new_game("demo_db_deleted")
     case = svc.cases["demo_db_deleted"]
