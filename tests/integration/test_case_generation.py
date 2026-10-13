@@ -69,7 +69,7 @@ async def test_job_flow_play_and_clear_deletes_case(svc):
     assert job["status"] == "running" and job["total"] == 6 and "_task" not in job
     job = await _wait(svc, job_id)
     assert job["status"] == "ready", job["message"]
-    assert job["preview"]["title"] and len(job["preview"]["characters"]) == 5
+    assert job["preview"]["title"] and len(job["preview"]["characters"]) in (5, 6)  # 20분: 5~6명 (PRD §6.2)
     assert all(c["location_id"] is None for c in job["preview"]["characters"])
     assert job["view"]["case_title"] == job["preview"]["title"]
     assert [t["id"] for t in svc.themes()] == svc.presets  # 만든 사건은 주제 목록에 안 나옴

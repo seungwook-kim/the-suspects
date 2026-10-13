@@ -61,7 +61,8 @@ def portrait_prompt(*, role: str, age: int, gender: str, appearance: dict, setti
     return (
         f"Photorealistic close-up head-and-shoulders portrait photo of a fictional {age}-year-old Korean {who} "
         f"who works as {role}, wearing {look[0]}, with {look[1]}{extra}. "
-        "The face and shoulders fill the frame, cropped at the chest, eyes in the upper third. "
+        "The face and shoulders fill the frame, cropped at the upper chest, eyes in the upper third; "
+        "only the head, neck and upper chest are visible, so trousers, shoes and hands are out of frame. "
         "Relaxed neutral expression with closed lips, looking straight at the camera, natural soft daylight, "
         f"modern present-day South Korea, softly blurred background{(' suggesting ' + setting) if setting else ''}. "
         "An ordinary-looking person, not a celebrity and not resembling any real person. "
@@ -133,6 +134,8 @@ class PortraitStore:
         self._sem = asyncio.Semaphore(concurrency or images.concurrency)
         self._tasks: dict[str, asyncio.Task] = {}
         self._starts: dict[str, int] = {}  # 판마다 그리기 시작 횟수 (빠진 그림 다시 그리기 상한용)
+        self._emo_jobs: dict[tuple[str, str, str], asyncio.Task] = {}  # (판, 인물, 표정) → 그리기 (끝나도 남겨 재시도 막음)
+        self._base_files: dict[tuple[str, str], str] = {}  # (판, 인물) → 보관함의 기본 사진 (표정 사진 잇기용)
 
     @property
     def enabled(self) -> bool:
@@ -175,14 +178,20 @@ class PortraitStore:
         return out
 
     def missing(self, key: str, ids: list[str]) -> bool:
-        """기본 사진이나 설정된 표정 사진 중 빠진 게 있는지."""
-        base, emos = self.urls(key), self.emotion_urls(key)
-        return any(i not in base or any(e not in emos.get(i, {}) for e in self.images.emotions) for i in ids)
+        """기본 사진이 빠진 사람이 있는지 (표정 사진은 그 감정이 처음 나올 때 그린다)."""
+        base = self.urls(key)
+        return any(i not in base for i in ids)
+
+    @property
+    def can_fill(self) -> bool:
+        """새로 그리거나(그림 연결 켜짐) 보관함에서 꺼내 쓸 수 있는지."""
+        return self.images.enabled or self.library is not None
 
     def start(self, key: str, people: list[dict], *, setting: str = "", game_id: str | None = None) -> None:
-        """people: [{id, role, age, gender, appearance}] — 공개 정보만. 이미 그리는 중이면 무시.
-        이미 있는 그림은 건너뛰므로 다시 부르면 빠진 사람만 그린다. 한 판에 MAX_STARTS번까지(계속 실패할 때 무한 반복 방지)."""
-        if not self.enabled or self.pending(key) or self._starts.get(key, 0) >= MAX_STARTS:
+        """기본 사진 그리기 시작. people: [{id, role, age, gender, appearance}] — 공개 정보만. 이미 그리는 중이면 무시.
+        이미 있는 그림은 건너뛰므로 다시 부르면 빠진 사람만 채운다. 한 판에 MAX_STARTS번까지(무한 반복 방지).
+        새로 그릴 수 없으면(할당량 초과·실패) 보관함에서 비슷한 사람 사진(표정 사진 포함)을 꺼내 쓴다."""
+        if not self.can_fill or self.pending(key) or self._starts.get(key, 0) >= MAX_STARTS:
             return
         try:
             loop = asyncio.get_running_loop()
@@ -193,76 +202,123 @@ class PortraitStore:
 
     def pending(self, key: str) -> bool:
         t = self._tasks.get(key)
-        return bool(t and not t.done())
+        return bool(t and not t.done()) or any(k == key and not j.done() for (k, _, _), j in self._emo_jobs.items())
 
     async def wait(self, key: str) -> None:
         t = self._tasks.get(key)
         if t:
             await t
+        jobs = [j for (k, _, _), j in self._emo_jobs.items() if k == key]
+        if jobs:
+            await asyncio.gather(*jobs, return_exceptions=True)
+
+    @staticmethod
+    def _save(d: Path, name: str, img: bytes) -> None:
+        tmp = d / f"{name}.tmp"
+        tmp.write_bytes(img)
+        tmp.replace(d / f"{name}.webp")  # 반쯤 쓴 파일이 서빙되지 않게
+
+    async def _draw(self, prompt: str, seed: int, game_id: str | None, refs: list[bytes] | None = None) -> bytes | None:
+        async with self._sem:
+            if not self.images.enabled:  # 그사이 할당량이 끝났으면 남은 요청은 보내지 않는다
+                return None
+            raw = await self.images.generate(prompt, seed=seed, game_id=game_id, ref_images=refs)
+        return compact(raw, max_size=(self.images.width, self.images.height),
+                       quality=self.images.webp_quality) if raw else None
+
+    @staticmethod
+    def _base_path(d: Path, pid: str) -> Path | None:
+        return next((d / f"{pid}.{e}" for e in EXTS if (d / f"{pid}.{e}").exists()), None)
+
+    def _reuse(self, key: str, d: Path, p: dict, used: set[str]) -> bool:
+        """보관함에서 비슷한 사람(같은 직업군·성별, 가까운 나이) 사진을 꺼내 이 판의 사진으로 쓴다. 표정 사진도 함께."""
+        if self.library is None:
+            return False
+        hit = self.library.pick(p, exclude=used)
+        if not hit:
+            return False
+        rec, emos = hit
+        used.add(rec["file"])
+        self._save(d, p["id"], (self.library.root / rec["file"]).read_bytes())
+        for emo, path in emos.items():
+            self._save(d, f"{p['id']}--{emo}", path.read_bytes())
+        self._base_files[(key, p["id"])] = rec["file"]
+        return True
 
     async def _draw_all(self, key: str, people: list[dict], setting: str, game_id: str | None) -> None:
         d = self._dir(key)
         d.mkdir(parents=True, exist_ok=True)
-
-        def save(name: str, img: bytes) -> None:
-            tmp = d / f"{name}.tmp"
-            tmp.write_bytes(img)
-            tmp.replace(d / f"{name}.webp")  # 반쯤 쓴 파일이 서빙되지 않게
-
-        async def draw(prompt: str, seed: int, refs: list[bytes] | None = None) -> bytes | None:
-            async with self._sem:
-                if not self.images.enabled:  # 그사이 할당량이 끝났으면 남은 요청은 보내지 않는다
-                    return None
-                raw = await self.images.generate(prompt, seed=seed, game_id=game_id, ref_images=refs)
-            return compact(raw, max_size=(self.images.width, self.images.height),
-                           quality=self.images.webp_quality) if raw else None
+        used: set[str] = set()  # 이 판에서 이미 꺼내 쓴 보관함 사진 (같은 얼굴 두 번 금지)
 
         async def one(p: dict) -> None:
             pid = p["id"]
-            if not _SAFE.match(pid):
+            if not _SAFE.match(pid) or self._base_path(d, pid):
                 return
-            # 1) 기본(무표정) 사진 — 이미 있으면 그대로 쓴다(빠진 그림 다시 그리기)
-            base_path = next((d / f"{pid}.{e}" for e in EXTS if (d / f"{pid}.{e}").exists()), None)
-            seed, base_file = random.randrange(2**31), None
-            if base_path:
-                base = base_path.read_bytes()
-            else:
+            img = None
+            if self.images.enabled:
                 prompt = portrait_prompt(role=p["role"], age=p["age"], gender=p["gender"],
                                          appearance=p.get("appearance") or {}, setting=setting)
-                img = await draw(prompt, seed)
-                if not img:
-                    return
-                save(pid, img)
-                base = img
-                if self.library is not None:  # 사건·판·인물 id 없이 공개 외모 정보만
-                    base_file = self.library.add(img, "webp", person=p, prompt=prompt, provider=self.images.provider,
-                                                 model=self.images.model, seed=seed)["file"]
-
-            # 2) 표정 사진 — 기본 사진을 참조로 넣어 같은 얼굴에 표정만 바꾼다 (한 장 약 10초)
-            ref = ref_image(base)
-
-            async def emotion(emo: str) -> None:
-                if (d / f"{pid}--{emo}.webp").exists():
-                    return
-                prompt = expression_prompt(emo)
-                img = await draw(prompt, seed, [ref])
-                if not img:
-                    return
-                save(f"{pid}--{emo}", img)
-                if self.library is not None:
-                    self.library.add(img, "webp", person=p, prompt=prompt, provider=self.images.provider,
-                                     model=self.images.model, seed=seed, kind="emotion", emotion=emo,
-                                     base_file=base_file)
-
-            await asyncio.gather(*(emotion(e) for e in self.images.emotions if e in EMOTION_EN),
-                                 return_exceptions=True)
+                seed = random.randrange(2**31)
+                img = await self._draw(prompt, seed, game_id)
+                if img:
+                    self._save(d, pid, img)
+                    if self.library is not None:  # 사건·판·인물 id 없이 공개 외모 정보만
+                        self._base_files[(key, pid)] = self.library.add(
+                            img, "webp", person=p, prompt=prompt, provider=self.images.provider,
+                            model=self.images.model, seed=seed)["file"]
+            if not img:
+                self._reuse(key, d, p, used)
+            elif self.images.emotion_mode == "eager":  # 설정으로 표정까지 미리 그리기
+                await asyncio.gather(*(self._draw_emotion(key, p, e, game_id) for e in self.images.emotions),
+                                     return_exceptions=True)
 
         await asyncio.gather(*(one(p) for p in people), return_exceptions=True)
+
+    def want_emotions(self, key: str, wants: list[tuple[dict, str]], *, game_id: str | None = None) -> None:
+        """지금 나온 감정의 표정 사진이 없으면 그것만 그린다(감정이 처음 나올 때, 한 장 약 7~10초).
+        그동안 화면은 기본 사진 + 효과. 사람·표정마다 한 번만 시도한다."""
+        if not self.images.enabled or not _SAFE.match(key):
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        d = self.root / key
+        for p, emo in wants:
+            jk = (key, p["id"], emo)
+            if (emo not in EMOTION_EN or emo not in self.images.emotions or jk in self._emo_jobs
+                    or not _SAFE.match(p["id"]) or (d / f"{p['id']}--{emo}.webp").exists()
+                    or not self._base_path(d, p["id"])):
+                continue
+            self._emo_jobs[jk] = loop.create_task(self._draw_emotion(key, p, emo, game_id))
+
+    async def _draw_emotion(self, key: str, p: dict, emo: str, game_id: str | None) -> None:
+        """기본 사진을 참조로 넣어 같은 얼굴에 표정만 바꿔 그린다."""
+        d = self._dir(key)
+        pid = p["id"]
+        base_path = self._base_path(d, pid)
+        if not base_path or (d / f"{pid}--{emo}.webp").exists():
+            return
+        prompt, seed = expression_prompt(emo), random.randrange(2**31)
+        img = await self._draw(prompt, seed, game_id, [ref_image(base_path.read_bytes())])
+        if not img:
+            return
+        self._save(d, f"{pid}--{emo}", img)
+        if self.library is not None:
+            self.library.add(img, "webp", person=p, prompt=prompt, provider=self.images.provider,
+                             model=self.images.model, seed=seed, kind="emotion", emotion=emo,
+                             base_file=self._base_files.get((key, pid)))
 
     def delete(self, key: str) -> None:
         """판 그림만 지운다. 보관함 사진은 남는다."""
         t = self._tasks.pop(key, None)
         self._starts.pop(key, None)
+        for jk in [jk for jk in self._emo_jobs if jk[0] == key]:
+            j = self._emo_jobs.pop(jk)
+            if not j.done():
+                j.cancel()
+        for bk in [bk for bk in self._base_files if bk[0] == key]:
+            self._base_files.pop(bk)
         if t and not t.done():
             t.cancel()
         if _SAFE.match(key):

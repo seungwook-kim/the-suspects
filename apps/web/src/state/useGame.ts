@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import { api } from '../api/client'
 import type { Action, AgEvent, ClearHistory, CreateOptions, FinaleStep, PlayerView, ShareCard } from '../api/types'
 import { addSave } from '../util/saves'
@@ -9,12 +9,14 @@ export interface GameResult {
   card: ShareCard | null
 }
 
-// 초상화는 게임을 만든 뒤 서버가 백그라운드로 그린다(기본 사진 약 40초, 표정 사진은 3~4분 더). 그동안 몇 초마다 주소만 받아 채운다.
+// 초상화는 게임을 만든 뒤 서버가 백그라운드로 그린다(기본 사진 약 1분). 표정 사진은 그 감정이 처음 나올 때 서버가
+// 그 사람 것만 그린다(약 10초). 그래서 게임을 열 때와 행동이 끝날 때마다 다시 묻고, 그리는 동안(pending) 몇 초마다 채운다.
 export const PORTRAIT_POLL_MS = 3000
 export const PORTRAIT_POLL_MAX_MS = 360_000
 
 export function useGame() {
   const [state, dispatch] = useReducer(clientReducer, initialClientState)
+  const [portraitKick, setPortraitKick] = useState(0) // 행동이 끝날 때마다 +1 → 사진 상태를 다시 묻는다
   const gameIdRef = useRef<string | null>(null)
   const busyRef = useRef(false)
   const viewRef = useRef(state.view)
@@ -42,7 +44,7 @@ export function useGame() {
       alive = false
       window.clearTimeout(timer)
     }
-  }, [viewGameId])
+  }, [viewGameId, portraitKick])
 
   const fail = useCallback((e: unknown) => {
     dispatch({ kind: 'error', message: e instanceof Error ? e.message : '알 수 없는 오류가 났습니다.' })
@@ -74,6 +76,7 @@ export function useGame() {
       } finally {
         busyRef.current = false
         dispatch({ kind: 'running', value: false })
+        setPortraitKick((n) => n + 1) // 이번 행동으로 새 감정이 나왔으면 서버가 표정 사진을 그리기 시작했을 수 있다
       }
       if (opts.tick && !sawError) dispatch({ kind: 'tick_turn_away' })
     },

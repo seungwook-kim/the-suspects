@@ -4,7 +4,7 @@
 장소가 어떤 조건으로 열리는지는 여기서 정한다. LLM(사건 작가)은 이 뼈대에 이름·설명·대사를 입힌다.
 그래서 작가가 아무리 들쭉날쭉해도 검수(server/cases/verify.py)의 구조 규칙은 설계상 통과한다.
 
-뼈대(인물 수 n = 5~7)
+뼈대(인물 수 n = 5~10, PRD §6.2 — 플레이 시간 20분 5~6명, 40분 7~8명, 60분 9~10명)
   범인 X        : 동기·수단·기회 모두. 사건 시각에 현장.
   의심 인물 H1  : 동기 + 수단 (기회 없음 — 그 시각 건물 밖)
   의심 인물 H2  : 동기 + 기회 (수단 없음 — 사건 직전 현장 근처)
@@ -211,7 +211,8 @@ def draw(case_id: str, theme_text: str, options: dict | None, seed: int | None =
     opts = options or {}
     rng = random.Random(seed)
     minutes = int(opts.get("play_minutes") or 40)
-    n = {20: 5, 40: 6, 60: 7}.get(minutes, 6)
+    lo, hi = {20: (5, 6), 40: (7, 8), 60: (9, 10)}.get(minutes, (7, 8))
+    n = rng.randint(lo, hi)  # 핵심 4역할 + 주변 인물 n-4명
     plots = ["culprit", "h1", "h2", "witness"] + [f"b{i + 1}" for i in range(n - 4)]
     rng.shuffle(plots)  # 범인이 늘 첫 번째 인물이 되지 않게
     people = []

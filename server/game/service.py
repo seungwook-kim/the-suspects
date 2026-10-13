@@ -153,6 +153,10 @@ class GameService:
     def _view(self, case: CaseBible, state: GameState, masker: IdMasker) -> PlayerView:
         self._refresh(case, state)
         key = self._portrait_key(state)
+        # 표정 사진은 그 감정이 처음 나올 때 그 사람 것만 그린다 (할당량 절약, 그동안은 기본 사진 + 효과)
+        wants = [(p, state.npc_states[p["id"]].emotion) for p in self._public_people(case.characters)
+                 if p["id"] in state.npc_states and state.npc_states[p["id"]].emotion != "neutral"]
+        self.portraits.want_emotions(key, wants, game_id=state.game_id)
         return build_view(case, state, masker, chips=self._chips(case, state, masker), bands=self._bands(),
                           actions_total=self.cfg.day_actions, portraits=self.portraits.urls(key),
                           portrait_emotions=self.portraits.emotion_urls(key))

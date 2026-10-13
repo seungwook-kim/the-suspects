@@ -40,10 +40,12 @@ class ImageClient:
         self.aspect_ratio: str = role.get("aspect_ratio", "3:4")
         self.width: int = int(role.get("width", 480))  # 그리는 크기 = 저장 최대 크기
         self.height: int = int(role.get("height", 640))
-        self.concurrency: int = int(role.get("concurrency", 7))  # 한 판의 인물을 한꺼번에 (공급자 대기 시간이 대부분)
+        self.concurrency: int = int(role.get("concurrency", 10))  # 한 판의 인물을 한꺼번에 (공급자 대기 시간이 대부분)
         self.webp_quality: int = int(role.get("webp_quality", 80))
         # 같은 얼굴로 따로 그릴 표정 (기본 사진 = neutral). 비우면 표정 사진 없이 화면 효과만
         self.emotions: list[str] = list(role.get("emotions", ["nervous", "flustered", "angry", "sad", "happy"]))
+        # lazy: 그 감정이 처음 나올 때 그 사람 것만 그림(기본, 할당량 절약) / eager: 기본 사진 뒤에 표정까지 미리
+        self.emotion_mode: str = str(role.get("emotion_mode", "lazy"))
         if self.provider == "cloudflare":
             self.api_key = api_key if api_key is not None else os.getenv("CLOUDFLARE_API_TOKEN", "")
             self.account_id = account_id if account_id is not None else os.getenv("CLOUDFLARE_ACCOUNT_ID", "")

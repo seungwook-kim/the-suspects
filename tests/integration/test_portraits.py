@@ -49,7 +49,7 @@ def svc(tmp_path, prompts):
         prompts.append(prompt)
         return real_image()
 
-    s.portraits = PortraitStore(tmp_path / "portraits", ImageClient(tracer=s.llm.tracer, generator=fake))
+    s.portraits = PortraitStore(tmp_path / "portraits", eager(ImageClient(tracer=s.llm.tracer, generator=fake)))
     return s
 
 
@@ -121,7 +121,7 @@ async def test_portrait_status_while_drawing(tmp_path):
         await gate.wait()
         return real_image()
 
-    s.portraits = PortraitStore(tmp_path / "portraits", ImageClient(tracer=s.llm.tracer, generator=fake))
+    s.portraits = PortraitStore(tmp_path / "portraits", eager(ImageClient(tracer=s.llm.tracer, generator=fake)))
     game_id, view = s.new_game("demo_db_deleted")
     assert s.portrait_status(game_id) == {"pending": True, "urls": {}, "emotions": {}}  # 화면은 이걸 보고 계속 묻는다
     gate.set()
@@ -138,6 +138,60 @@ async def test_portrait_status_while_drawing(tmp_path):
             assert c.get("/api/games/g_nope/portraits").status_code == 404
     finally:
         service_mod._SERVICE = None
+
+
+def eager(images: ImageClient) -> ImageClient:
+    images.emotion_mode = "eager"  # 표정까지 처음에 전부 그리는 설정
+    return images
+
+
+async def test_lazy_expression_drawn_when_emotion_first_appears(tmp_path):
+    """기본 설정(lazy): 처음에는 기본 사진만, 어떤 인물의 감정이 바뀌면 그 사람·그 표정만 그린다(한 번만)."""
+    s = GameService(tmp_path, in_memory=True)
+    prompts = []
+
+    async def fake(prompt: str):
+        prompts.append(prompt)
+        return real_image()
+
+    s.portraits = PortraitStore(tmp_path / "portraits", ImageClient(tracer=s.llm.tracer, generator=fake))
+    game_id, view = s.new_game("demo_db_deleted")
+    await s.portraits.wait(game_id)
+    n = len(view.characters)
+    assert len(prompts) == n and s.portraits.emotion_urls(game_id) == {}  # 기본 사진만
+    case, state, masker = s._load(game_id)
+    npc = view.characters[0].id
+    state.npc_states[npc].emotion = "angry"
+    s._view(case, state, masker)  # 화면 정보를 만들 때 지금 감정의 표정 사진이 없으면 그리기 시작
+    assert s.portrait_status(game_id)["pending"] is True
+    await s.portraits.wait(game_id)
+    assert s.portraits.emotion_urls(game_id) == {npc: {"angry": s.portraits.emotion_urls(game_id)[npc]["angry"]}}
+    assert len(prompts) == n + 1 and "angry expression" in prompts[-1]
+    s._view(case, state, masker)
+    await s.portraits.wait(game_id)
+    assert len(prompts) == n + 1  # 이미 있으면 다시 그리지 않는다
+
+
+async def test_reuse_library_when_drawing_unavailable(tmp_path):
+    """새로 그릴 수 없으면(할당량 초과 등) 보관함에서 같은 직업군·성별·비슷한 나이 사진을 표정 사진째 꺼내 쓴다."""
+    lib = PortraitLibrary(tmp_path / "lib")
+    img = compact(real_image(), max_size=(480, 640), quality=80)
+    case = load_case_by_id("demo_db_deleted")
+    for ch in case.characters:  # 지난 판들에서 쌓인 사진이라고 치자
+        person = dict(role=ch.role, age=ch.age, gender=ch.gender, appearance=ch.appearance)
+        base = lib.add(img, "webp", person=person, prompt="p", provider="cloudflare", model="m", seed=1)
+        lib.add(img, "webp", person=person, prompt="e", provider="cloudflare", model="m", seed=1,
+                kind="emotion", emotion="angry", base_file=base["file"])
+    s = GameService(tmp_path, in_memory=True)
+    off = ImageClient(api_key="")  # 그림 연결 꺼짐
+    s.portraits = PortraitStore(tmp_path / "portraits", off, library=lib)
+    game_id, view = s.new_game("demo_db_deleted")
+    await s.portraits.wait(game_id)
+    v = s.view(game_id)
+    assert all(c.portrait_url for c in v.characters)  # 전원 사진
+    assert all((c.portrait_emotions or {}).get("angry") for c in v.characters)  # 표정 사진도 함께
+    assert len((lib.root / "index.jsonl").read_text(encoding="utf-8").splitlines()) == 2 * len(case.characters)  # 보관함에 중복 저장 안 함
+    assert (lib.root / "groups.json").is_file() and all((lib.root / g).is_dir() for g in ("security", "office", "general"))
 
 
 def no_emotions(images: ImageClient) -> ImageClient:
@@ -238,7 +292,7 @@ async def test_library_keeps_photos_after_clear_by_job_group(tmp_path):
         return real_image("JPEG")
 
     library = tmp_path / "library"
-    s.portraits = PortraitStore(tmp_path / "portraits", ImageClient(tracer=s.llm.tracer, generator=fake),
+    s.portraits = PortraitStore(tmp_path / "portraits", eager(ImageClient(tracer=s.llm.tracer, generator=fake)),
                                 library=PortraitLibrary(library))
     game_id, _ = s.new_game("demo_db_deleted")
     await s.portraits.wait(game_id)
