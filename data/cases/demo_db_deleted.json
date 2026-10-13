@@ -1,0 +1,4034 @@
+{
+ "case_id": "demo_db_deleted",
+ "title": "사라진 운영 DB",
+ "theme": "서비스 오픈 전날 밤 운영 DB가 삭제된 사건",
+ "tone": "balanced",
+ "difficulty": "normal",
+ "skeleton": "insider_borrowed_credential",
+ "incident": {
+  "time": 1385,
+  "location_id": "loc_serverroom",
+  "summary": "서비스 오픈을 하루 앞둔 밤 11시 5분쯤, 모아테크 판교 오피스 지하 서버실의 운영 DB(moa_prod)가 통째로 삭제됐습니다. 접속 감사 로그까지 함께 지워져 누가 했는지 알 수 없습니다. 오픈은 내일 오전 9시입니다."
+ },
+ "start_location_id": "loc_lobby",
+ "locations": [
+  {
+   "id": "loc_lobby",
+   "name": "1층 로비·보안데스크",
+   "description": "유리문 안쪽에 보안데스크와 방문자 단말기가 있다. CCTV 모니터와 출입 기록 단말이 여기에 있다.",
+   "connections": [
+    "loc_office",
+    "loc_meeting",
+    "loc_parking",
+    "loc_serverroom"
+   ],
+   "unlock_condition": null,
+   "background_ref": "bg/lobby",
+   "overlays_allowed": [],
+   "investigate_evidence_ids": [
+    "E3",
+    "E7",
+    "E9",
+    "E15",
+    "E23"
+   ]
+  },
+  {
+   "id": "loc_office",
+   "name": "3층 개발팀 사무실",
+   "description": "모니터 불빛이 남아 있는 개발팀 공간. 오픈 D-1 체크리스트가 벽에 붙어 있다.",
+   "connections": [
+    "loc_lobby",
+    "loc_pantry",
+    "loc_meeting",
+    "loc_roof"
+   ],
+   "unlock_condition": null,
+   "background_ref": "bg/office",
+   "overlays_allowed": [],
+   "investigate_evidence_ids": [
+    "E1",
+    "E2",
+    "E6",
+    "E16",
+    "E17",
+    "E18",
+    "E20",
+    "E21",
+    "E25",
+    "E28"
+   ]
+  },
+  {
+   "id": "loc_pantry",
+   "name": "3층 탕비실",
+   "description": "믹스커피 냄새가 나는 작은 방. 서랍장과 화이트보드, 야식 영수증이 보인다.",
+   "connections": [
+    "loc_office"
+   ],
+   "unlock_condition": null,
+   "background_ref": "bg/pantry",
+   "overlays_allowed": [],
+   "investigate_evidence_ids": [
+    "E27"
+   ]
+  },
+  {
+   "id": "loc_meeting",
+   "name": "2층 회의실",
+   "description": "오래된 보고서 바인더가 꽂힌 서류장이 있는 회의실. 아침 장애 대응 회의가 열린다.",
+   "connections": [
+    "loc_lobby",
+    "loc_office"
+   ],
+   "unlock_condition": "talk:npc_pm",
+   "background_ref": "bg/meeting",
+   "overlays_allowed": [],
+   "investigate_evidence_ids": [
+    "E11",
+    "E12"
+   ]
+  },
+  {
+   "id": "loc_serverroom",
+   "name": "지하 1층 서버실",
+   "description": "서늘하고 시끄러운 서버실. 구석에 점검용 콘솔(bastion-02)이 있다.",
+   "connections": [
+    "loc_lobby",
+    "loc_b1hall"
+   ],
+   "unlock_condition": "evidence:E2",
+   "background_ref": "bg/serverroom",
+   "overlays_allowed": [],
+   "investigate_evidence_ids": [
+    "E4",
+    "E5",
+    "E26"
+   ]
+  },
+  {
+   "id": "loc_b1hall",
+   "name": "지하 1층 복도·청소용품실",
+   "description": "서버실 앞 복도와 청소용품실. 엘리베이터 홀에 CCTV가 있다.",
+   "connections": [
+    "loc_serverroom"
+   ],
+   "unlock_condition": "evidence:E7",
+   "background_ref": "bg/b1hall",
+   "overlays_allowed": [],
+   "investigate_evidence_ids": [
+    "E10"
+   ]
+  },
+  {
+   "id": "loc_roof",
+   "name": "옥상 휴게 공간",
+   "description": "바람이 센 옥상. 야간 근무자들이 쉬는 낡은 의자와 보온병이 놓여 있다.",
+   "connections": [
+    "loc_office"
+   ],
+   "unlock_condition": "talk:npc_dowon",
+   "background_ref": "bg/roof",
+   "overlays_allowed": [],
+   "investigate_evidence_ids": [
+    "E8"
+   ]
+  },
+  {
+   "id": "loc_parking",
+   "name": "지하 주차장",
+   "description": "차단기와 출차 기록 단말이 있는 주차장 출구.",
+   "connections": [
+    "loc_lobby"
+   ],
+   "unlock_condition": "talk:npc_guard",
+   "background_ref": "bg/parking",
+   "overlays_allowed": [],
+   "investigate_evidence_ids": [
+    "E22"
+   ]
+  }
+ ],
+ "characters": [
+  {
+   "id": "npc_dowon",
+   "name": "서도윤",
+   "role": "신입 개발자(백엔드, 입사 4개월차)",
+   "age": 26,
+   "gender": "M",
+   "appearance": {
+    "hair": "눈썹 위까지 내려오는 짧은 검은 앞머리",
+    "outfit": "구겨진 체크 셔츠 위에 회색 후드집업",
+    "accessory": "대형 헤드폰을 목에 걸고 있음",
+    "build": "마른 체격"
+   },
+   "face_seed": 1101,
+   "personality": "소심하고 눈치를 많이 보는 성실파. 실수를 하면 말이 빨라지고 사과부터 한다.",
+   "temperament": "timid",
+   "small_talk_style": "normal",
+   "speech_style": "존댓말인데 말끝을 흐린다. '아, 그게요...', '죄송합니다'를 자주 쓰고 긴장하면 같은 말을 반복하며 빨라진다.",
+   "goals": [
+    "오픈 전에 자기 실수를 아무도 모르게 수습한다",
+    "정규직 전환 평가를 무사히 통과한다"
+   ],
+   "secrets": [
+    "오후 7시경 배포 스크립트 옵션을 잘못 넣어 운영 DB에 마이그레이션을 시도했다가 롤백했다(피해 없음). 들킬까 봐 21시에 퇴근했다고 말하고 몰래 남아 수습했다."
+   ],
+   "routine": [
+    {
+     "start": 540,
+     "end": 1481,
+     "location_id": "loc_office"
+    }
+   ],
+   "relations": [
+    {
+     "target": "npc_dba",
+     "type": "사수",
+     "detail": "DB 쪽을 배우는 중",
+     "known_publicly": true
+    },
+    {
+     "target": "npc_yoon",
+     "type": "동료",
+     "detail": "존경하는 시니어",
+     "known_publicly": true
+    },
+    {
+     "target": "npc_chu",
+     "type": "안면",
+     "detail": "야간에 쓰레기통을 비우러 오는 청소 아저씨. 가끔 믹스커피를 나눠 마신다",
+     "known_publicly": false
+    }
+   ],
+   "tier": "main",
+   "record_access": [
+    "messenger",
+    "server_log"
+   ],
+   "initial_visible": true,
+   "reveal_condition": null,
+   "key_witness": false,
+   "is_culprit": false,
+   "is_accomplice": false
+  },
+  {
+   "id": "npc_dba",
+   "name": "고태식",
+   "role": "DBA(데이터베이스 관리자, 2021년 입사)",
+   "age": 45,
+   "gender": "M",
+   "appearance": {
+    "hair": "이마가 넓은 짧은 머리, 옆머리에 흰머리가 조금",
+    "outfit": "소매를 걷어 올린 와이셔츠와 베이지 슬랙스",
+    "accessory": "두꺼운 뿔테 안경",
+    "build": "듬직한 체격"
+   },
+   "face_seed": 1102,
+   "personality": "무뚝뚝하지만 정이 많은 책임감 강한 베테랑. 자기 영역을 건드리면 예민해진다.",
+   "temperament": "normal",
+   "small_talk_style": "blunt",
+   "speech_style": "부산 사투리. '마', '~아입니까', '~했다 아이가', '~하이소'를 쓴다. 화나면 말이 짧아지고 목소리가 커진다.",
+   "goals": [
+    "관리형 DB 전환 계획으로 자기 자리가 없어지는 것을 막는다",
+    "오프사이트 백업이 멈춘 것이 자기 탓으로 드러나지 않게 한다"
+   ],
+   "secrets": [
+    "오프사이트 백업 전송이 3주째 실패하고 있었는데 알림 메일을 열어보지 않고 방치했다.",
+    "구조조정 소문에 시달려 최근 이직 사이트를 자주 보고 있다."
+   ],
+   "routine": [
+    {
+     "start": 540,
+     "end": 1285,
+     "location_id": "loc_office"
+    },
+    {
+     "start": 1295,
+     "end": 1302,
+     "location_id": "loc_parking"
+    }
+   ],
+   "relations": [
+    {
+     "target": "npc_yoon",
+     "type": "동료",
+     "detail": "서로 회사 불만을 털어놓는 사이",
+     "known_publicly": true
+    },
+    {
+     "target": "npc_hwang",
+     "type": "업무",
+     "detail": "외주 개발자에게 읽기 전용 계정을 발급해 줌",
+     "known_publicly": true
+    },
+    {
+     "target": "npc_dowon",
+     "type": "후배",
+     "detail": "DB 업무를 가르치는 중",
+     "known_publicly": true
+    }
+   ],
+   "tier": "main",
+   "record_access": [
+    "server_log",
+    "access_log",
+    "call"
+   ],
+   "initial_visible": true,
+   "reveal_condition": null,
+   "key_witness": false,
+   "is_culprit": false,
+   "is_accomplice": false
+  },
+  {
+   "id": "npc_yoon",
+   "name": "윤석진",
+   "role": "시니어 백엔드 개발자(퇴사 예정)",
+   "age": 41,
+   "gender": "M",
+   "appearance": {
+    "hair": "옆으로 단정하게 넘긴 머리",
+    "outfit": "회색 후드티에 청바지, 사무실 슬리퍼",
+    "accessory": "스마트워치",
+    "build": "키가 크고 마른 편"
+   },
+   "face_seed": 1103,
+   "personality": "냉소적이고 효율을 따지는 실력자. 겉으로는 무심하지만 인정받지 못한 일에 오래 서운해한다.",
+   "temperament": "cold",
+   "small_talk_style": "blunt",
+   "speech_style": "짧은 반말 섞인 문장. '~임', '~인 듯', '뭐, 그렇다 치고.'를 쓰고 한숨을 자주 쉰다. 귀찮아지면 존댓말이 반말로 샌다.",
+   "goals": [
+    "조용히 퇴사하고 이 일에 엮이지 않는다",
+    "옛 동료에게 서버실 카드를 빌려준 일이 드러나지 않게 한다"
+   ],
+   "secrets": [
+    "퇴사 전날 옛 동료 추성만에게 부탁을 받고 서버실 출입카드를 빌려줬다. 뭔가 하려는 줄 알면서 회사에 대한 앙금 때문에 모른 척했고, 구 서비스 계정이 아직 살아 있다는 말도 흘렸다.",
+    "다음 날 아침 탕비실 서랍에서 카드가 돌아와 있는 것을 발견하고 아무에게도 말하지 않았다."
+   ],
+   "routine": [
+    {
+     "start": 540,
+     "end": 1230,
+     "location_id": "loc_office"
+    },
+    {
+     "start": 1270,
+     "end": 1440,
+     "location_id": "off:bar"
+    }
+   ],
+   "relations": [
+    {
+     "target": "npc_chu",
+     "type": "옛 동료",
+     "detail": "2019년 장애 때 책임을 지고 쫓겨난 선배",
+     "known_publicly": false
+    },
+    {
+     "target": "npc_dba",
+     "type": "동료",
+     "detail": "서로 불만을 나누는 사이",
+     "known_publicly": true
+    }
+   ],
+   "tier": "main",
+   "record_access": [
+    "messenger",
+    "access_log",
+    "server_log",
+    "call",
+    "bank"
+   ],
+   "initial_visible": true,
+   "reveal_condition": null,
+   "key_witness": false,
+   "is_culprit": false,
+   "is_accomplice": true
+  },
+  {
+   "id": "npc_hwang",
+   "name": "황지호",
+   "role": "외주 개발자(결제 모듈 납품 프리랜서)",
+   "age": 34,
+   "gender": "M",
+   "appearance": {
+    "hair": "가볍게 펌을 한 갈색 머리",
+    "outfit": "슬림핏 남색 재킷과 흰 티셔츠",
+    "accessory": "스티커가 가득 붙은 노트북 백팩",
+    "build": "보통 체격"
+   },
+   "face_seed": 1104,
+   "personality": "말이 빠르고 계산에 밝은 사업가형. 돈 이야기에 예민하고 체면을 중시한다.",
+   "temperament": "normal",
+   "small_talk_style": "chatty",
+   "speech_style": "비즈니스 존댓말에 영어 IT 용어를 섞는다. '솔직히 말씀드리면', '컨텍스트상', '리스크', '팩트는'. 곤란하면 '그건 계약서 문구상...'으로 빠진다.",
+   "goals": [
+    "밀린 대금 3,200만원을 오픈 전에 받아낸다",
+    "소스 인도 협상에서 불리해지지 않는다"
+   ],
+   "secrets": [
+    "어젯밤 22시 10분쯤 노트북과 인도용 USB를 챙기러 회사에 들렀다가 22시 49분에 나갔다. PM에게 대금을 안 주면 소스를 넘기지 않겠다는 압박 메시지를 보낸 터라 방문 사실을 숨기고 싶다."
+   ],
+   "routine": [
+    {
+     "start": 1330,
+     "end": 1369,
+     "location_id": "loc_lobby"
+    }
+   ],
+   "relations": [
+    {
+     "target": "npc_pm",
+     "type": "거래",
+     "detail": "대금 지급 담당 창구",
+     "known_publicly": true
+    },
+    {
+     "target": "npc_dba",
+     "type": "업무",
+     "detail": "읽기 전용 VPN 계정을 받음",
+     "known_publicly": true
+    }
+   ],
+   "tier": "main",
+   "record_access": [
+    "messenger"
+   ],
+   "initial_visible": true,
+   "reveal_condition": null,
+   "key_witness": false,
+   "is_culprit": false,
+   "is_accomplice": false
+  },
+  {
+   "id": "npc_chu",
+   "name": "추성만",
+   "role": "야간 청소원(시설관리 용역업체 소속, 근무 2년째)",
+   "age": 54,
+   "gender": "M",
+   "appearance": {
+    "hair": "짧게 친 반백 머리",
+    "outfit": "회색 청소복 위에 푸른 앞치마",
+    "accessory": "목에 수건을 두르고 있음",
+    "build": "어깨가 넓고 손마디가 굵음"
+   },
+   "face_seed": 1105,
+   "personality": "느긋하고 말이 많은 수더분한 아저씨. 믹스커피를 건네며 남의 이야기를 잘 들어준다. 예전 일은 잘 꺼내지 않는다.",
+   "temperament": "normal",
+   "small_talk_style": "chatty",
+   "speech_style": "충청도 사투리. '~했슈', '~그려유', '~혀유'처럼 말끝을 느릿하게 끈다. 모르는 척 되묻는 버릇('그게 뭔디유?')이 있다.",
+   "goals": [
+    "오늘 밤 일을 마치고 아무 일 없다는 듯 퇴근한다",
+    "6년 전 자신을 내쫓은 회사가 오픈 전날 무너지는 것을 본다"
+   ],
+   "secrets": [
+    "2018~2019년 모아테크 개발2팀 개발자였다. 2019년 11월 결제 장애의 책임을 혼자 뒤집어쓰고 해고됐고, 2023년 용역업체 소속 청소원으로 같은 건물에 돌아왔다.",
+    "범행 당일 20시 30분 윤석진에게 서버실 카드를 받아 22시 58분 서버실에 들어갔다. 23시 3분 자신이 2018년에 만든 구 서비스 계정 svc_legacy_bk로 콘솔에 로그인해 운영 DB와 로컬 스냅샷을 지우고, 감사 로그 서비스를 멈춰 30분 기록을 날렸다.",
+    "범행 뒤 카드는 탕비실 서랍에 돌려놨다."
+   ],
+   "routine": [
+    {
+     "start": 1198,
+     "end": 1370,
+     "location_id": "loc_office"
+    },
+    {
+     "start": 1375,
+     "end": 1423,
+     "location_id": "loc_serverroom"
+    },
+    {
+     "start": 1438,
+     "end": 1460,
+     "location_id": "loc_office"
+    }
+   ],
+   "relations": [
+    {
+     "target": "npc_yoon",
+     "type": "옛 동료",
+     "detail": "2018년 같이 일했다. 아는 척하지 않는다",
+     "known_publicly": false
+    },
+    {
+     "target": "npc_dowon",
+     "type": "안면",
+     "detail": "가끔 믹스커피를 나눠 마신다",
+     "known_publicly": true
+    },
+    {
+     "target": "npc_guard",
+     "type": "야간 동료",
+     "detail": "같이 야식을 먹는 사이",
+     "known_publicly": true
+    }
+   ],
+   "tier": "main",
+   "record_access": [],
+   "initial_visible": true,
+   "reveal_condition": null,
+   "key_witness": false,
+   "is_culprit": true,
+   "is_accomplice": false
+  },
+  {
+   "id": "npc_guard",
+   "name": "남궁철",
+   "role": "야간 경비원",
+   "age": 58,
+   "gender": "M",
+   "appearance": {
+    "hair": "숱이 적은 짧은 흰머리",
+    "outfit": "남색 경비복과 모자",
+    "accessory": "손전등과 무전기",
+    "build": "단단한 체격"
+   },
+   "face_seed": 1106,
+   "personality": "원칙주의에 성실하다. 졸음을 쫓으려 늘 자판기 커피를 든다.",
+   "temperament": "normal",
+   "small_talk_style": "blunt",
+   "speech_style": "군대식 다나까체. '~입니다!', '확인했습니다.' 처럼 짧고 또박또박 끊어 말한다.",
+   "goals": [
+    "근무 중 규정을 어긴 일이 드러나지 않게 한다"
+   ],
+   "secrets": [
+    "23시 20분부터 20분간 정문 밖에 담배를 피우러 나가 로비 보안데스크를 비웠다(규정 위반)."
+   ],
+   "routine": [
+    {
+     "start": 1080,
+     "end": 1380,
+     "location_id": "loc_lobby"
+    },
+    {
+     "start": 1420,
+     "end": 1800,
+     "location_id": "loc_lobby"
+    }
+   ],
+   "relations": [
+    {
+     "target": "npc_chu",
+     "type": "야간 동료",
+     "detail": "같이 야식을 먹는 사이",
+     "known_publicly": true
+    }
+   ],
+   "tier": "minor",
+   "record_access": [
+    "access_log",
+    "cctv"
+   ],
+   "initial_visible": true,
+   "reveal_condition": null,
+   "key_witness": true,
+   "is_culprit": false,
+   "is_accomplice": false
+  },
+  {
+   "id": "npc_pm",
+   "name": "한소라",
+   "role": "프로덕트 매니저(서비스 오픈 담당)",
+   "age": 29,
+   "gender": "F",
+   "appearance": {
+    "hair": "어깨까지 오는 웨이브 머리",
+    "outfit": "베이지 가디건에 흰 블라우스",
+    "accessory": "얇은 팔찌와 스티커 붙은 노트북",
+    "build": "보통 체격"
+   },
+   "face_seed": 1107,
+   "personality": "밝고 빠르고 일 욕심이 많다. 급하면 미루던 일을 더 미룬다.",
+   "temperament": "normal",
+   "small_talk_style": "chatty",
+   "speech_style": "밝고 빠른 말투. '헐', '대박', '~했거든요오'를 쓰고 문장 끝을 올린다.",
+   "goals": [
+    "내일 오픈을 어떻게든 정상화한다",
+    "외주 대금 문제를 조용히 정리한다"
+   ],
+   "secrets": [
+    "외주 대금 지급을 재무팀에 올리지 않고 미루고 있었다(예산 승인 미비)."
+   ],
+   "routine": [
+    {
+     "start": 540,
+     "end": 1140,
+     "location_id": "loc_office"
+    },
+    {
+     "start": 1455,
+     "end": 1800,
+     "location_id": "loc_office"
+    }
+   ],
+   "relations": [
+    {
+     "target": "npc_hwang",
+     "type": "거래",
+     "detail": "외주 대금 지급 담당",
+     "known_publicly": true
+    }
+   ],
+   "tier": "minor",
+   "record_access": [
+    "messenger"
+   ],
+   "initial_visible": true,
+   "reveal_condition": null,
+   "key_witness": false,
+   "is_culprit": false,
+   "is_accomplice": false
+  }
+ ],
+ "culprit_ids": [
+  "npc_chu"
+ ],
+ "mmo": {
+  "npc_chu": {
+   "motive": "6년 전 장애 책임을 혼자 뒤집어쓰고 해고된 데 대한 앙갚음. 오픈 전날 서비스를 무너뜨리려 했다.",
+   "means": "2018년에 자기가 만든 구 서비스 계정 svc_legacy_bk(관리자 권한, 폐기 누락)의 비밀번호를 알고, 윤석진의 서버실 출입카드를 빌렸다.",
+   "opportunity": "용역 청소원으로 야간에 건물에 상주했고, 경비가 자리를 비운 시간대에 지하 서버실에 들어갔다."
+  },
+  "npc_yoon": {
+   "motive": "퇴사 앙금과 CTO에 대한 불만",
+   "means": "관리자 계정과 서버실 카드를 가졌다",
+   "opportunity": null
+  },
+  "npc_dba": {
+   "motive": "관리형 DB 전환으로 자리를 잃을 위기",
+   "means": "dba_root 전권을 가졌다",
+   "opportunity": null
+  },
+  "npc_dowon": {
+   "motive": "자신의 마이그레이션 실수가 드러날까 하는 불안",
+   "means": "배포 스크립트에 운영 접속 정보가 들어 있다",
+   "opportunity": null
+  },
+  "npc_hwang": {
+   "motive": "대금 3,200만원 미지급",
+   "means": null,
+   "opportunity": "건물에는 있었으나 사건 16분 전에 퇴장"
+  }
+ },
+ "trick": "폐기 누락된 옛 서비스 계정 svc_legacy_bk와 빌린 서버실 카드. 감사 로그 서비스를 멈춰 30분 기록을 지웠다.",
+ "timeline": [
+  {
+   "time": 540,
+   "character_id": "npc_dowon",
+   "location_id": "loc_office",
+   "action": "출근"
+  },
+  {
+   "time": 540,
+   "character_id": "npc_pm",
+   "location_id": "loc_office",
+   "action": "근무"
+  },
+  {
+   "time": 1080,
+   "character_id": "npc_dba",
+   "location_id": "loc_office",
+   "action": "근무"
+  },
+  {
+   "time": 1080,
+   "character_id": "npc_guard",
+   "location_id": "loc_lobby",
+   "action": "근무 시작"
+  },
+  {
+   "time": 1120,
+   "character_id": "npc_yoon",
+   "location_id": "loc_office",
+   "action": "마지막 야근 중 불평"
+  },
+  {
+   "time": 1140,
+   "character_id": "npc_pm",
+   "location_id": "off:home",
+   "action": "퇴근"
+  },
+  {
+   "time": 1152,
+   "character_id": "npc_dowon",
+   "location_id": "loc_office",
+   "action": "배포 스크립트 실수 후 롤백"
+  },
+  {
+   "time": 1198,
+   "character_id": "npc_chu",
+   "location_id": "loc_lobby",
+   "action": "출근(용역 청소 시작)"
+  },
+  {
+   "time": 1202,
+   "character_id": "npc_chu",
+   "location_id": "loc_office",
+   "action": "3층 청소 시작"
+  },
+  {
+   "time": 1230,
+   "character_id": "npc_chu",
+   "location_id": "loc_pantry",
+   "action": "탕비실 앞에서 윤석진에게 서버실 카드를 받음"
+  },
+  {
+   "time": 1230,
+   "character_id": "npc_yoon",
+   "location_id": "loc_pantry",
+   "action": "추성만에게 카드를 건넴"
+  },
+  {
+   "time": 1238,
+   "character_id": "npc_yoon",
+   "location_id": "loc_lobby",
+   "action": "퇴근"
+  },
+  {
+   "time": 1240,
+   "character_id": "npc_chu",
+   "location_id": "loc_office",
+   "action": "3층 청소 재개"
+  },
+  {
+   "time": 1250,
+   "character_id": "npc_yoon",
+   "location_id": "off:street",
+   "action": "홍대로 이동"
+  },
+  {
+   "time": 1270,
+   "character_id": "npc_yoon",
+   "location_id": "off:bar",
+   "action": "홍대 포차에서 술자리"
+  },
+  {
+   "time": 1285,
+   "character_id": "npc_dba",
+   "location_id": "loc_office",
+   "action": "퇴근 전 점검"
+  },
+  {
+   "time": 1295,
+   "character_id": "npc_dba",
+   "location_id": "loc_lobby",
+   "action": "퇴근 이동"
+  },
+  {
+   "time": 1298,
+   "character_id": "npc_dba",
+   "location_id": "loc_parking",
+   "action": "차량 탑승"
+  },
+  {
+   "time": 1302,
+   "character_id": "npc_dba",
+   "location_id": "off:road",
+   "action": "주차장 출차"
+  },
+  {
+   "time": 1330,
+   "character_id": "npc_hwang",
+   "location_id": "loc_lobby",
+   "action": "방문자 등록"
+  },
+  {
+   "time": 1335,
+   "character_id": "npc_dba",
+   "location_id": "off:home",
+   "action": "귀가"
+  },
+  {
+   "time": 1338,
+   "character_id": "npc_hwang",
+   "location_id": "loc_office",
+   "action": "서도윤과 짧게 대화, 노트북 챙김"
+  },
+  {
+   "time": 1365,
+   "character_id": "npc_hwang",
+   "location_id": "loc_lobby",
+   "action": "하강"
+  },
+  {
+   "time": 1369,
+   "character_id": "npc_hwang",
+   "location_id": "off:street",
+   "action": "퇴장"
+  },
+  {
+   "time": 1370,
+   "character_id": "npc_chu",
+   "location_id": "loc_lobby",
+   "action": "큰 천가방을 들고 엘리베이터로 이동"
+  },
+  {
+   "time": 1375,
+   "character_id": "npc_chu",
+   "location_id": "loc_b1hall",
+   "action": "지하 1층 도착"
+  },
+  {
+   "time": 1378,
+   "character_id": "npc_chu",
+   "location_id": "loc_serverroom",
+   "action": "윤석진의 카드로 서버실 입장"
+  },
+  {
+   "time": 1383,
+   "character_id": "npc_chu",
+   "location_id": "loc_serverroom",
+   "action": "svc_legacy_bk로 콘솔 로그인"
+  },
+  {
+   "time": 1383,
+   "character_id": "npc_guard",
+   "location_id": "loc_office",
+   "action": "3층 순찰"
+  },
+  {
+   "time": 1385,
+   "character_id": "npc_chu",
+   "location_id": "loc_serverroom",
+   "action": "운영 DB 삭제, 스냅샷 분리, 감사 로그 중지"
+  },
+  {
+   "time": 1385,
+   "character_id": "npc_dowon",
+   "location_id": "loc_office",
+   "action": "사무실에서 노트북 작업"
+  },
+  {
+   "time": 1392,
+   "character_id": "npc_guard",
+   "location_id": "loc_lobby",
+   "action": "로비 복귀"
+  },
+  {
+   "time": 1393,
+   "character_id": "npc_dowon",
+   "location_id": "loc_office",
+   "action": "DB 장애 확인 후 보고"
+  },
+  {
+   "time": 1400,
+   "character_id": "npc_guard",
+   "location_id": "off:street",
+   "action": "정문 밖에서 흡연"
+  },
+  {
+   "time": 1420,
+   "character_id": "npc_guard",
+   "location_id": "loc_lobby",
+   "action": "자리 복귀"
+  },
+  {
+   "time": 1422,
+   "character_id": "npc_chu",
+   "location_id": "loc_serverroom",
+   "action": "서버실 퇴실"
+  },
+  {
+   "time": 1423,
+   "character_id": "npc_chu",
+   "location_id": "loc_b1hall",
+   "action": "엘리베이터 홀 이동"
+  },
+  {
+   "time": 1430,
+   "character_id": "npc_chu",
+   "location_id": "loc_lobby",
+   "action": "1층 경유"
+  },
+  {
+   "time": 1435,
+   "character_id": "npc_chu",
+   "location_id": "loc_pantry",
+   "action": "탕비실 서랍에 카드를 돌려놓음"
+  },
+  {
+   "time": 1438,
+   "character_id": "npc_chu",
+   "location_id": "loc_office",
+   "action": "카트를 끌고 청소 마무리"
+  },
+  {
+   "time": 1450,
+   "character_id": "npc_pm",
+   "location_id": "loc_lobby",
+   "action": "장애 소식에 회사로 복귀"
+  },
+  {
+   "time": 1455,
+   "character_id": "npc_pm",
+   "location_id": "loc_office",
+   "action": "사무실 합류"
+  },
+  {
+   "time": 1481,
+   "character_id": "npc_dowon",
+   "location_id": "loc_office",
+   "action": "사무실 퇴실"
+  }
+ ],
+ "evidence": [
+  {
+   "id": "E1",
+   "name": "감사 로그 30분 공백",
+   "kind": "record",
+   "content": "bastion-02의 접속 감사 로그에 23:10~23:40 구간 기록이 통째로 없다. 직전 기록은 23:09, 서비스가 재시작된 23:41에 공백이 감지됐다. 로그 서비스를 멈추고 기록을 지운 사람이 있다는 뜻이다.",
+   "location_id": "loc_office",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [],
+   "reveals_contradiction_of": [],
+   "indirect_traces": [
+    "E2",
+    "E3",
+    "E4"
+   ],
+   "destroyable": true,
+   "public_area": false
+  },
+  {
+   "id": "E2",
+   "name": "디스크 사용량 급증 기록",
+   "kind": "record",
+   "content": "모니터링 지표: 23:05부터 7분간 디스크 I/O 사용률 98%(평시 12%). 데이터 볼륨 사용량이 412GB에서 0.3%로 급감했다. 23:12에 서비스 헬스체크가 실패하고 알림이 나갔다. 감사 로그가 지워졌어도 지표는 남았다.",
+   "location_id": "loc_office",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [],
+   "reveals_contradiction_of": [],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E3",
+   "name": "서버실 출입카드 기록",
+   "kind": "record",
+   "content": "서버실 출입문 기록: 22:58 카드 YSJ-0412(윤석진) 인증 성공, 23:42 같은 카드로 퇴실. 약 44분간 누군가 윤석진의 카드로 서버실에 있었다.",
+   "location_id": "loc_lobby",
+   "visibility": [
+    "player"
+   ],
+   "is_key": true,
+   "element_tags": [
+    "opportunity"
+   ],
+   "linked_suspects": [
+    "npc_yoon"
+   ],
+   "reveals_contradiction_of": [],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E4",
+   "name": "서버실 콘솔 로그인 기록",
+   "kind": "record",
+   "content": "bastion-02 콘솔(서버실 로컬 tty1)에 23:03 svc_legacy_bk 계정으로 로그인한 기록이 감사 로그가 멈추기 전에 남았다. 원격이 아니라 서버실 안에서 로그인했다는 뜻이다.",
+   "location_id": "loc_serverroom",
+   "visibility": [
+    "player"
+   ],
+   "is_key": true,
+   "element_tags": [
+    "means"
+   ],
+   "linked_suspects": [],
+   "reveals_contradiction_of": [],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E5",
+   "name": "오프사이트 백업 21일 연속 실패",
+   "kind": "record",
+   "content": "오프사이트 백업 전송이 21일째 S3 자격증명 만료로 실패했고, 알림 메일이 DBA 그룹으로 매일 발송됐다. 사건 전날까지 백업은 정상이라는 말과 맞지 않는다.",
+   "location_id": "loc_serverroom",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [
+    "npc_dba"
+   ],
+   "reveals_contradiction_of": [
+    "L_dba_1"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E6",
+   "name": "서도윤의 운영 DB 마이그레이션 시도",
+   "kind": "record",
+   "content": "19:12 서도윤의 배포 스크립트가 --env=prod로 마이그레이션을 실행했다가 즉시 롤백했다. 변경은 0건이다. 스크립트에 운영 접속 정보가 그대로 들어 있다.",
+   "location_id": "loc_office",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [
+    "motive",
+    "means"
+   ],
+   "linked_suspects": [
+    "npc_dowon"
+   ],
+   "reveals_contradiction_of": [],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E7",
+   "name": "지하 1층 CCTV: 추성만의 이동",
+   "kind": "record",
+   "content": "지하 1층 엘리베이터 홀 CCTV: 22:55 청소복 차림의 추성만이 대형 천가방을 들고 하차해 서버실 방향으로 이동, 23:43 서버실 방향에서 나와 엘리베이터에 탑승.",
+   "location_id": "loc_lobby",
+   "visibility": [
+    "player"
+   ],
+   "is_key": true,
+   "element_tags": [
+    "opportunity"
+   ],
+   "linked_suspects": [
+    "npc_chu"
+   ],
+   "reveals_contradiction_of": [
+    "L_chu_1"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": true
+  },
+  {
+   "id": "E8",
+   "name": "속지에 이름이 적힌 개발서적",
+   "kind": "object",
+   "content": "옥상 휴게 의자 옆 낡은 개발서적 '스프링 입문'. 속지에 '추성만, 모아테크 개발2팀, 2018'이라고 적혀 있다. 청소원이 되기 전에 개발자였다는 흔적이다.",
+   "location_id": "loc_roof",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [
+    "npc_chu"
+   ],
+   "reveals_contradiction_of": [
+    "L_chu_2"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E9",
+   "name": "복도 CCTV: 카드 전달 장면",
+   "kind": "record",
+   "content": "20:30 3층 탕비실 앞 CCTV: 윤석진이 추성만에게 카드 크기의 물건을 건넸고 추성만이 앞치마 주머니에 넣었다. 두 사람이 아는 사이라는 증거이기도 하다.",
+   "location_id": "loc_lobby",
+   "visibility": [
+    "player"
+   ],
+   "is_key": true,
+   "element_tags": [
+    "means"
+   ],
+   "linked_suspects": [
+    "npc_chu",
+    "npc_yoon"
+   ],
+   "reveals_contradiction_of": [
+    "L_yoon_1",
+    "L_yoon_2",
+    "L_chu_3"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": true
+  },
+  {
+   "id": "E10",
+   "name": "청소 점검표의 빈 칸",
+   "kind": "object",
+   "content": "청소용품실에 걸린 3층 청소 점검표. 22:50~23:55 구간 서명란이 비어 있다. 추성만이 말한 '밤새 3층만 청소'와 맞지 않는다.",
+   "location_id": "loc_b1hall",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [
+    "opportunity"
+   ],
+   "linked_suspects": [
+    "npc_chu"
+   ],
+   "reveals_contradiction_of": [
+    "L_chu_1"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E11",
+   "name": "계정 소유자표",
+   "kind": "document",
+   "content": "2018년 계정 발급 대장 사본: svc_legacy_bk, 구 백업서버 연동 서비스 계정, 소유자 smchoo(개발2팀 추성만), 권한 관리자, 폐기 표시 없음. 비밀번호가 변경된 이력이 없다.",
+   "location_id": "loc_meeting",
+   "visibility": [
+    "player"
+   ],
+   "is_key": true,
+   "element_tags": [
+    "means"
+   ],
+   "linked_suspects": [
+    "npc_chu"
+   ],
+   "reveals_contradiction_of": [
+    "L_chu_2"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E12",
+   "name": "2019년 결제 장애 회고 회의록",
+   "kind": "document",
+   "content": "2019년 11월 결제 장애 회고 회의록: 책임 안건에서 개발2팀 추성만(smchoo)에게 정직 후 계약 종료를 권고했다. 참석자 윤석진(개발1팀)의 이름도 있다. CTO 지시로 사전 공유 없이 스키마가 바뀐 정황은 기록에서 빠졌다.",
+   "location_id": "loc_meeting",
+   "visibility": [
+    "player"
+   ],
+   "is_key": true,
+   "element_tags": [
+    "motive"
+   ],
+   "linked_suspects": [
+    "npc_chu"
+   ],
+   "reveals_contradiction_of": [
+    "L_chu_2",
+    "L_yoon_2"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E13",
+   "name": "윤석진의 카드 결제 내역",
+   "kind": "record",
+   "content": "윤석진의 체크카드: 21:12 홍대 포차 청춘 78,000원, 22:47 호프집 달빛 43,500원(모두 서교동). 22:58 서버실 출입 시각에 윤석진은 판교가 아니라 홍대에 있었다.",
+   "location_id": null,
+   "visibility": [
+    "warrant:bank"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [
+    "npc_yoon"
+   ],
+   "reveals_contradiction_of": [
+    "L_yoon_1"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E14",
+   "name": "윤석진의 통화 기록",
+   "kind": "record",
+   "content": "윤석진 휴대전화: 22:56 통화 6분, 23:05 대리운전 호출 2분. 두 건 모두 기지국이 마포구 서교동이다. 사건 시각에 윤석진은 서버실에 없었다.",
+   "location_id": null,
+   "visibility": [
+    "warrant:call"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [
+    "npc_yoon"
+   ],
+   "reveals_contradiction_of": [
+    "L_yoon_1"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E15",
+   "name": "황지호의 방문자 기록",
+   "kind": "record",
+   "content": "방문자 단말기: 22:10 황지호(외주) 방문 등록, 22:49 퇴장 처리. 사건 시각(23:05)보다 16분 먼저 건물을 나갔다.",
+   "location_id": "loc_lobby",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [
+    "opportunity"
+   ],
+   "linked_suspects": [
+    "npc_hwang"
+   ],
+   "reveals_contradiction_of": [
+    "L_hwang_1"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E16",
+   "name": "황지호의 대금 압박 메시지",
+   "kind": "record",
+   "content": "20:20 황지호: '내일 오픈 전까지 입금 안 되면 소스 인도는 보류하겠습니다.' 3,200만원 대금이 한 달 넘게 밀려 있다.",
+   "location_id": "loc_office",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [
+    "motive"
+   ],
+   "linked_suspects": [
+    "npc_hwang"
+   ],
+   "reveals_contradiction_of": [],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E17",
+   "name": "외주 계정 권한 목록",
+   "kind": "document",
+   "content": "계정 권한표: ext_hwang은 읽기 전용 VPN 계정이다. 운영 DB 삭제나 서버 명령 실행 권한이 없다.",
+   "location_id": "loc_office",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [
+    "npc_hwang"
+   ],
+   "reveals_contradiction_of": [],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E18",
+   "name": "고태식의 불안 메시지",
+   "kind": "record",
+   "content": "20:45 고태식: '매니지드 DB로 갈아탄다는 얘기 아직도 진행 중이라 카더라. 그라믄 우리 팀 자리는 어데 있노.'",
+   "location_id": "loc_office",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [
+    "motive"
+   ],
+   "linked_suspects": [
+    "npc_dba"
+   ],
+   "reveals_contradiction_of": [],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E20",
+   "name": "DBA 계정 권한",
+   "kind": "document",
+   "content": "계정 권한표: dba_root(고태식)는 운영 DB 전권(root)이다.",
+   "location_id": "loc_office",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [
+    "means"
+   ],
+   "linked_suspects": [
+    "npc_dba"
+   ],
+   "reveals_contradiction_of": [],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E21",
+   "name": "윤석진의 퇴사 불만 메시지",
+   "kind": "record",
+   "content": "18:40 윤석진: '난 오늘이 마지막 야근임. 인수인계 문서는 어차피 아무도 안 읽으니까 안 씀. CTO 얼굴 보는 것도 오늘이 끝이고.'",
+   "location_id": "loc_office",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [
+    "motive"
+   ],
+   "linked_suspects": [
+    "npc_yoon"
+   ],
+   "reveals_contradiction_of": [],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E22",
+   "name": "고태식의 주차장 출차 기록",
+   "kind": "record",
+   "content": "21:42 주차장 출구 차단기 기록: 차량 12가 3456(고태식)이 퇴근했다. 사건 시각 DBA는 이미 회사를 떠난 뒤였다.",
+   "location_id": "loc_parking",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [
+    "npc_dba"
+   ],
+   "reveals_contradiction_of": [],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E23",
+   "name": "로비 CCTV: 경비석 무인",
+   "kind": "record",
+   "content": "1층 로비 CCTV: 23:20~23:40 보안데스크가 비어 있었다. 경비원은 근무 중 자리를 비운 적 없다고 했다.",
+   "location_id": "loc_lobby",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [
+    "npc_guard"
+   ],
+   "reveals_contradiction_of": [
+    "L_guard_1"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": true
+  },
+  {
+   "id": "E24",
+   "name": "경비원의 증언: 서도윤 확인",
+   "kind": "testimony",
+   "content": "남궁철: '23시 3분 순찰 때 3층 사무실에서 서도윤이 혼자 노트북을 보고 있었고, 복도에 청소 카트는 서 있는데 청소원은 안 보였습니다.'",
+   "location_id": null,
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [
+    "npc_dowon"
+   ],
+   "reveals_contradiction_of": [
+    "L_dowon_1"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E25",
+   "name": "서도윤의 3층 퇴실 기록",
+   "kind": "record",
+   "content": "3층 사무실 출입문 기록: 00:41 서도윤 퇴실. 21시쯤 퇴근했다는 말과 다르다.",
+   "location_id": "loc_office",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [
+    "npc_dowon"
+   ],
+   "reveals_contradiction_of": [
+    "L_dowon_1"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E26",
+   "name": "삭제된 명령 기록",
+   "kind": "record",
+   "content": "bastion-02 svc_legacy_bk의 .bash_history 크기가 0B이고 최종 수정이 23:38이다. 명령 기록을 비웠다.",
+   "location_id": "loc_serverroom",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [],
+   "reveals_contradiction_of": [],
+   "indirect_traces": [
+    "E4",
+    "E2"
+   ],
+   "destroyable": true,
+   "public_area": false
+  },
+  {
+   "id": "E27",
+   "name": "야식 배달 영수증",
+   "kind": "record",
+   "content": "20:15 치킨 2인분이 3층 로비로 배달됐다. 수령인은 서도윤. 한밤의 개발자들이 먹은 야식이다.",
+   "location_id": "loc_pantry",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [
+    "npc_dowon"
+   ],
+   "reveals_contradiction_of": [],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  },
+  {
+   "id": "E28",
+   "name": "서도윤의 밤 메시지",
+   "kind": "record",
+   "content": "21:15 서도윤: '저는 조금만 더 보고 가겠습니다.' 23:13 '운영 DB 접속이 안 돼요!!' 23:16 '감사 로그가 비어 있어요'. 21시 퇴근이라는 말과 다르다.",
+   "location_id": "loc_office",
+   "visibility": [
+    "player"
+   ],
+   "is_key": false,
+   "element_tags": [],
+   "linked_suspects": [
+    "npc_dowon"
+   ],
+   "reveals_contradiction_of": [
+    "L_dowon_1"
+   ],
+   "indirect_traces": [],
+   "destroyable": false,
+   "public_area": false
+  }
+ ],
+ "lie_ledger": [
+  {
+   "id": "L_chu_1",
+   "liar_id": "npc_chu",
+   "topic": "밤 동선",
+   "lie": "밤새 3층 사무실만 청소했고 지하엔 내려간 적 없슈.",
+   "truth": "22:55~23:43 지하 1층에 내려가 윤석진의 카드로 서버실에 있었다.",
+   "rebuttal_evidence_ids": [
+    "E7",
+    "E10"
+   ]
+  },
+  {
+   "id": "L_chu_2",
+   "liar_id": "npc_chu",
+   "topic": "회사와의 인연",
+   "lie": "이 회사랑은 2년 전 용역 들어오면서 처음 인연이 닿았슈.",
+   "truth": "2018~2019년 개발2팀 개발자였고 장애 책임으로 해고됐다.",
+   "rebuttal_evidence_ids": [
+    "E8",
+    "E11",
+    "E12"
+   ]
+  },
+  {
+   "id": "L_chu_3",
+   "liar_id": "npc_chu",
+   "topic": "출입카드",
+   "lie": "윤 선생 카드는 본 적도 없슈.",
+   "truth": "20시 30분 탕비실 앞에서 윤석진에게 카드를 받았다.",
+   "rebuttal_evidence_ids": [
+    "E9"
+   ]
+  },
+  {
+   "id": "L_yoon_1",
+   "liar_id": "npc_yoon",
+   "topic": "출입카드 보관",
+   "lie": "내 카드는 하루종일 내 가방에 있었음. 남한테 빌려준 적 없음.",
+   "truth": "20시 30분 추성만에게 카드를 건넸고, 사건 시각에는 홍대 술집에 있었다.",
+   "rebuttal_evidence_ids": [
+    "E9",
+    "E13",
+    "E14"
+   ]
+  },
+  {
+   "id": "L_yoon_2",
+   "liar_id": "npc_yoon",
+   "topic": "청소원과의 관계",
+   "lie": "청소하시는 분이랑은 인사도 해 본 적 없음.",
+   "truth": "2018~2019년 같이 일한 옛 동료 추성만임을 알고 있다.",
+   "rebuttal_evidence_ids": [
+    "E12",
+    "E9"
+   ]
+  },
+  {
+   "id": "L_hwang_1",
+   "liar_id": "npc_hwang",
+   "topic": "어젯밤 행적",
+   "lie": "어젯밤엔 회사 근처에도 안 갔습니다. 집에서 쉬었어요.",
+   "truth": "22:10~22:49 노트북을 가지러 회사에 있었다.",
+   "rebuttal_evidence_ids": [
+    "E15"
+   ]
+  },
+  {
+   "id": "L_dba_1",
+   "liar_id": "npc_dba",
+   "topic": "백업 상태",
+   "lie": "오프사이트 백업은 매일 정상으로 나가고 있었습니더.",
+   "truth": "전송이 21일째 실패 중이었고 알림 메일을 방치했다.",
+   "rebuttal_evidence_ids": [
+    "E5"
+   ]
+  },
+  {
+   "id": "L_dowon_1",
+   "liar_id": "npc_dowon",
+   "topic": "퇴근 시각",
+   "lie": "저는 9시쯤 퇴근했어요... 그 뒤는 모릅니다.",
+   "truth": "자신의 실수를 수습하느라 00:41까지 3층 사무실에 남아 있었다.",
+   "rebuttal_evidence_ids": [
+    "E25",
+    "E28",
+    "E24"
+   ]
+  },
+  {
+   "id": "L_guard_1",
+   "liar_id": "npc_guard",
+   "topic": "근무 태도",
+   "lie": "근무 중 한순간도 자리를 비운 적 없습니다!",
+   "truth": "23:20~23:40 정문 밖에서 흡연하느라 보안데스크를 비웠다.",
+   "rebuttal_evidence_ids": [
+    "E23"
+   ]
+  }
+ ],
+ "records": [
+  {
+   "id": "rec_server_log_011",
+   "system": "server_log",
+   "time": 120,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "로컬 스냅샷 생성 성공 (moa_prod, 412GB)",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_server_log_001",
+   "system": "server_log",
+   "time": 130,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "오프사이트 백업 전송 실패: S3 자격증명 만료 (연속 21일째 실패, 알림 메일 DBA 그룹 발송)",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": "E5"
+  },
+  {
+   "id": "rec_server_log_012",
+   "system": "server_log",
+   "time": 180,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "로그 로테이트 완료",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_server_log_013",
+   "system": "server_log",
+   "time": 390,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "CPU 사용률 평시 범위",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_013",
+   "system": "access_log",
+   "time": 507,
+   "person_id": "npc_dowon",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 서도윤",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_018",
+   "system": "access_log",
+   "time": 510,
+   "person_id": "npc_dba",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 고태식",
+   "visibility": [
+    "player",
+    "npc:npc_dba"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_009",
+   "system": "access_log",
+   "time": 529,
+   "person_id": "npc_pm",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 한소라",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_016",
+   "system": "access_log",
+   "time": 530,
+   "person_id": "npc_dba",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 고태식",
+   "visibility": [
+    "player",
+    "npc:npc_dba"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_019",
+   "system": "access_log",
+   "time": 533,
+   "person_id": "npc_dba",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 고태식",
+   "visibility": [
+    "player",
+    "npc:npc_dba"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_012",
+   "system": "access_log",
+   "time": 535,
+   "person_id": "npc_dowon",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 서도윤",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_cctv_009",
+   "system": "cctv",
+   "time": 535,
+   "person_id": null,
+   "location_id": "loc_lobby",
+   "detail": "3층 복도 CCTV: 평상시 이동",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_015",
+   "system": "access_log",
+   "time": 536,
+   "person_id": "npc_dowon",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 서도윤",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_026",
+   "system": "access_log",
+   "time": 536,
+   "person_id": "npc_pm",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 한소라",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_031",
+   "system": "access_log",
+   "time": 547,
+   "person_id": null,
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 인증: 사원 EMP-1659",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_022",
+   "system": "access_log",
+   "time": 548,
+   "person_id": "npc_pm",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 한소라",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_019",
+   "system": "messenger",
+   "time": 552,
+   "person_id": "npc_pm",
+   "location_id": null,
+   "detail": "#general | 한소라: 굿모닝! 오늘 점심 뭐 드실래요?",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_021",
+   "system": "access_log",
+   "time": 555,
+   "person_id": "npc_yoon",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 윤석진",
+   "visibility": [
+    "player",
+    "npc:npc_yoon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_020",
+   "system": "messenger",
+   "time": 555,
+   "person_id": "npc_dowon",
+   "location_id": null,
+   "detail": "#general | 서도윤: 저는 김치찌개 좋습니다",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_011",
+   "system": "access_log",
+   "time": 558,
+   "person_id": "npc_dowon",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 서도윤",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_025",
+   "system": "access_log",
+   "time": 563,
+   "person_id": "npc_pm",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 한소라",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_010",
+   "system": "access_log",
+   "time": 565,
+   "person_id": "npc_yoon",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 윤석진",
+   "visibility": [
+    "player",
+    "npc:npc_yoon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_024",
+   "system": "access_log",
+   "time": 565,
+   "person_id": "npc_pm",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 한소라",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_017",
+   "system": "access_log",
+   "time": 567,
+   "person_id": "npc_pm",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 한소라",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_014",
+   "system": "access_log",
+   "time": 578,
+   "person_id": "npc_dba",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 고태식",
+   "visibility": [
+    "player",
+    "npc:npc_dba"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_020",
+   "system": "access_log",
+   "time": 579,
+   "person_id": "npc_dba",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 고태식",
+   "visibility": [
+    "player",
+    "npc:npc_dba"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_023",
+   "system": "access_log",
+   "time": 580,
+   "person_id": "npc_pm",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출근 인증: 한소라",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_cctv_007",
+   "system": "cctv",
+   "time": 581,
+   "person_id": null,
+   "location_id": "loc_office",
+   "detail": "3층 복도 CCTV: 평상시 이동",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_server_log_014",
+   "system": "server_log",
+   "time": 605,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "배포 파이프라인: staging 배포 성공",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_021",
+   "system": "messenger",
+   "time": 630,
+   "person_id": "npc_yoon",
+   "location_id": null,
+   "detail": "#general | 윤석진: 스탠드업 생략해도 되죠? 어차피 내용 같음",
+   "visibility": [
+    "player",
+    "npc:npc_yoon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_028",
+   "system": "access_log",
+   "time": 651,
+   "person_id": null,
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 인증: 사원 EMP-1704",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_delivery_003",
+   "system": "delivery",
+   "time": 690,
+   "person_id": null,
+   "location_id": "loc_pantry",
+   "detail": "생수 배송: 3층 탕비실",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_cctv_011",
+   "system": "cctv",
+   "time": 711,
+   "person_id": null,
+   "location_id": "loc_lobby",
+   "detail": "1층 로비 CCTV: 택배 기사 방문",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_022",
+   "system": "messenger",
+   "time": 725,
+   "person_id": "npc_dba",
+   "location_id": null,
+   "detail": "#general | 고태식: 점심 먹으러 갑니더.",
+   "visibility": [
+    "player",
+    "npc:npc_dba"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_030",
+   "system": "access_log",
+   "time": 741,
+   "person_id": null,
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 인증: 사원 EMP-1104",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_bank_003",
+   "system": "bank",
+   "time": 754,
+   "person_id": "npc_dba",
+   "location_id": null,
+   "detail": "체크카드 결제 9,500원, 가맹점 '판교 순대국' ",
+   "visibility": [
+    "warrant:bank",
+    "npc:npc_dba"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_bank_004",
+   "system": "bank",
+   "time": 760,
+   "person_id": "npc_dowon",
+   "location_id": null,
+   "detail": "체크카드 결제 8,000원, 가맹점 '김밥천국 판교점'",
+   "visibility": [
+    "warrant:bank",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_call_007",
+   "system": "call",
+   "time": 765,
+   "person_id": "npc_dowon",
+   "location_id": null,
+   "detail": "발신 서도윤 -> 가족 (2분)",
+   "visibility": [
+    "warrant:call",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_server_log_015",
+   "system": "server_log",
+   "time": 800,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "헬스체크 정상 (응답 82ms)",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_027",
+   "system": "access_log",
+   "time": 813,
+   "person_id": null,
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 인증: 사원 EMP-1010",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_delivery_002",
+   "system": "delivery",
+   "time": 840,
+   "person_id": null,
+   "location_id": "loc_lobby",
+   "detail": "택배 도착: 모아테크 1층 보안데스크 수령, 사무용품",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_call_006",
+   "system": "call",
+   "time": 860,
+   "person_id": "npc_pm",
+   "location_id": null,
+   "detail": "발신 한소라 -> 클라이언트 (7분)",
+   "visibility": [
+    "warrant:call",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_023",
+   "system": "messenger",
+   "time": 880,
+   "person_id": "npc_pm",
+   "location_id": null,
+   "detail": "#general | 한소라: 오픈 공지 문구 최종본 공유드려요!",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_024",
+   "system": "messenger",
+   "time": 910,
+   "person_id": "npc_dowon",
+   "location_id": null,
+   "detail": "#general | 서도윤: 공지 문구 확인했습니다. 오타 없습니다.",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_029",
+   "system": "access_log",
+   "time": 928,
+   "person_id": null,
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 인증: 사원 EMP-1838",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_cctv_010",
+   "system": "cctv",
+   "time": 940,
+   "person_id": null,
+   "location_id": "loc_parking",
+   "detail": "1층 로비 CCTV: 택배 기사 방문",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_server_log_016",
+   "system": "server_log",
+   "time": 940,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "배포 파이프라인: staging 테스트 통과",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_032",
+   "system": "access_log",
+   "time": 958,
+   "person_id": null,
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 인증: 사원 EMP-1684",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_call_008",
+   "system": "call",
+   "time": 965,
+   "person_id": "npc_yoon",
+   "location_id": null,
+   "detail": "발신 윤석진 -> 인사팀 (4분, 퇴사 서류)",
+   "visibility": [
+    "warrant:call",
+    "npc:npc_yoon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_cctv_008",
+   "system": "cctv",
+   "time": 972,
+   "person_id": null,
+   "location_id": "loc_office",
+   "detail": "1층 로비 CCTV: 택배 기사 방문",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_025",
+   "system": "messenger",
+   "time": 985,
+   "person_id": "npc_yoon",
+   "location_id": null,
+   "detail": "#general | 윤석진: 커피 머신 또 고장남",
+   "visibility": [
+    "player",
+    "npc:npc_yoon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_026",
+   "system": "messenger",
+   "time": 990,
+   "person_id": "npc_dba",
+   "location_id": null,
+   "detail": "#general | 고태식: 그거 어제부터 그렇다 아이가.",
+   "visibility": [
+    "player",
+    "npc:npc_dba"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_delivery_004",
+   "system": "delivery",
+   "time": 1040,
+   "person_id": "npc_pm",
+   "location_id": "loc_lobby",
+   "detail": "서류 퀵 배송: 한소라 수령",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_server_log_017",
+   "system": "server_log",
+   "time": 1075,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "디스크 사용량 점검: 데이터 볼륨 412GB / 1TB",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_001",
+   "system": "messenger",
+   "time": 1085,
+   "person_id": "npc_pm",
+   "location_id": null,
+   "detail": "#dev-night | 한소라: 내일 오픈 최종 체크리스트 올려놨어요! 다들 확인 부탁드려요",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_002",
+   "system": "messenger",
+   "time": 1092,
+   "person_id": "npc_dba",
+   "location_id": null,
+   "detail": "#dev-night | 고태식: 체크했다. 백업은 정상이고 DB 쪽은 이상 없습니더.",
+   "visibility": [
+    "player",
+    "npc:npc_dba"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_003",
+   "system": "messenger",
+   "time": 1120,
+   "person_id": "npc_yoon",
+   "location_id": null,
+   "detail": "#dev-night | 윤석진: 난 오늘이 마지막 야근임. 인수인계 문서는 어차피 아무도 안 읽으니까 안 씀. CTO 얼굴 보는 것도 오늘이 끝이고.",
+   "visibility": [
+    "player",
+    "npc:npc_yoon"
+   ],
+   "evidence_id": "E21"
+  },
+  {
+   "id": "rec_messenger_004",
+   "system": "messenger",
+   "time": 1121,
+   "person_id": "npc_dba",
+   "location_id": null,
+   "detail": "#dev-night | 고태식: 석진아 그라지 마라 마.",
+   "visibility": [
+    "player",
+    "npc:npc_dba"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_bank_005",
+   "system": "bank",
+   "time": 1135,
+   "person_id": "npc_pm",
+   "location_id": null,
+   "detail": "체크카드 결제 14,200원, 가맹점 '카페 온도'",
+   "visibility": [
+    "warrant:bank",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_005",
+   "system": "messenger",
+   "time": 1142,
+   "person_id": "npc_dowon",
+   "location_id": null,
+   "detail": "#dev-night | 서도윤: 저 배포 스크립트 최종 점검 중입니다...",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_server_log_002",
+   "system": "server_log",
+   "time": 1152,
+   "person_id": "npc_dowon",
+   "location_id": "loc_serverroom",
+   "detail": "deploy-script: migrate --env=prod 실행 후 즉시 롤백, 변경 0건 (실행자 dev_deploy / 서도윤)",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": "E6"
+  },
+  {
+   "id": "rec_messenger_006",
+   "system": "messenger",
+   "time": 1154,
+   "person_id": "npc_dowon",
+   "location_id": null,
+   "detail": "#dev-night | 서도윤: (삭제된 메시지)",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_001",
+   "system": "access_log",
+   "time": 1198,
+   "person_id": "npc_chu",
+   "location_id": "loc_lobby",
+   "detail": "1층 게이트 출입 (용역 사원증 CLN-0231 추성만)",
+   "visibility": [
+    "player",
+    "npc:npc_chu"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_server_log_018",
+   "system": "server_log",
+   "time": 1200,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "헬스체크 정상 (응답 79ms)",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_002",
+   "system": "access_log",
+   "time": 1202,
+   "person_id": "npc_chu",
+   "location_id": "loc_office",
+   "detail": "3층 사무실 출입 (용역 사원증 CLN-0231 추성만)",
+   "visibility": [
+    "player",
+    "npc:npc_chu"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_delivery_001",
+   "system": "delivery",
+   "time": 1215,
+   "person_id": "npc_dowon",
+   "location_id": "loc_office",
+   "detail": "치킨 배달 완료: 모아테크 3층 로비, 수령 서도윤, 2인분",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": "E27"
+  },
+  {
+   "id": "rec_messenger_007",
+   "system": "messenger",
+   "time": 1220,
+   "person_id": "npc_hwang",
+   "location_id": null,
+   "detail": "#dev-night | 황지호: 소라님, 대금 건 아직도 소식이 없네요. 솔직히 말씀드리면 내일 오픈 전까지 입금 안 되면 소스 인도는 보류하겠습니다.",
+   "visibility": [
+    "player",
+    "npc:npc_hwang"
+   ],
+   "evidence_id": "E16"
+  },
+  {
+   "id": "rec_messenger_008",
+   "system": "messenger",
+   "time": 1222,
+   "person_id": "npc_pm",
+   "location_id": null,
+   "detail": "#dev-night | 한소라: 헐 지호님ㅠㅠ 저도 급하게 알아보고 있어요오 오늘 내로 재무팀에 올릴게요",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_cctv_001",
+   "system": "cctv",
+   "time": 1230,
+   "person_id": "npc_yoon",
+   "location_id": "loc_pantry",
+   "detail": "3층 복도(탕비실 앞) CCTV: 윤석진이 추성만에게 카드 크기의 물건을 건넴. 추성만이 앞치마 주머니에 넣음. 물건 식별 불가.",
+   "visibility": [
+    "player",
+    "npc:npc_yoon"
+   ],
+   "evidence_id": "E9"
+  },
+  {
+   "id": "rec_cctv_002",
+   "system": "cctv",
+   "time": 1231,
+   "person_id": "npc_chu",
+   "location_id": "loc_pantry",
+   "detail": "3층 복도(탕비실 앞) CCTV: 추성만이 탕비실 앞을 벗어나 청소 카트로 복귀",
+   "visibility": [
+    "player",
+    "npc:npc_chu"
+   ],
+   "evidence_id": "E9"
+  },
+  {
+   "id": "rec_messenger_009",
+   "system": "messenger",
+   "time": 1245,
+   "person_id": "npc_dba",
+   "location_id": null,
+   "detail": "#dev-night | 고태식: 매니지드 DB로 갈아탄다는 얘기 아직도 진행 중이라 카더라. 그라믄 우리 팀 자리는 어데 있노.",
+   "visibility": [
+    "player",
+    "npc:npc_dba"
+   ],
+   "evidence_id": "E18"
+  },
+  {
+   "id": "rec_bank_001",
+   "system": "bank",
+   "time": 1272,
+   "person_id": "npc_yoon",
+   "location_id": "off:bar",
+   "detail": "체크카드 결제 78,000원, 가맹점 '포차 청춘' (마포구 서교동)",
+   "visibility": [
+    "warrant:bank",
+    "npc:npc_yoon"
+   ],
+   "evidence_id": "E13"
+  },
+  {
+   "id": "rec_messenger_010",
+   "system": "messenger",
+   "time": 1272,
+   "person_id": "npc_dba",
+   "location_id": null,
+   "detail": "#dev-night | 고태식: 퇴근합니더. 내일 보입시다.",
+   "visibility": [
+    "player",
+    "npc:npc_dba"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_011",
+   "system": "messenger",
+   "time": 1275,
+   "person_id": "npc_dowon",
+   "location_id": null,
+   "detail": "#dev-night | 서도윤: 들어가세요! 저는 조금만 더 보고 가겠습니다.",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": "E28"
+  },
+  {
+   "id": "rec_access_log_003",
+   "system": "access_log",
+   "time": 1302,
+   "person_id": "npc_dba",
+   "location_id": "loc_parking",
+   "detail": "주차장 출구 차단기 통과 (차량 12가 3456, 등록자 고태식)",
+   "visibility": [
+    "player",
+    "npc:npc_dba"
+   ],
+   "evidence_id": "E22"
+  },
+  {
+   "id": "rec_call_005",
+   "system": "call",
+   "time": 1310,
+   "person_id": "npc_dba",
+   "location_id": "off:home",
+   "detail": "발신 고태식 -> 가족 (3분). 기지국: 성남시 분당구",
+   "visibility": [
+    "warrant:call",
+    "npc:npc_dba"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_004",
+   "system": "access_log",
+   "time": 1330,
+   "person_id": "npc_hwang",
+   "location_id": "loc_lobby",
+   "detail": "방문자 등록: 황지호(외주), 방문 목적 '노트북 수령', 담당자 한소라 전화 확인",
+   "visibility": [
+    "player",
+    "npc:npc_hwang"
+   ],
+   "evidence_id": "E15"
+  },
+  {
+   "id": "rec_call_001",
+   "system": "call",
+   "time": 1332,
+   "person_id": "npc_hwang",
+   "location_id": null,
+   "detail": "발신 황지호 -> 한소라 (1분, 방문 확인)",
+   "visibility": [
+    "warrant:call",
+    "npc:npc_hwang"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_012",
+   "system": "messenger",
+   "time": 1332,
+   "person_id": "npc_hwang",
+   "location_id": null,
+   "detail": "#dev-night | 황지호: 노트북 가지러 잠깐 1층 왔어요. 올라가도 되죠?",
+   "visibility": [
+    "player",
+    "npc:npc_hwang"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_bank_002",
+   "system": "bank",
+   "time": 1367,
+   "person_id": "npc_yoon",
+   "location_id": "off:bar",
+   "detail": "체크카드 결제 43,500원, 가맹점 '호프집 달빛' (마포구 서교동)",
+   "visibility": [
+    "warrant:bank",
+    "npc:npc_yoon"
+   ],
+   "evidence_id": "E13"
+  },
+  {
+   "id": "rec_access_log_005",
+   "system": "access_log",
+   "time": 1369,
+   "person_id": "npc_hwang",
+   "location_id": "loc_lobby",
+   "detail": "방문자 퇴장 처리: 황지호(외주)",
+   "visibility": [
+    "player",
+    "npc:npc_hwang"
+   ],
+   "evidence_id": "E15"
+  },
+  {
+   "id": "rec_messenger_013",
+   "system": "messenger",
+   "time": 1369,
+   "person_id": "npc_hwang",
+   "location_id": null,
+   "detail": "#dev-night | 황지호: 나갑니다. 내일 뵙겠습니다.",
+   "visibility": [
+    "player",
+    "npc:npc_hwang"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_cctv_003",
+   "system": "cctv",
+   "time": 1375,
+   "person_id": "npc_chu",
+   "location_id": "loc_b1hall",
+   "detail": "지하 1층 엘리베이터 홀 CCTV: 청소복 차림의 추성만이 대형 천가방을 들고 하차, 서버실 방향으로 이동",
+   "visibility": [
+    "player",
+    "npc:npc_chu"
+   ],
+   "evidence_id": "E7"
+  },
+  {
+   "id": "rec_call_002",
+   "system": "call",
+   "time": 1376,
+   "person_id": "npc_yoon",
+   "location_id": "off:bar",
+   "detail": "발신 윤석진 -> 010-****-2291 (6분). 기지국: 마포구 서교동",
+   "visibility": [
+    "warrant:call",
+    "npc:npc_yoon"
+   ],
+   "evidence_id": "E14"
+  },
+  {
+   "id": "rec_access_log_006",
+   "system": "access_log",
+   "time": 1378,
+   "person_id": "npc_yoon",
+   "location_id": "loc_serverroom",
+   "detail": "서버실 출입문 카드 인증 성공: YSJ-0412 (윤석진)",
+   "visibility": [
+    "player",
+    "npc:npc_yoon"
+   ],
+   "evidence_id": "E3"
+  },
+  {
+   "id": "rec_server_log_003",
+   "system": "server_log",
+   "time": 1382,
+   "person_id": "npc_hwang",
+   "location_id": null,
+   "detail": "VPN 접속: ext_hwang (읽기 전용 role), 외부 IP, 23:20 종료",
+   "visibility": [
+    "player",
+    "npc:npc_hwang"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_server_log_004",
+   "system": "server_log",
+   "time": 1383,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "bastion-02 콘솔(tty1, 서버실 로컬) 로그인: svc_legacy_bk",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": "E4"
+  },
+  {
+   "id": "rec_call_003",
+   "system": "call",
+   "time": 1385,
+   "person_id": "npc_yoon",
+   "location_id": "off:bar",
+   "detail": "발신 윤석진 -> 대리운전 1588-**** (2분). 기지국: 마포구 서교동",
+   "visibility": [
+    "warrant:call",
+    "npc:npc_yoon"
+   ],
+   "evidence_id": "E14"
+  },
+  {
+   "id": "rec_server_log_005",
+   "system": "server_log",
+   "time": 1385,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "디스크 I/O 사용률 98% (평시 12%) 시작, 데이터 볼륨 사용량 급감",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": "E2"
+  },
+  {
+   "id": "rec_server_log_006",
+   "system": "server_log",
+   "time": 1392,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "디스크 I/O 정상화, 데이터 볼륨 사용량 0.3% (직전 412GB). 서비스 헬스체크 실패: moa_prod 연결 0, 에러율 100%",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": "E2"
+  },
+  {
+   "id": "rec_server_log_007",
+   "system": "server_log",
+   "time": 1392,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "스냅샷 볼륨 vol-local-snap-07 detach 이벤트 (실행 주체 기록 없음)",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_014",
+   "system": "messenger",
+   "time": 1393,
+   "person_id": "npc_dowon",
+   "location_id": null,
+   "detail": "#dev-night | 서도윤: 운영 DB 접속이 안 돼요!! 에러율 100%예요",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": "E28"
+  },
+  {
+   "id": "rec_messenger_015",
+   "system": "messenger",
+   "time": 1394,
+   "person_id": "npc_pm",
+   "location_id": null,
+   "detail": "#dev-night | 한소라: 헐 뭐라고요? 지금 갈게요",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_messenger_016",
+   "system": "messenger",
+   "time": 1396,
+   "person_id": "npc_dowon",
+   "location_id": null,
+   "detail": "#dev-night | 서도윤: 로그도 안 남아 있어요... 감사 로그가 비어 있어요",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": "E28"
+  },
+  {
+   "id": "rec_cctv_005",
+   "system": "cctv",
+   "time": 1400,
+   "person_id": "npc_guard",
+   "location_id": "loc_lobby",
+   "detail": "1층 로비 CCTV: 보안데스크 무인, 경비원 자리 비움",
+   "visibility": [
+    "player",
+    "npc:npc_guard"
+   ],
+   "evidence_id": "E23"
+  },
+  {
+   "id": "rec_messenger_017",
+   "system": "messenger",
+   "time": 1410,
+   "person_id": "npc_pm",
+   "location_id": null,
+   "detail": "#dev-night | 한소라: 태식님 연락 안 돼요 윤석진님도...",
+   "visibility": [
+    "player",
+    "npc:npc_pm"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_cctv_006",
+   "system": "cctv",
+   "time": 1420,
+   "person_id": "npc_guard",
+   "location_id": "loc_lobby",
+   "detail": "1층 로비 CCTV: 경비원 보안데스크 복귀",
+   "visibility": [
+    "player",
+    "npc:npc_guard"
+   ],
+   "evidence_id": "E23"
+  },
+  {
+   "id": "rec_server_log_008",
+   "system": "server_log",
+   "time": 1421,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "auditd 서비스 재시작. 직전 기록 23:09, 이후 기록 23:41: 23:10~23:40 구간 감사 로그 없음 (30분 공백)",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": "E1"
+  },
+  {
+   "id": "rec_server_log_009",
+   "system": "server_log",
+   "time": 1421,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "bastion-02 /home/svc_legacy_bk/.bash_history 크기 0B (최종 수정 23:38)",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": "E26"
+  },
+  {
+   "id": "rec_server_log_010",
+   "system": "server_log",
+   "time": 1421,
+   "person_id": null,
+   "location_id": "loc_serverroom",
+   "detail": "bastion-02 콘솔 세션 종료: svc_legacy_bk",
+   "visibility": [
+    "player"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_007",
+   "system": "access_log",
+   "time": 1422,
+   "person_id": "npc_yoon",
+   "location_id": "loc_serverroom",
+   "detail": "서버실 출입문 퇴실 인증: YSJ-0412 (윤석진)",
+   "visibility": [
+    "player",
+    "npc:npc_yoon"
+   ],
+   "evidence_id": "E3"
+  },
+  {
+   "id": "rec_cctv_004",
+   "system": "cctv",
+   "time": 1423,
+   "person_id": "npc_chu",
+   "location_id": "loc_b1hall",
+   "detail": "지하 1층 엘리베이터 홀 CCTV: 서버실 방향에서 추성만이 이동해 엘리베이터 탑승",
+   "visibility": [
+    "player",
+    "npc:npc_chu"
+   ],
+   "evidence_id": "E7"
+  },
+  {
+   "id": "rec_messenger_018",
+   "system": "messenger",
+   "time": 1435,
+   "person_id": "npc_dowon",
+   "location_id": null,
+   "detail": "#dev-night | 서도윤: CTO님께 전화했어요. 아침에 모여서 얘기하자고 하세요.",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_call_004",
+   "system": "call",
+   "time": 1438,
+   "person_id": "npc_dowon",
+   "location_id": null,
+   "detail": "발신 서도윤 -> CTO (4분)",
+   "visibility": [
+    "warrant:call",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": null
+  },
+  {
+   "id": "rec_access_log_008",
+   "system": "access_log",
+   "time": 1481,
+   "person_id": "npc_dowon",
+   "location_id": "loc_office",
+   "detail": "3층 사무실 퇴실 인증: 서도윤",
+   "visibility": [
+    "player",
+    "npc:npc_dowon"
+   ],
+   "evidence_id": "E25"
+  }
+ ],
+ "documents": [
+  {
+   "id": "doc_manual",
+   "title": "모아마켓 운영 DB 운영·백업 매뉴얼 v3.2",
+   "doc_type": "manual",
+   "sections": [
+    {
+     "heading": "1. 개요",
+     "text": "모아마켓 운영 DB(moa_prod)는 PostgreSQL 16으로 구성되며 지하 1층 서버실 rack-07에 있다. 담당 DBA는 고태식이다.\n운영 DB 스키마 변경은 반드시 배포 티켓을 거치며, 직접 접속은 점검 목적에 한해 DBA 승인 후 허용한다.",
+     "context": "모아마켓 운영 DB 매뉴얼의 개요. 운영 DB의 구성과 담당자, 변경 절차를 설명한다."
+    },
+    {
+     "heading": "2. 백업 정책 > 백업 주기와 보존 기간",
+     "text": "매일 02:00에 서버실 로컬 스냅샷을 만들고 7일간 보존한다. 02:10에 오프사이트(S3)로 전송하며 30일간 보존한다.\n오프사이트 전송이 실패하면 DBA 메일 그룹으로 알림이 나간다. 알림은 당일 안에 확인해야 한다.",
+     "context": "운영 DB 백업 정책 중 백업 주기와 보존 기간. 로컬 스냅샷과 오프사이트 백업의 관계를 정한다."
+    },
+    {
+     "heading": "2. 백업 정책 > 백업 점검",
+     "text": "매주 월요일 DBA가 백업 점검표에 서명한다. 오프사이트 전송 실패가 3일 이상 이어지면 CTO에게 보고한다.",
+     "context": "운영 DB 백업 정책 중 정기 점검과 보고 규정."
+    },
+    {
+     "heading": "3. 계정 관리",
+     "text": "운영 DB와 관련 서버의 계정은 개인 계정과 서비스 계정으로 나눈다. 개인 계정은 입사 시 발급하고 퇴사 당일 비활성화한다. 권한은 최소 권한 원칙에 따라 읽기, 쓰기, 관리자 세 단계로 구분한다.\n현재 주요 계정은 다음과 같다. dba_root는 고태식이 쓰는 운영 DB 전권(root) 계정이다. adm_ysj는 윤석진의 관리자 계정이다. dev_deploy는 서도윤이 배포 파이프라인에서 쓰는 읽기/쓰기 계정으로 스키마 변경은 불가하다. ext_hwang은 외주 개발자 황지호의 읽기 전용 VPN 계정이다.\n계정 신청과 폐기는 보안 담당 승인을 받아 대장에 기록한다. 분기마다 계정 대장을 점검하되, 서비스 계정은 연동 시스템 영향 때문에 담당 팀 확인 후 폐기한다. 폐기 대상 서비스 계정 목록은 분기 점검 때 갱신한다.\n계정 대장 점검은 보안 담당이 분기 마지막 주에 진행한다. 점검자는 대장의 계정별 사용 이력과 마지막 로그인 시각, 권한 수준, 담당 부서와 담당자의 재직 여부를 확인하고 이상이 있으면 담당 팀에 정리를 요청한다. 정리 요청을 받은 팀은 2주 안에 폐기 또는 유지 사유를 회신해야 하며, 회신이 없는 계정은 다음 분기에 다시 점검한다. 점검 결과는 보안 회의에서 공유하고 대장 사본을 2층 회의실 서류장에 보관한다. 외부 업체 인력과 외주 개발자의 계정은 계약 기간이 끝나면 계약 담당이 보안 담당에게 폐기를 요청하고, 요청이 접수되면 영업일 기준 3일 안에 비활성화한다. 계약 연장이 있으면 갱신 사실을 대장 비고란에 함께 적는다.\n서비스 계정은 비밀번호 변경 주기가 길고, 사용 이력이 없는 계정도 점검 대상에서 제외되는 경우가 있다. 점검 제외 사유는 대장 비고란에 기록한다.\n※ 비고: svc_legacy_bk는 2018년 구 백업 서버 연동용으로 만든 서비스 계정이며 담당자는 smchoo(개발2팀)다. 담당자 퇴사(2019-12) 후 이관·폐기 목록에서 누락되어 현재도 활성 상태이고, 관리자 권한과 기존 비밀번호가 유지되고 있다.",
+     "context": "운영 DB 계정 관리 규정. 계정 종류와 권한, 퇴사자 처리와 서비스 계정 예외를 다룬다."
+    },
+    {
+     "heading": "4. 감사 로그",
+     "text": "접속 감사 로그(auditd)는 bastion-02 로컬 디스크에 보관하며 주 1회 수동으로 반출한다. 중앙 수집 서버로의 실시간 전송은 예산 문제로 도입이 보류됐다.\n서비스 계정의 접속도 같은 방식으로 기록된다.",
+     "context": "감사 로그 보관 방식. 로그가 어디에 쌓이고 누가 지울 수 있는지를 설명한다."
+    },
+    {
+     "heading": "5. 서버실 출입",
+     "text": "서버실 출입은 개인 카드로만 허용하며 카드 대여와 공유를 금지한다. 서버실 청소는 주 1회 낮 시간에 외부 업체가 DBA 동행으로 진행한다. 야간 청소 인력은 서버실 출입 권한이 없다.",
+     "context": "서버실 출입 규정. 카드 사용 원칙과 청소 규정을 다룬다."
+    },
+    {
+     "heading": "6. 장애 복구 절차",
+     "text": "장애 시 먼저 오프사이트 백업에서 복구한다. 오프사이트 백업을 쓸 수 없으면 로컬 스냅샷으로 복구한다. 두 가지가 모두 없으면 애플리케이션 로그로 재구성하되 최대 24시간 분량의 데이터 손실이 생길 수 있다.",
+     "context": "운영 DB 장애 시 복구 순서. 오프사이트 백업과 로컬 스냅샷 중 무엇을 먼저 쓰는지 설명한다."
+    }
+   ],
+   "visibility": [
+    "public"
+   ]
+  },
+  {
+   "id": "doc_chat",
+   "title": "#dev-night 사내 메신저 대화 로그 (오픈 전날 18시~자정)",
+   "doc_type": "chat_log",
+   "sections": [
+    {
+     "heading": "18:00~19:59 (오픈 D-1 마지막 점검)",
+     "text": "[18:05] 한소라: 내일 오픈 최종 체크리스트 올려놨어요! 다들 확인 부탁드려요\n[18:12] 고태식: 체크했다. 백업은 정상이고 DB 쪽은 이상 없습니더.\n[18:40] 윤석진: 난 오늘이 마지막 야근임. 인수인계 문서는 어차피 아무도 안 읽으니까 안 씀. CTO 얼굴 보는 것도 오늘이 끝이고.\n[18:41] 고태식: 석진아 그라지 마라 마.\n[19:02] 서도윤: 저 배포 스크립트 최종 점검 중입니다...\n[19:14] 서도윤: (삭제된 메시지)",
+     "context": "오픈 전날 저녁 점검. 한소라 PM의 체크리스트 공유와 개발자들의 마지막 잡담."
+    },
+    {
+     "heading": "20:00~21:59 (대금 문제와 퇴근)",
+     "text": "[20:20] 황지호: 소라님, 대금 건 아직도 소식이 없네요. 솔직히 말씀드리면 내일 오픈 전까지 입금 안 되면 소스 인도는 보류하겠습니다.\n[20:22] 한소라: 헐 지호님ㅠㅠ 저도 급하게 알아보고 있어요오 오늘 내로 재무팀에 올릴게요\n[20:45] 고태식: 매니지드 DB로 갈아탄다는 얘기 아직도 진행 중이라 카더라. 그라믄 우리 팀 자리는 어데 있노.\n[21:12] 고태식: 퇴근합니더. 내일 보입시다.\n[21:15] 서도윤: 들어가세요! 저는 조금만 더 보고 가겠습니다.",
+     "context": "저녁 시간대 대화. 외주 대금 압박과 DBA의 불안, 퇴근 인사가 오간다."
+    },
+    {
+     "heading": "22:00~23:59 (사고 발생)",
+     "text": "[22:12] 황지호: 노트북 가지러 잠깐 1층 왔어요. 올라가도 되죠?\n[22:49] 황지호: 나갑니다. 내일 뵙겠습니다.\n[23:13] 서도윤: 운영 DB 접속이 안 돼요!! 에러율 100%예요\n[23:14] 한소라: 헐 뭐라고요? 지금 갈게요\n[23:16] 서도윤: 로그도 안 남아 있어요... 감사 로그가 비어 있어요\n[23:30] 한소라: 태식님 연락 안 돼요 윤석진님도...\n[23:55] 서도윤: CTO님께 전화했어요. 아침에 모여서 얘기하자고 하세요.",
+     "context": "밤 사이 대화. 외주 개발자 방문 소식, 그리고 운영 DB 장애 발견과 보고."
+    }
+   ],
+   "visibility": [
+    "public"
+   ]
+  },
+  {
+   "id": "doc_minutes_2019",
+   "title": "2019년 11월 결제 장애 회고 회의록",
+   "doc_type": "minutes",
+   "sections": [
+    {
+     "heading": "안건 1. 장애 경과",
+     "text": "2019-11-14 새벽 결제 DB 장애가 4시간 이어졌고 주문 1.2만 건의 결제 상태가 어긋났다. 복구에는 백업 복원과 수작업 대조가 필요했다. 참석: CTO, 개발1팀 윤석진, 개발2팀 추성만, 인프라팀.",
+     "context": "2019년 11월 결제 DB 장애 회고 회의의 첫 안건. 장애 경과와 피해 규모."
+    },
+    {
+     "heading": "안건 2. 원인",
+     "text": "직접 원인은 개발2팀이 관리하던 백업 스크립트(담당 계정 smchoo)가 변경된 스키마를 인식하지 못한 것이다. 스키마 변경은 CTO 지시로 사전 공유 없이 진행됐으나 이 사실은 본 회의록에 기재하지 않는다.",
+     "context": "2019년 장애 회고 회의의 원인 분석 안건. 백업 스크립트와 스키마 변경의 관계."
+    },
+    {
+     "heading": "안건 3. 책임과 조치",
+     "text": "책임 안건: 개발2팀 추성만에게 정직 후 계약 종료를 권고한다. 본인은 이의를 제기했으나 CTO가 최종 결정했다.",
+     "context": "2019년 장애 회고 회의의 책임 안건. 담당자 징계 결정."
+    },
+    {
+     "heading": "안건 4. 후속 조치",
+     "text": "퇴사자 계정은 퇴사 당일 비활성화를 요청한다. 서비스 계정 목록 정리는 다음 분기로 연기한다.",
+     "context": "2019년 장애 회고 회의의 후속 조치 안건. 퇴사자 계정 정리 계획."
+    }
+   ],
+   "visibility": [
+    "player",
+    "npc:npc_chu",
+    "npc:npc_yoon"
+   ]
+  },
+  {
+   "id": "doc_incident_meeting",
+   "title": "오픈 전날 운영 DB 삭제 장애 대응 회의록 (당일 오전)",
+   "doc_type": "minutes",
+   "sections": [
+    {
+     "heading": "안건 1. 현황",
+     "text": "전날 23:12 운영 DB 헬스체크가 실패했고 확인 결과 moa_prod가 삭제돼 있었다. 접속 감사 로그에는 23:10~23:40 구간이 비어 있다. 서비스 오픈 예정은 오늘 09:00이다.",
+     "context": "운영 DB 삭제 사건 다음 날 오전 장애 대응 회의의 현황 안건."
+    },
+    {
+     "heading": "안건 2. 복구 가능성",
+     "text": "로컬 스냅샷은 삭제됐다. 오프사이트 백업은 21일 전부터 전송 실패 상태라 최신 복구본이 없다. 사실상 복구 불가이며 24시간 분량 이상의 데이터를 재구성해야 한다.",
+     "context": "운영 DB 삭제 장애 대응 회의의 복구 가능성 안건. 백업 상태를 점검한다."
+    },
+    {
+     "heading": "안건 3. 책임 소재",
+     "text": "CTO는 내부자 소행 가능성을 언급했고, DBA는 백업 점검 책임 문제로 방어적이었다. 외주 대금 문제와 시니어 개발자의 퇴사도 거론됐으나 확인된 사실은 없다.",
+     "context": "운영 DB 삭제 장애 대응 회의의 책임 소재 안건. 내부 책임 논쟁을 기록한다."
+    },
+    {
+     "heading": "안건 4. 대외 대응",
+     "text": "오픈은 연기한다. 경찰 신고 여부는 내부 조사 후 결정한다. 조사는 외부 수사 담당자에게 맡긴다.",
+     "context": "운영 DB 삭제 장애 대응 회의의 대외 대응 안건."
+    }
+   ],
+   "visibility": [
+    "public"
+   ]
+  }
+ ],
+ "bluff_claims": [
+  {
+   "id": "bc_accomplice_confessed",
+   "label": "공범이 이미 자백했다",
+   "truth_by_target": {
+    "npc_chu": 0.0,
+    "npc_yoon": 0.0,
+    "npc_dba": 0.0,
+    "npc_dowon": 0.0,
+    "npc_hwang": 0.0
+   },
+   "known_false_by": [
+    "npc_yoon"
+   ]
+  },
+  {
+   "id": "bc_cctv_caught",
+   "label": "CCTV에 다 찍혔다",
+   "truth_by_target": {
+    "npc_chu": 1.0,
+    "npc_yoon": 1.0,
+    "npc_hwang": 1.0,
+    "npc_dowon": 0.5,
+    "npc_dba": 0.5
+   },
+   "known_false_by": []
+  },
+  {
+   "id": "bc_card_log",
+   "label": "서버실 출입카드 기록을 확보했다",
+   "truth_by_target": {
+    "npc_yoon": 1.0,
+    "npc_chu": 1.0,
+    "npc_dba": 0.5,
+    "npc_dowon": 0.0,
+    "npc_hwang": 0.0
+   },
+   "known_false_by": []
+  },
+  {
+   "id": "bc_log_restored",
+   "label": "지워진 감사 로그를 복구했다",
+   "truth_by_target": {
+    "npc_chu": 0.5,
+    "npc_yoon": 0.0,
+    "npc_dba": 0.0,
+    "npc_dowon": 0.0,
+    "npc_hwang": 0.0
+   },
+   "known_false_by": []
+  },
+  {
+   "id": "bc_backup_restored",
+   "label": "오프사이트 백업으로 이미 복구에 성공했다",
+   "truth_by_target": {
+    "npc_chu": 0.0,
+    "npc_yoon": 0.0,
+    "npc_dba": 0.0,
+    "npc_dowon": 0.0,
+    "npc_hwang": 0.0
+   },
+   "known_false_by": [
+    "npc_dba"
+   ]
+  },
+  {
+   "id": "bc_witness_server",
+   "label": "서버실에 들어가는 걸 직접 본 목격자가 있다",
+   "truth_by_target": {
+    "npc_chu": 0.0,
+    "npc_yoon": 0.0,
+    "npc_dba": 0.0,
+    "npc_dowon": 0.0,
+    "npc_hwang": 0.0
+   },
+   "known_false_by": [
+    "npc_guard"
+   ]
+  }
+ ],
+ "initial_memories": [
+  {
+   "id": "mem_pub_01",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "public",
+   "visibility": [
+    "public"
+   ],
+   "doc_type": "observation",
+   "content": "모아마켓 서비스 오픈은 내일 오전 9시다. 사내 모두가 알고 있다.",
+   "game_time": 540,
+   "confidence": 1.0,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "오픈",
+    "모아마켓"
+   ]
+  },
+  {
+   "id": "mem_pub_02",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "public",
+   "visibility": [
+    "public"
+   ],
+   "doc_type": "observation",
+   "content": "본사는 판교 모아테크 빌딩. 서버실은 지하 1층, 개발팀은 3층, 회의실은 2층에 있다.",
+   "game_time": 540,
+   "confidence": 1.0,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "판교",
+    "서버실",
+    "3층"
+   ]
+  },
+  {
+   "id": "mem_dowon_01",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_dowon",
+   "visibility": [
+    "npc:npc_dowon"
+   ],
+   "doc_type": "observation",
+   "content": "19시 12분쯤 배포 스크립트에 --env=prod를 잘못 넣어 운영 DB에 마이그레이션을 시도했다가 바로 롤백했다. 데이터 피해는 없었고 아무에게도 말하지 않았다.",
+   "game_time": 1152,
+   "confidence": 0.95,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "배포",
+    "마이그레이션",
+    "실수",
+    "19:12"
+   ]
+  },
+  {
+   "id": "mem_dowon_02",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_dowon",
+   "visibility": [
+    "npc:npc_dowon"
+   ],
+   "doc_type": "observation",
+   "content": "22시 18분쯤 외주 황지호가 노트북을 가지러 3층에 올라와 짧게 이야기하고 갔다. 대금 문제로 한숨을 쉬었다.",
+   "game_time": 1338,
+   "confidence": 0.9,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "황지호",
+    "22:18",
+    "노트북",
+    "대금"
+   ]
+  },
+  {
+   "id": "mem_dowon_03",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_dowon",
+   "visibility": [
+    "npc:npc_dowon"
+   ],
+   "doc_type": "observation",
+   "content": "22시 50분쯤 청소 아저씨 추성만이 쓰레기통을 다 비운 뒤 큰 천가방을 들고 엘리베이터 쪽으로 갔다. 청소 카트는 복도에 그대로 있었다.",
+   "game_time": 1370,
+   "confidence": 0.7,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "추성만",
+    "청소",
+    "엘리베이터",
+    "22:50",
+    "카트"
+   ]
+  },
+  {
+   "id": "mem_dowon_04",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_dowon",
+   "visibility": [
+    "npc:npc_dowon"
+   ],
+   "doc_type": "observation",
+   "content": "23시 13분 운영 DB가 안 열리는 걸 발견해 메신저에 올렸다. 감사 로그도 비어 있었다.",
+   "game_time": 1393,
+   "confidence": 0.95,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": true,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "운영DB",
+    "23:13",
+    "감사로그"
+   ]
+  },
+  {
+   "id": "mem_dowon_05",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_dowon",
+   "visibility": [
+    "npc:npc_dowon"
+   ],
+   "doc_type": "observation",
+   "content": "23시 55분쯤 추성만 아저씨가 다시 올라와 카트를 끌고 청소를 마무리했다. 평소보다 말수가 적었다.",
+   "game_time": 1435,
+   "confidence": 0.7,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "추성만",
+    "23:55",
+    "카트"
+   ]
+  },
+  {
+   "id": "mem_dba_01",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_dba",
+   "visibility": [
+    "npc:npc_dba"
+   ],
+   "doc_type": "heard",
+   "content": "관리형 DB로 전환하면 DBA 자리가 없어질 거라는 소문을 들었다.",
+   "game_time": 1020,
+   "confidence": 0.6,
+   "source": "heard",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "구조조정",
+    "관리형DB",
+    "소문"
+   ]
+  },
+  {
+   "id": "mem_dba_02",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_dba",
+   "visibility": [
+    "npc:npc_dba"
+   ],
+   "doc_type": "observation",
+   "content": "퇴근 전에 운영 DB 상태를 눈으로 확인했다. 이상 없었다.",
+   "game_time": 1285,
+   "confidence": 0.9,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "21:25",
+    "운영DB",
+    "퇴근"
+   ]
+  },
+  {
+   "id": "mem_dba_03",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_dba",
+   "visibility": [
+    "npc:npc_dba"
+   ],
+   "doc_type": "observation",
+   "content": "21시 42분 주차장을 나와 퇴근했다. 집에는 22시쯤 도착했다.",
+   "game_time": 1302,
+   "confidence": 0.95,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": "E22",
+   "tags": [
+    "주차장",
+    "퇴근",
+    "21:42"
+   ]
+  },
+  {
+   "id": "mem_dba_04",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_dba",
+   "visibility": [
+    "npc:npc_dba"
+   ],
+   "doc_type": "reflection",
+   "content": "3주 전부터 오프사이트 전송 실패 알림 메일이 왔지만 열어보지 않고 방치했다. 들키면 내 책임이다.",
+   "game_time": 130,
+   "confidence": 0.9,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": "E5",
+   "tags": [
+    "오프사이트",
+    "백업",
+    "실패",
+    "알림"
+   ]
+  },
+  {
+   "id": "mem_dba_05",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_dba",
+   "visibility": [
+    "npc:npc_dba"
+   ],
+   "doc_type": "observation",
+   "content": "2주 전 외주 황지호에게 읽기 전용 VPN 계정만 발급해 줬다. 쓰기 권한은 주지 않았다.",
+   "game_time": -20160,
+   "confidence": 0.9,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "황지호",
+    "VPN",
+    "읽기전용"
+   ]
+  },
+  {
+   "id": "mem_yoon_01",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_yoon",
+   "visibility": [
+    "npc:npc_yoon"
+   ],
+   "doc_type": "observation",
+   "content": "20시 30분 탕비실 앞에서 추성만에게 서버실 출입카드를 건넸다. '오픈 전에 서버실 구경만 하고 싶다'고 했다.",
+   "game_time": 1230,
+   "confidence": 0.95,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": "E9",
+   "tags": [
+    "추성만",
+    "카드",
+    "탕비실",
+    "20:30",
+    "서버실"
+   ]
+  },
+  {
+   "id": "mem_yoon_02",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_yoon",
+   "visibility": [
+    "npc:npc_yoon"
+   ],
+   "doc_type": "observation",
+   "content": "사흘 전 추성만이 '그 옛날 계정, 아직 살아 있겠지?' 하고 농담처럼 물었고 '아마도'라고 답했다.",
+   "game_time": -4320,
+   "confidence": 0.8,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "추성만",
+    "계정",
+    "svc_legacy_bk"
+   ]
+  },
+  {
+   "id": "mem_yoon_03",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_yoon",
+   "visibility": [
+    "npc:npc_yoon"
+   ],
+   "doc_type": "observation",
+   "content": "21시 12분 홍대 포차에서 술을 마시기 시작했다. 22시 47분엔 2차, 23시 5분엔 대리운전을 불렀다.",
+   "game_time": 1272,
+   "confidence": 0.95,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "홍대",
+    "술",
+    "21:12",
+    "23:05"
+   ]
+  },
+  {
+   "id": "mem_yoon_04",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_yoon",
+   "visibility": [
+    "npc:npc_yoon"
+   ],
+   "doc_type": "observation",
+   "content": "다음 날 아침 탕비실 서랍에서 내 카드가 돌아와 있는 것을 발견했다. 아무에게도 말하지 않았다.",
+   "game_time": 1860,
+   "confidence": 0.9,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "카드",
+    "탕비실",
+    "서랍"
+   ]
+  },
+  {
+   "id": "mem_yoon_05",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_yoon",
+   "visibility": [
+    "npc:npc_yoon"
+   ],
+   "doc_type": "reflection",
+   "content": "2019년 11월 장애 때 추성만 선배가 CTO 대신 책임을 지고 쫓겨났다. 나도 그 회의에 있었다.",
+   "game_time": -3153600,
+   "confidence": 0.9,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "추성만",
+    "2019",
+    "장애",
+    "회의"
+   ]
+  },
+  {
+   "id": "mem_hwang_01",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_hwang",
+   "visibility": [
+    "npc:npc_hwang"
+   ],
+   "doc_type": "observation",
+   "content": "대금 3,200만원이 한 달 넘게 밀렸다. 소라 PM에게 소스 인도를 보류하겠다고 메시지를 보냈다.",
+   "game_time": 1220,
+   "confidence": 0.95,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": "E16",
+   "tags": [
+    "대금",
+    "소스",
+    "20:20"
+   ]
+  },
+  {
+   "id": "mem_hwang_02",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_hwang",
+   "visibility": [
+    "npc:npc_hwang"
+   ],
+   "doc_type": "observation",
+   "content": "22시 10분 노트북과 인도용 USB를 챙기러 1층에 들러 방문 등록을 했고 3층에서 서도윤을 만났다. 22시 49분에 나갔다.",
+   "game_time": 1330,
+   "confidence": 0.95,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": "E15",
+   "tags": [
+    "방문",
+    "22:10",
+    "22:49",
+    "노트북",
+    "서도윤"
+   ]
+  },
+  {
+   "id": "mem_hwang_03",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_hwang",
+   "visibility": [
+    "npc:npc_hwang"
+   ],
+   "doc_type": "observation",
+   "content": "22시 30분쯤 3층 복도에서 청소 아저씨가 쓰레기통을 비우고 있었다.",
+   "game_time": 1350,
+   "confidence": 0.8,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "청소",
+    "22:30",
+    "3층"
+   ]
+  },
+  {
+   "id": "mem_hwang_04",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_hwang",
+   "visibility": [
+    "npc:npc_hwang"
+   ],
+   "doc_type": "observation",
+   "content": "2주 전 읽기 전용 VPN 계정을 받았다. 운영 DB를 건드릴 권한은 없다.",
+   "game_time": -20160,
+   "confidence": 0.95,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": "E17",
+   "tags": [
+    "VPN",
+    "읽기전용"
+   ]
+  },
+  {
+   "id": "mem_chu_01",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_chu",
+   "visibility": [
+    "npc:npc_chu"
+   ],
+   "doc_type": "reflection",
+   "content": "2019년 11월 결제 장애 때 CTO 지시로 바뀐 스키마 탓인데 내가 모든 책임을 뒤집어쓰고 쫓겨났다. 그 억울함을 6년 동안 잊은 적이 없다.",
+   "game_time": -3153600,
+   "confidence": 0.99,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "2019",
+    "장애",
+    "해고",
+    "CTO",
+    "억울"
+   ]
+  },
+  {
+   "id": "mem_chu_02",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_chu",
+   "visibility": [
+    "npc:npc_chu"
+   ],
+   "doc_type": "observation",
+   "content": "20시 30분 탕비실 앞에서 윤석진에게 서버실 카드를 받았다. 석진이는 아무것도 묻지 않았다.",
+   "game_time": 1230,
+   "confidence": 0.99,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": "E9",
+   "tags": [
+    "윤석진",
+    "카드",
+    "20:30",
+    "탕비실"
+   ]
+  },
+  {
+   "id": "mem_chu_03",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_chu",
+   "visibility": [
+    "npc:npc_chu"
+   ],
+   "doc_type": "observation",
+   "content": "22시 58분 윤석진의 카드로 서버실에 들어갔다. 가방에는 장갑과 USB, 작은 손전등이 들어 있었다.",
+   "game_time": 1378,
+   "confidence": 0.99,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": "E3",
+   "tags": [
+    "서버실",
+    "22:58",
+    "카드"
+   ]
+  },
+  {
+   "id": "mem_chu_04",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_chu",
+   "visibility": [
+    "npc:npc_chu"
+   ],
+   "doc_type": "observation",
+   "content": "23시 3분 콘솔에서 2018년에 만든 svc_legacy_bk로 로그인했다. 비밀번호는 6년 전 그대로였다.",
+   "game_time": 1383,
+   "confidence": 0.99,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": "E4",
+   "tags": [
+    "svc_legacy_bk",
+    "23:03",
+    "콘솔",
+    "로그인"
+   ]
+  },
+  {
+   "id": "mem_chu_05",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_chu",
+   "visibility": [
+    "npc:npc_chu"
+   ],
+   "doc_type": "observation",
+   "content": "23시 5분 운영 DB를 삭제하고 로컬 스냅샷 볼륨을 분리한 뒤 감사 로그 서비스를 멈춰 기록을 지웠다. 오프사이트 백업이 있을까 봐 스냅샷부터 지웠다.",
+   "game_time": 1385,
+   "confidence": 0.99,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "운영DB",
+    "삭제",
+    "스냅샷",
+    "감사로그",
+    "23:05"
+   ]
+  },
+  {
+   "id": "mem_chu_06",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_chu",
+   "visibility": [
+    "npc:npc_chu"
+   ],
+   "doc_type": "observation",
+   "content": "23시 43분 지하 복도를 나왔다. 복도에 CCTV가 있는 건 알았지만 청소복이라 그냥 지나가는 사람으로 보일 거라 생각했다.",
+   "game_time": 1423,
+   "confidence": 0.9,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": "E7",
+   "tags": [
+    "CCTV",
+    "23:43",
+    "지하"
+   ]
+  },
+  {
+   "id": "mem_chu_07",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_chu",
+   "visibility": [
+    "npc:npc_chu"
+   ],
+   "doc_type": "observation",
+   "content": "23시 55분 탕비실 서랍에 카드를 돌려놨다. 석진이에게는 아무 말도 하지 않았다.",
+   "game_time": 1435,
+   "confidence": 0.99,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "카드",
+    "탕비실",
+    "서랍",
+    "23:55"
+   ]
+  },
+  {
+   "id": "mem_guard_01",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_guard",
+   "visibility": [
+    "npc:npc_guard"
+   ],
+   "doc_type": "observation",
+   "content": "19시 58분 추성만 청소원이 평소처럼 출근했다.",
+   "game_time": 1198,
+   "confidence": 0.95,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "추성만",
+    "19:58",
+    "출근"
+   ]
+  },
+  {
+   "id": "mem_guard_02",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_guard",
+   "visibility": [
+    "npc:npc_guard"
+   ],
+   "doc_type": "observation",
+   "content": "20시 38분 윤석진이 평소보다 이르게 퇴근했다. 인사가 건조했다.",
+   "game_time": 1238,
+   "confidence": 0.9,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "윤석진",
+    "20:38",
+    "퇴근"
+   ]
+  },
+  {
+   "id": "mem_guard_03",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_guard",
+   "visibility": [
+    "npc:npc_guard"
+   ],
+   "doc_type": "observation",
+   "content": "22시 10분 외주 황지호가 노트북을 가지러 왔다며 방문 등록을 했고 22시 49분에 나갔다.",
+   "game_time": 1330,
+   "confidence": 0.95,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": "E15",
+   "tags": [
+    "황지호",
+    "방문자",
+    "22:10",
+    "22:49"
+   ]
+  },
+  {
+   "id": "mem_guard_04",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_guard",
+   "visibility": [
+    "npc:npc_guard"
+   ],
+   "doc_type": "observation",
+   "content": "23시 3분 3층을 순찰했다. 서도윤이 혼자 노트북을 보고 있었고 복도에는 청소 카트가 서 있는데 청소원은 보이지 않았다.",
+   "game_time": 1383,
+   "confidence": 0.9,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": true,
+   "is_key_evidence": false,
+   "evidence_id": "E24",
+   "tags": [
+    "서도윤",
+    "순찰",
+    "23:03",
+    "카트",
+    "3층"
+   ]
+  },
+  {
+   "id": "mem_guard_05",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_guard",
+   "visibility": [
+    "npc:npc_guard"
+   ],
+   "doc_type": "observation",
+   "content": "23시 20분부터 20분 동안 정문 밖에서 담배를 피웠다. 그 사이 보안데스크는 비어 있었다. 규정 위반이라 말하지 않았다.",
+   "game_time": 1400,
+   "confidence": 0.95,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": "E23",
+   "tags": [
+    "담배",
+    "23:20",
+    "보안데스크",
+    "자리비움"
+   ]
+  },
+  {
+   "id": "mem_pm_01",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_pm",
+   "visibility": [
+    "npc:npc_pm"
+   ],
+   "doc_type": "heard",
+   "content": "윤석진이 마지막 야근이라며 인수인계 문서는 안 쓰겠다고 했다.",
+   "game_time": 1120,
+   "confidence": 0.8,
+   "source": "heard",
+   "source_npc": "npc_yoon",
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "윤석진",
+    "인수인계",
+    "퇴사"
+   ]
+  },
+  {
+   "id": "mem_pm_02",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_pm",
+   "visibility": [
+    "npc:npc_pm"
+   ],
+   "doc_type": "observation",
+   "content": "황지호가 대금 문제로 소스 인도를 보류하겠다고 압박했다. 사실 재무팀에 올리지 않고 미루고 있었다.",
+   "game_time": 1220,
+   "confidence": 0.95,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "황지호",
+    "대금",
+    "소스",
+    "재무팀"
+   ]
+  },
+  {
+   "id": "mem_pm_03",
+   "case_id": "demo_db_deleted",
+   "slot_id": "__template__",
+   "owner": "npc_pm",
+   "visibility": [
+    "npc:npc_pm"
+   ],
+   "doc_type": "observation",
+   "content": "서도윤이 운영 DB 장애를 알려 회사로 향했다. 고태식과 윤석진은 연락이 안 됐다.",
+   "game_time": 1394,
+   "confidence": 0.9,
+   "source": "direct",
+   "source_npc": null,
+   "contaminated_by": [],
+   "is_first_testimony": false,
+   "is_key_evidence": false,
+   "evidence_id": null,
+   "tags": [
+    "서도윤",
+    "23:14",
+    "장애",
+    "연락"
+   ]
+  }
+ ],
+ "storyboard": {
+  "intro": "서비스 오픈을 하루 앞둔 아침, 모아테크 사무실은 조용히 뒤집혀 있다. 운영 DB가 사라졌고 누가 했는지 알려 줄 기록도 함께 지워졌다.",
+  "briefing": [
+   "어젯밤 11시 5분쯤 지하 서버실의 운영 DB가 삭제됐습니다.",
+   "접속 감사 로그의 30분 구간이 비어 있어 누가 접속했는지 알 수 없습니다.",
+   "오픈은 오늘 오전 9시. 내부 조사가 시작되기 전에 단서를 모아 주십시오."
+  ],
+  "beats": [
+   {
+    "id": "beat_open",
+    "when": "시작",
+    "text": "로비 보안데스크, 3층 사무실, 탕비실이 열려 있다. 서도윤이 사무실에서 안절부절못한다."
+   },
+   {
+    "id": "beat_cctv",
+    "when": "보안데스크 조사",
+    "text": "출입 기록과 CCTV 열람으로 서버실 카드 사용 시각을 알게 된다."
+   },
+   {
+    "id": "beat_server",
+    "when": "E2 확보",
+    "text": "서버실이 열리고 콘솔 로그인 기록과 백업 실패 기록이 나온다."
+   },
+   {
+    "id": "beat_card",
+    "when": "E3 확보",
+    "text": "카드 주인 윤석진의 알리바이(영장 필요)가 쟁점이 된다."
+   },
+   {
+    "id": "beat_past",
+    "when": "2층 회의실",
+    "text": "2019년 장애 회고 자료에서 오래된 동기가 드러난다."
+   },
+   {
+    "id": "beat_counter",
+    "when": "day:2",
+    "text": "범인의 반격 후보: 청소 점검표 위치를 옮기고, 서도윤에게 믹스커피를 건네며 수사 상황을 떠본다. 핵심 증거는 지우지 않는다."
+   }
+  ],
+  "red_herrings": [
+   "황지호: 대금 분쟁과 방문 기록",
+   "고태식: 구조조정 불안과 root 권한, 백업 방치",
+   "서도윤: 숨긴 마이그레이션 실수와 거짓 퇴근 시각"
+  ],
+  "solution_path": [
+   "E1/E2: 누군가 감사 로그를 지웠다",
+   "E3+E13/E14: 윤석진의 카드가 쓰였지만 본인은 홍대에 있었다",
+   "E9: 카드는 추성만에게 넘어갔다",
+   "E7/E10: 추성만은 지하에 있었다",
+   "E4+E11: svc_legacy_bk는 추성만의 옛 계정",
+   "E12: 6년 전 해고 동기"
+  ]
+ },
+ "fingerprint": {
+  "motive_type": "revenge_dismissal",
+  "trick_type": "borrowed_card_legacy_account",
+  "culprit_role": "night_cleaner",
+  "synopsis": "퇴사자 출신 야간 청소원이 동료의 출입카드와 폐기 누락된 옛 서비스 계정으로 오픈 전날 운영 DB를 지웠다."
+ }
+}
