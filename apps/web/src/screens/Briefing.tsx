@@ -26,7 +26,7 @@ export function Cast({ characters, onShown }: { characters: PublicCharacter[]; o
       <div className="cast">
         {characters.map((c, i) => (
           <article key={c.id} className={`cast-card${i < shown ? ' in' : ''}`} aria-hidden={i >= shown} data-testid="cast-card">
-            <Portrait seed={c.face_seed} appearance={c.appearance} emotion="neutral" width={110} still portraitUrl={c.portrait_url} name={c.name} />
+            <Portrait seed={c.face_seed} appearance={c.appearance} emotion="neutral" width={110} still portraitUrl={c.portrait_url} portraitEmotions={c.portrait_emotions} name={c.name} />
             <div>
               <strong>{c.name}</strong>
               <span className="muted"> · {c.role} · {c.age}세</span>

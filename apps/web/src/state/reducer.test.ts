@@ -128,4 +128,17 @@ describe('AG-UI 리듀서', () => {
     const same = clientReducer(s, { kind: 'portraits', urls: { a: '/api/portraits/g1/a.webp?v=1' } })
     expect(same).toBe(s)
   })
+
+  it('표정 사진 주소는 기존 것을 지우지 않고 합치며, 바뀐 게 없으면 같은 상태', () => {
+    const ch = (id: string): PublicCharacter => ({
+      id, name: id, role: 'r', age: 30, gender: 'F', appearance: {}, face_seed: 1, location_id: null, emotion: 'neutral', one_liner: '',
+    })
+    let s = clientReducer(initialClientState, { kind: 'set_view', view: { ...view(), characters: [ch('a'), ch('b')] } })
+    s = clientReducer(s, { kind: 'portraits', urls: {}, emotions: { a: { angry: '/a--angry.webp' } } })
+    s = clientReducer(s, { kind: 'portraits', urls: {}, emotions: { a: { sad: '/a--sad.webp' } } })
+    expect(s.view!.characters[0].portrait_emotions).toEqual({ angry: '/a--angry.webp', sad: '/a--sad.webp' })
+    expect(s.view!.characters[1].portrait_emotions ?? null).toBeNull()
+    expect(clientReducer(s, { kind: 'portraits', urls: {}, emotions: { a: { angry: '/a--angry.webp' } } })).toBe(s)
+    expect(clientReducer(s, { kind: 'portraits', urls: {} })).toBe(s)
+  })
 })

@@ -66,6 +66,39 @@ describe('Portrait', () => {
     expect(host.querySelector('img')!.classList.contains('loaded')).toBe(true)
   })
 
+  it('감정에 맞는 표정 사진이 있으면 그것을 보여 주고, 없으면 기본 사진으로', () => {
+    show(<Portrait seed={1} portraitUrl="/base.png" portraitEmotions={{ angry: '/angry.png' }} emotion="angry" />)
+    expect([...host.querySelectorAll('img')].map((i) => i.getAttribute('src'))).toEqual(['/angry.png'])
+    expect(host.querySelector('.portrait-tint')).toBeNull()
+    expect(host.textContent).toContain('💢')
+    show(<Portrait seed={1} portraitUrl="/base.png" portraitEmotions={{ angry: '/angry.png' }} emotion="sad" />)
+    expect(host.querySelector('img:last-of-type')!.getAttribute('src')).toBe('/base.png')
+  })
+
+  it('사진을 바꾸는 동안 이전 사진을 남겨 두었다가 새 사진이 불러와지면 치운다', () => {
+    const emo = { angry: '/angry.png' }
+    show(<Portrait seed={1} portraitUrl="/base.png" portraitEmotions={emo} emotion="neutral" />)
+    act(() => {
+      host.querySelector('img')!.dispatchEvent(new Event('load'))
+    })
+    show(<Portrait seed={1} portraitUrl="/base.png" portraitEmotions={emo} emotion="angry" />)
+    const imgs = [...host.querySelectorAll('img')]
+    expect(imgs.map((i) => i.getAttribute('src'))).toEqual(['/base.png', '/angry.png'])
+    expect(imgs[0].classList.contains('loaded')).toBe(true)
+    act(() => {
+      imgs[1].dispatchEvent(new Event('load'))
+    })
+    expect([...host.querySelectorAll('img')].map((i) => i.getAttribute('src'))).toEqual(['/angry.png'])
+  })
+
+  it('표정 사진 로드가 실패하면 기본 사진으로 돌아간다', () => {
+    show(<Portrait seed={1} portraitUrl="/base.png" portraitEmotions={{ angry: '/bad.png' }} emotion="angry" />)
+    act(() => {
+      host.querySelector('img')!.dispatchEvent(new Event('error'))
+    })
+    expect([...host.querySelectorAll('img')].map((i) => i.getAttribute('src'))).toEqual(['/base.png'])
+  })
+
   it('분노는 붉은 색조와 💢, 당황은 흔들림과 💦', () => {
     stubMotion(false)
     show(<Portrait seed={1} portraitUrl="/p.png" emotion="angry" />)

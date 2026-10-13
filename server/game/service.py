@@ -152,8 +152,10 @@ class GameService:
 
     def _view(self, case: CaseBible, state: GameState, masker: IdMasker) -> PlayerView:
         self._refresh(case, state)
+        key = self._portrait_key(state)
         return build_view(case, state, masker, chips=self._chips(case, state, masker), bands=self._bands(),
-                          actions_total=self.cfg.day_actions, portraits=self.portraits.urls(self._portrait_key(state)))
+                          actions_total=self.cfg.day_actions, portraits=self.portraits.urls(key),
+                          portrait_emotions=self.portraits.emotion_urls(key))
 
     def _obtain(self, case: CaseBible, state: GameState, evidence_ids: list[str]) -> list[str]:
         """증거를 수첩에 넣는다. 새로 얻은 것만 돌려준다."""
@@ -293,11 +295,11 @@ class GameService:
         빠진 사람이 있는데 그리는 중이 아니면(서버 재시작으로 작업이 끊김 등) 빠진 사람만 다시 그린다(상한 있음)."""
         state = self.store.load_live(game_id)
         key = self._portrait_key(state)
-        urls = self.portraits.urls(key)
         case = self.cases.get(state.case_id)
-        if case and not self.portraits.pending(key) and any(c.id not in urls for c in case.characters):
+        if case and not self.portraits.pending(key) and self.portraits.missing(key, [c.id for c in case.characters]):
             self.portraits.start(key, self._public_people(case.characters), setting=case.theme, game_id=game_id)
-        return {"pending": self.portraits.pending(key), "urls": urls}
+        return {"pending": self.portraits.pending(key), "urls": self.portraits.urls(key),
+                "emotions": self.portraits.emotion_urls(key)}
 
     # ================================================================= 행동
     async def act(self, game_id: str, action: dict) -> AsyncIterator[dict]:

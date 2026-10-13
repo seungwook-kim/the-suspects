@@ -16,6 +16,8 @@ export interface PublicCharacter {
   one_liner: string
   /** AI 초상화 주소. 처음엔 null 이었다가 나중에 채워질 수 있다. 없으면 절차적 SVG 로 그린다. */
   portrait_url?: string | null
+  /** 표정별 사진 주소(감정 이름 → 주소). 이미 그려진 표정만 있고 neutral 은 portrait_url 이다. */
+  portrait_emotions?: Record<string, string> | null
 }
 
 export interface PublicLocation {
@@ -153,6 +155,7 @@ export interface CasePreview {
 export interface PortraitStatus {
   pending: boolean
   urls: Record<string, string> // 인물 id → 사진 주소
+  emotions: Record<string, Record<string, string>> // 인물 id → (감정 → 표정 사진 주소)
 }
 
 export interface CaseJob {

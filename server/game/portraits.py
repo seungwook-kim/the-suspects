@@ -70,6 +70,35 @@ def portrait_prompt(*, role: str, age: int, gender: str, appearance: dict, setti
     )
 
 
+# 표정 사진: 기본 사진을 참조로 넣고 표정만 바꿔 그린다 (같은 얼굴 유지, 2026-10-13 사용자 요청)
+EMOTION_EN = {
+    "nervous": "a tense, nervous expression: lips pressed together, eyebrows slightly raised, eyes glancing to the side",
+    "flustered": "a flustered, startled expression: eyes wide open, eyebrows raised high, mouth slightly open, "
+                 "a drop of sweat on the forehead",
+    "angry": "an angry expression: furrowed brows, glaring eyes, clenched jaw, tight lips",
+    "sad": "a sad expression: drooping eyebrows, downcast eyes, the corners of the mouth turned down",
+    "happy": "a warm, relieved smile with eyes crinkling at the corners",
+}
+
+
+def expression_prompt(emotion: str) -> str:
+    return (
+        "Edit this photo. It must stay the exact same person: identical face, identity, age, skin, hairstyle, "
+        "clothing, accessories, background, lighting, camera angle and framing. "
+        f"Change only the facial expression to {EMOTION_EN[emotion]}. "
+        "Photorealistic, natural and subtle, no text, no watermark."
+    )
+
+
+def ref_image(webp: bytes, max_size: tuple[int, int] = (378, 504)) -> bytes:
+    """참조로 넣을 기본 사진: 512×512보다 작게 줄여 JPEG로 (Cloudflare 참조 사진 제한)."""
+    im = Image.open(io.BytesIO(webp)).convert("RGB")
+    im.thumbnail(max_size, Image.LANCZOS)
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=90)
+    return buf.getvalue()
+
+
 def compact(data: bytes, *, max_size: tuple[int, int], quality: int) -> bytes | None:
     """받은 그림을 최대 크기 안으로 줄이고 WebP로 압축한다. 그림이 아니면 None (저장하지 않음)."""
     try:
@@ -122,12 +151,33 @@ class PortraitStore:
         p = self._dir(key) / filename
         return p if p.is_file() else None
 
-    def urls(self, key: str) -> dict[str, str]:
+    def _files(self, key: str) -> list[Path]:
         d = self.root / key if _SAFE.match(key) else None
         if d is None or not d.is_dir():
-            return {}
-        return {p.stem: f"/api/portraits/{key}/{p.name}?v={int(p.stat().st_mtime)}"
-                for p in d.iterdir() if p.suffix[1:] in EXTS}
+            return []
+        return [p for p in d.iterdir() if p.suffix[1:] in EXTS]
+
+    @staticmethod
+    def _url(key: str, p: Path) -> str:
+        return f"/api/portraits/{key}/{p.name}?v={int(p.stat().st_mtime)}"
+
+    def urls(self, key: str) -> dict[str, str]:
+        """기본(무표정) 사진: 인물 id → 주소."""
+        return {p.stem: self._url(key, p) for p in self._files(key) if "--" not in p.stem}
+
+    def emotion_urls(self, key: str) -> dict[str, dict[str, str]]:
+        """표정 사진: 인물 id → {표정: 주소}. 파일 이름은 <인물 id>--<표정>.webp."""
+        out: dict[str, dict[str, str]] = {}
+        for p in self._files(key):
+            pid, sep, emo = p.stem.partition("--")
+            if sep and emo in EMOTION_EN:
+                out.setdefault(pid, {})[emo] = self._url(key, p)
+        return out
+
+    def missing(self, key: str, ids: list[str]) -> bool:
+        """기본 사진이나 설정된 표정 사진 중 빠진 게 있는지."""
+        base, emos = self.urls(key), self.emotion_urls(key)
+        return any(i not in base or any(e not in emos.get(i, {}) for e in self.images.emotions) for i in ids)
 
     def start(self, key: str, people: list[dict], *, setting: str = "", game_id: str | None = None) -> None:
         """people: [{id, role, age, gender, appearance}] — 공개 정보만. 이미 그리는 중이면 무시.
@@ -154,24 +204,56 @@ class PortraitStore:
         d = self._dir(key)
         d.mkdir(parents=True, exist_ok=True)
 
-        async def one(p: dict) -> None:
-            if not _SAFE.match(p["id"]) or any((d / f"{p['id']}.{e}").exists() for e in EXTS):
-                return
-            prompt = portrait_prompt(role=p["role"], age=p["age"], gender=p["gender"],
-                                     appearance=p.get("appearance") or {}, setting=setting)
-            seed = random.randrange(2**31)
-            async with self._sem:
-                raw = await self.images.generate(prompt, seed=seed, game_id=game_id)
-            img = compact(raw, max_size=(self.images.width, self.images.height),
-                          quality=self.images.webp_quality) if raw else None
-            if not img:
-                return
-            tmp = d / f"{p['id']}.tmp"
+        def save(name: str, img: bytes) -> None:
+            tmp = d / f"{name}.tmp"
             tmp.write_bytes(img)
-            tmp.replace(d / f"{p['id']}.webp")  # 반쯤 쓴 파일이 서빙되지 않게
-            if self.library is not None:  # 사건·판·인물 id 없이 공개 외모 정보만
-                self.library.add(img, "webp", person=p, prompt=prompt, provider=self.images.provider,
-                                 model=self.images.model, seed=seed)
+            tmp.replace(d / f"{name}.webp")  # 반쯤 쓴 파일이 서빙되지 않게
+
+        async def draw(prompt: str, seed: int, refs: list[bytes] | None = None) -> bytes | None:
+            async with self._sem:
+                raw = await self.images.generate(prompt, seed=seed, game_id=game_id, ref_images=refs)
+            return compact(raw, max_size=(self.images.width, self.images.height),
+                           quality=self.images.webp_quality) if raw else None
+
+        async def one(p: dict) -> None:
+            pid = p["id"]
+            if not _SAFE.match(pid):
+                return
+            # 1) 기본(무표정) 사진 — 이미 있으면 그대로 쓴다(빠진 그림 다시 그리기)
+            base_path = next((d / f"{pid}.{e}" for e in EXTS if (d / f"{pid}.{e}").exists()), None)
+            seed, base_file = random.randrange(2**31), None
+            if base_path:
+                base = base_path.read_bytes()
+            else:
+                prompt = portrait_prompt(role=p["role"], age=p["age"], gender=p["gender"],
+                                         appearance=p.get("appearance") or {}, setting=setting)
+                img = await draw(prompt, seed)
+                if not img:
+                    return
+                save(pid, img)
+                base = img
+                if self.library is not None:  # 사건·판·인물 id 없이 공개 외모 정보만
+                    base_file = self.library.add(img, "webp", person=p, prompt=prompt, provider=self.images.provider,
+                                                 model=self.images.model, seed=seed)["file"]
+
+            # 2) 표정 사진 — 기본 사진을 참조로 넣어 같은 얼굴에 표정만 바꾼다 (한 장 약 10초)
+            ref = ref_image(base)
+
+            async def emotion(emo: str) -> None:
+                if (d / f"{pid}--{emo}.webp").exists():
+                    return
+                prompt = expression_prompt(emo)
+                img = await draw(prompt, seed, [ref])
+                if not img:
+                    return
+                save(f"{pid}--{emo}", img)
+                if self.library is not None:
+                    self.library.add(img, "webp", person=p, prompt=prompt, provider=self.images.provider,
+                                     model=self.images.model, seed=seed, kind="emotion", emotion=emo,
+                                     base_file=base_file)
+
+            await asyncio.gather(*(emotion(e) for e in self.images.emotions if e in EMOTION_EN),
+                                 return_exceptions=True)
 
         await asyncio.gather(*(one(p) for p in people), return_exceptions=True)
 

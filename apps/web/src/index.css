@@ -158,6 +158,7 @@ input, select {
 .portrait-ph svg { height: 100%; }
 .portrait-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; opacity: 0; transition: opacity 0.5s ease, filter 0.3s ease, transform 0.3s ease; }
 .portrait-img.loaded { opacity: 1; }
+.portrait-photo.expr .portrait-img { filter: none; transform: none; }
 .portrait-tint { position: absolute; inset: 0; pointer-events: none; transition: background 0.3s; }
 .portrait-badge { position: absolute; top: 2%; right: 2%; line-height: 1; pointer-events: none; }
 .emo-angry .portrait-tint { background: rgba(220, 38, 30, 0.28); mix-blend-mode: multiply; }

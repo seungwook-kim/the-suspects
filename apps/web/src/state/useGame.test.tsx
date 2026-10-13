@@ -48,9 +48,9 @@ afterEach(() => {
 describe('초상화 기다리기', () => {
   it('그리는 동안 몇 초마다 주소를 받아 채우고, 다 그리면 멈춘다', async () => {
     portraits
-      .mockResolvedValueOnce({ pending: true, urls: {} })
-      .mockResolvedValueOnce({ pending: true, urls: { a: '/p/a.webp' } })
-      .mockResolvedValue({ pending: false, urls: { a: '/p/a.webp', b: '/p/b.webp' } })
+      .mockResolvedValueOnce({ pending: true, urls: {}, emotions: {} })
+      .mockResolvedValueOnce({ pending: true, urls: { a: '/p/a.webp' }, emotions: {} })
+      .mockResolvedValue({ pending: false, urls: { a: '/p/a.webp', b: '/p/b.webp' }, emotions: {} })
     act(() => g.adoptGame('g1', view))
     await flush()
     expect(portraits).toHaveBeenCalledWith('g1')
@@ -66,8 +66,27 @@ describe('초상화 기다리기', () => {
     expect(portraits).toHaveBeenCalledTimes(n) // 다 채워지면 더 묻지 않음
   })
 
+  it('기본 사진이 다 있어도 표정을 그리는 동안(pending) 계속 묻고, 채우고, 끝나면 멈춘다', async () => {
+    const full = { ...view, characters: view.characters.map((c) => ({ ...c, portrait_url: `/p/${c.id}.webp` })) } as unknown as PlayerView
+    portraits
+      .mockResolvedValueOnce({ pending: true, urls: {}, emotions: {} })
+      .mockResolvedValueOnce({ pending: true, urls: {}, emotions: { a: { angry: '/p/a--angry.webp' } } })
+      .mockResolvedValue({ pending: false, urls: {}, emotions: { a: { angry: '/p/a--angry.webp', sad: '/p/a--sad.webp' }, b: { happy: '/p/b--happy.webp' } } })
+    act(() => g.adoptGame('g1', full))
+    await flush()
+    expect(portraits).toHaveBeenCalledTimes(1)
+    await flush(PORTRAIT_POLL_MS)
+    expect(g.state.view!.characters[0].portrait_emotions).toEqual({ angry: '/p/a--angry.webp' })
+    await flush(PORTRAIT_POLL_MS)
+    expect(g.state.view!.characters[0].portrait_emotions).toEqual({ angry: '/p/a--angry.webp', sad: '/p/a--sad.webp' })
+    expect(g.state.view!.characters[1].portrait_emotions).toEqual({ happy: '/p/b--happy.webp' })
+    const n = portraits.mock.calls.length
+    await flush(PORTRAIT_POLL_MS * 5)
+    expect(portraits).toHaveBeenCalledTimes(n)
+  })
+
   it('서버가 그리지 않는 중이면(키 없음 등) 한 번만 묻고 SVG로 둔다', async () => {
-    portraits.mockResolvedValue({ pending: false, urls: {} })
+    portraits.mockResolvedValue({ pending: false, urls: {}, emotions: {} })
     act(() => g.adoptGame('g1', view))
     await flush(PORTRAIT_POLL_MS * 5)
     expect(portraits).toHaveBeenCalledTimes(1)

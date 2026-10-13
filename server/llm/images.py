@@ -42,6 +42,8 @@ class ImageClient:
         self.height: int = int(role.get("height", 640))
         self.concurrency: int = int(role.get("concurrency", 7))  # 한 판의 인물을 한꺼번에 (공급자 대기 시간이 대부분)
         self.webp_quality: int = int(role.get("webp_quality", 80))
+        # 같은 얼굴로 따로 그릴 표정 (기본 사진 = neutral). 비우면 표정 사진 없이 화면 효과만
+        self.emotions: list[str] = list(role.get("emotions", ["nervous", "flustered", "angry", "sad", "happy"]))
         if self.provider == "cloudflare":
             self.api_key = api_key if api_key is not None else os.getenv("CLOUDFLARE_API_TOKEN", "")
             self.account_id = account_id if account_id is not None else os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
@@ -61,21 +63,24 @@ class ImageClient:
         return self.provider != "cloudflare" or bool(self.account_id)
 
     async def generate(self, prompt: str, *, seed: int | None = None, node: str = "portrait",
-                       game_id: str | None = None) -> bytes | None:
+                       game_id: str | None = None, ref_images: list[bytes] | None = None) -> bytes | None:
+        """ref_images: 참조 사진(JPEG). 같은 얼굴로 표정만 바꿔 그릴 때 기본 사진을 넣는다.
+        Cloudflare는 참조 사진이 512×512보다 작아야 한다(portraits.ref_image가 줄여서 넘김)."""
         if not self.enabled:
             return None
         t0, ok, err, out = time.perf_counter(), False, "", None
+        refs = ref_images or []
         try:
             if self._generator:
                 out = await self._generator(prompt)
             elif self.provider == "cloudflare":
-                out = await self._call_cloudflare(prompt, seed)
+                out = await self._call_cloudflare(prompt, seed, refs)
             else:
-                out = await self._call_openrouter(prompt)
+                out = await self._call_openrouter(prompt, refs)
             ok = out is not None
         except Exception as e:  # 그림 실패(할당량 초과 포함)는 게임을 멈추지 않는다 (SVG로 대신)
             err = f"{type(e).__name__}: {str(e)[:200]}"
-        extra: dict = {"provider": self.provider, "seed": seed}
+        extra: dict = {"provider": self.provider, "seed": seed, "refs": len(refs)}
         if err:
             extra["errors"] = [err]
         self.tracer.record(CallRecord(
@@ -86,23 +91,30 @@ class ImageClient:
         ))
         return out
 
-    async def _call_cloudflare(self, prompt: str, seed: int | None) -> bytes | None:
+    async def _call_cloudflare(self, prompt: str, seed: int | None, refs: list[bytes]) -> bytes | None:
         fields = {"prompt": prompt, "width": str(self.width), "height": str(self.height)}
         if seed is not None:
             fields["seed"] = str(seed)
+        files: dict = {k: (None, v) for k, v in fields.items()}  # 글자만 있어도 multipart로 보내야 한다
+        for i, ref in enumerate(refs[:4]):  # 참조 사진은 input_image_0~3
+            files[f"input_image_{i}"] = (f"ref{i}.jpg", ref, "image/jpeg")
         async with httpx.AsyncClient(timeout=120, transport=self._transport) as http:
             r = await http.post(f"{CLOUDFLARE_API}/accounts/{self.account_id}/ai/run/{self.model}",
-                                headers={"Authorization": f"Bearer {self.api_key}"},
-                                files={k: (None, v) for k, v in fields.items()})  # 글자만 있어도 multipart로 보내야 한다
+                                headers={"Authorization": f"Bearer {self.api_key}"}, files=files)
             r.raise_for_status()
             data = r.json()
         image = (data.get("result") or {}).get("image") if isinstance(data, dict) else None
         return base64.b64decode(image) if image else None
 
-    async def _call_openrouter(self, prompt: str) -> bytes | None:
+    async def _call_openrouter(self, prompt: str, refs: list[bytes]) -> bytes | None:
+        content: str | list = prompt
+        if refs:
+            content = [{"type": "text", "text": prompt}] + [
+                {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(r).decode()}}
+                for r in refs]
         body = {
             "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": [{"role": "user", "content": content}],
             "modalities": ["image", "text"],
             "image_config": {"aspect_ratio": self.aspect_ratio},
         }

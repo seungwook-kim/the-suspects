@@ -17,6 +17,8 @@ interface Props {
   still?: boolean
   /** AI 초상화 주소. 없거나 로드에 실패하면 절차적 SVG 로 그린다. */
   portraitUrl?: string | null
+  /** 표정별 사진 주소(감정 → 주소). 현재 감정의 사진이 있으면 그것을, 없으면 portraitUrl 을 보여 준다. */
+  portraitEmotions?: Record<string, string> | null
   /** 주 화면 초상화: lazy 로딩을 쓰지 않는다 */
   eager?: boolean
 }
@@ -44,15 +46,20 @@ function usePrefersReducedMotion(): boolean {
   return reduced
 }
 
-export function Portrait({ seed, appearance, emotion = 'neutral', speaking, width = 240, className, title, name, still, portraitUrl, eager }: Props) {
+export function Portrait({ seed, appearance, emotion = 'neutral', speaking, width = 240, className, title, name, still, portraitUrl, portraitEmotions, eager }: Props) {
   const [blink, setBlink] = useState(false)
   const [mouth, setMouth] = useState(0)
   const [failed, setFailed] = useState(0) // 실패 기록이 바뀔 때 다시 그리기 위한 카운터
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null)
   const reduced = usePrefersReducedMotion()
 
-  const url = portraitUrl && !failedUrls.has(portraitUrl) ? portraitUrl : null
   void failed
+  const emoUrl = emotion !== 'neutral' ? portraitEmotions?.[emotion] : undefined
+  const useEmo = !!emoUrl && !failedUrls.has(emoUrl)
+  const base = portraitUrl && !failedUrls.has(portraitUrl) ? portraitUrl : null
+  const url = useEmo ? emoUrl! : base
+  // 바꾸는 사이에 빈 화면이 되지 않게, 마지막으로 불러온 사진을 새 사진이 뜰 때까지 아래에 둔다
+  const below = loadedUrl && url && loadedUrl !== url && !failedUrls.has(loadedUrl) ? loadedUrl : null
   const usePhoto = !!url
 
   // 3~6초마다 눈 깜빡임 (그림일 때만)
@@ -107,7 +114,6 @@ export function Portrait({ seed, appearance, emotion = 'neutral', speaking, widt
     )
   }
 
-  const loaded = loadedUrl === url
   const fx = [
     !reduced && emotion === 'flustered' ? 'fx-shake' : '',
     !reduced && emotion === 'nervous' ? 'fx-tremble' : '',
@@ -116,7 +122,7 @@ export function Portrait({ seed, appearance, emotion = 'neutral', speaking, widt
   const badge = emotion === 'flustered' ? '💦' : emotion === 'angry' ? '💢' : null
   return (
     <div
-      className={`portrait portrait-photo emo-${emotion}${speaking ? ' speaking' : ''}${reduced ? ' calm' : ''} ${className ?? ''}`}
+      className={`portrait portrait-photo emo-${emotion}${speaking ? ' speaking' : ''}${reduced ? ' calm' : ''}${useEmo ? ' expr' : ''} ${className ?? ''}`}
       style={style}
       title={title}
       aria-label={title}
@@ -124,19 +130,24 @@ export function Portrait({ seed, appearance, emotion = 'neutral', speaking, widt
       <div className={`portrait-bob${fx.includes('fx-bob') ? ' fx-bob' : ''}`}>
         <div className={`portrait-frame ${fx.filter((f) => f !== 'fx-bob').join(' ')}`}>
           <div className="portrait-ph" dangerouslySetInnerHTML={{ __html: svg }} />
-          <img
-            className={`portrait-img${loaded ? ' loaded' : ''}`}
-            src={url}
-            alt={name ?? title ?? ''}
-            loading={eager ? undefined : 'lazy'}
-            decoding="async"
-            onLoad={() => setLoadedUrl(url)}
-            onError={() => {
-              failedUrls.add(url)
-              setFailed((n) => n + 1)
-            }}
-          />
-          {(emotion === 'angry' || emotion === 'sad') && <div className="portrait-tint" aria-hidden />}
+          {[below, url].map((u) =>
+            u ? (
+              <img
+                key={u}
+                className={`portrait-img${loadedUrl === u ? ' loaded' : ''}`}
+                src={u}
+                alt={u === url ? (name ?? title ?? '') : ''}
+                loading={eager ? undefined : 'lazy'}
+                decoding="async"
+                onLoad={() => setLoadedUrl(u)}
+                onError={() => {
+                  failedUrls.add(u)
+                  setFailed((n) => n + 1)
+                }}
+              />
+            ) : null,
+          )}
+          {!useEmo && (emotion === 'angry' || emotion === 'sad') && <div className="portrait-tint" aria-hidden />}
         </div>
         {badge && (
           <span className="portrait-badge" aria-hidden style={{ fontSize: Math.max(14, Math.round(width * 0.17)) }}>

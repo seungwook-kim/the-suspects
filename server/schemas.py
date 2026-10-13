@@ -454,6 +454,7 @@ class PublicCharacter(BaseModel):
     emotion: Emotion = "neutral"
     one_liner: str = ""  # 인물 카드 한 줄 특징 (공개 정보)
     portrait_url: str | None = None  # 그 판을 위해 새로 그린 AI 초상화 (없으면 절차적 SVG)
+    portrait_emotions: dict[str, str] | None = None  # 같은 얼굴의 표정 사진: 표정 → 주소 (그린 것만)
 
 
 class PublicLocation(BaseModel):

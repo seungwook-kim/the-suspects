@@ -177,7 +177,7 @@ function applyCustom(s: ClientState, name: string, value: unknown): ClientState 
 export type UiAction =
   | { kind: 'event'; ev: AgEvent }
   | { kind: 'set_view'; view: PlayerView }
-  | { kind: 'portraits'; urls: Record<string, string> }
+  | { kind: 'portraits'; urls: Record<string, string>; emotions?: Record<string, Record<string, string>> }
   | { kind: 'clear_cutin' }
   | { kind: 'clear_director' }
   | { kind: 'clear_overheard' }
@@ -195,9 +195,23 @@ export function clientReducer(s: ClientState, a: UiAction): ClientState {
     case 'set_view':
       return { ...s, view: a.view, emotions: {}, needsResync: false }
     case 'portraits': {
-      // 나중에 완성된 초상화 주소만 채운다 (바뀐 게 없으면 같은 상태 → 다시 그리지 않음)
-      if (!s.view || !s.view.characters.some((c) => a.urls[c.id] && a.urls[c.id] !== c.portrait_url)) return s
-      const characters = s.view.characters.map((c) => (a.urls[c.id] ? { ...c, portrait_url: a.urls[c.id] } : c))
+      // 나중에 완성된 초상화·표정 주소만 채운다 (바뀐 게 없으면 같은 상태 → 다시 그리지 않음)
+      if (!s.view) return s
+      const emo = a.emotions ?? {}
+      let changed = false
+      const characters = s.view.characters.map((c) => {
+        let next = c
+        const url = a.urls[c.id]
+        if (url && url !== c.portrait_url) next = { ...next, portrait_url: url }
+        const add = emo[c.id]
+        if (add) {
+          const cur = c.portrait_emotions ?? {}
+          if (Object.keys(add).some((k) => add[k] && add[k] !== cur[k])) next = { ...next, portrait_emotions: { ...cur, ...add } }
+        }
+        if (next !== c) changed = true
+        return next
+      })
+      if (!changed) return s
       return { ...s, view: { ...s.view, characters } }
     }
     case 'clear_cutin':

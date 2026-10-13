@@ -67,8 +67,10 @@ class PortraitLibrary:
         return self.root / "index.jsonl"
 
     def add(self, img: bytes, ext: str, *, person: dict, prompt: str, provider: str, model: str,
-            seed: int | None, kind: str = "base", source: str = "game", note: str = "") -> dict:
-        """person: {role, age, gender, appearance}. source: game(게임 중) | design(개발 중 시안·시험)."""
+            seed: int | None, kind: str = "base", source: str = "game", note: str = "",
+            emotion: str | None = None, base_file: str | None = None) -> dict:
+        """person: {role, age, gender, appearance}. source: game(게임 중) | design(개발 중 시안·시험).
+        kind: base(무표정) | emotion(표정 사진, emotion·base_file로 기본 사진과 이어짐)."""
         appearance = person.get("appearance") or {}
         group = job_group(person["role"], appearance)
         sub = self.root / group / _bucket(person["gender"], person["age"])
@@ -81,6 +83,10 @@ class PortraitLibrary:
             "role": person["role"], "age": person["age"], "gender": person["gender"],
             "appearance": appearance, "prompt": prompt,
         }
+        if emotion:
+            rec["emotion"] = emotion
+        if base_file:
+            rec["base_file"] = base_file
         if note:
             rec["note"] = note
         with self.index_path.open("a", encoding="utf-8") as f:

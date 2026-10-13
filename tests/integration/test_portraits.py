@@ -15,7 +15,7 @@ from server.api.app import app
 from PIL import Image
 
 from server.game.portrait_library import PortraitLibrary, job_group
-from server.game.portraits import PortraitStore, compact, image_ext, portrait_prompt
+from server.game.portraits import PortraitStore, compact, expression_prompt, image_ext, portrait_prompt, ref_image
 from server.cases.loader import load_case_by_id
 from server.game.service import GameService
 from server.llm.images import ImageClient
@@ -68,7 +68,13 @@ async def test_preset_game_draws_fresh_portraits(svc, prompts):
     v = svc.view(game_id)
     assert all(c.portrait_url and c.portrait_url.startswith(f"/api/portraits/{game_id}/") for c in v.characters)
     assert all(c.portrait_url.split("?")[0].endswith(".webp") for c in v.characters)  # 작은 WebP로 저장
-    assert len(prompts) == len(case.characters)
+    per_person = 1 + len(svc.portraits.images.emotions)  # 기본 1장 + 표정 사진
+    assert len([x for x in prompts if x.startswith("Photorealistic")]) == len(case.characters)
+    assert len(prompts) == len(case.characters) * per_person
+    # 표정 사진: 같은 얼굴로 표정만 바꾼 사진이 인물마다 설정된 표정 수만큼
+    for c in v.characters:
+        assert set(c.portrait_emotions or {}) == set(svc.portraits.images.emotions)
+        assert all(u.split("?")[0].endswith(f"{c.id}--{e}.webp") for e, u in c.portrait_emotions.items())
     # 그림 요청에 범인 여부·비밀·성격이 들어가면 안 된다 (수상해 보이게 그려지는 것 방지)
     blob = "\n".join(prompts)
     for ch in case.characters:
@@ -80,7 +86,7 @@ async def test_preset_game_draws_fresh_portraits(svc, prompts):
     # 다른 판은 다른 그림 (얼굴 재사용 없음): 같은 사건이라도 판마다 새로 그린다
     game2, _ = svc.new_game("demo_db_deleted")
     await svc.portraits.wait(game2)
-    assert len(prompts) == 2 * len(case.characters)
+    assert len(prompts) == 2 * len(case.characters) * per_person
 
     # 클리어하면 그 판의 그림 삭제
     st = svc.store.load_live(game_id)
@@ -117,11 +123,12 @@ async def test_portrait_status_while_drawing(tmp_path):
 
     s.portraits = PortraitStore(tmp_path / "portraits", ImageClient(tracer=s.llm.tracer, generator=fake))
     game_id, view = s.new_game("demo_db_deleted")
-    assert s.portrait_status(game_id) == {"pending": True, "urls": {}}  # 화면은 이걸 보고 계속 묻는다
+    assert s.portrait_status(game_id) == {"pending": True, "urls": {}, "emotions": {}}  # 화면은 이걸 보고 계속 묻는다
     gate.set()
     await s.portraits.wait(game_id)
     st = s.portrait_status(game_id)
     assert st["pending"] is False and set(st["urls"]) == {c.id for c in view.characters}
+    assert all(set(st["emotions"][c.id]) == set(s.portraits.images.emotions) for c in view.characters)
 
     service_mod._SERVICE = s
     try:
@@ -133,6 +140,11 @@ async def test_portrait_status_while_drawing(tmp_path):
         service_mod._SERVICE = None
 
 
+def no_emotions(images: ImageClient) -> ImageClient:
+    images.emotions = []  # 기본 사진만 세는 시험
+    return images
+
+
 async def test_missing_portraits_redrawn_once_when_asked(tmp_path):
     """그리던 작업이 끊기거나 실패해 빠진 사람이 있으면, 상태를 물을 때 빠진 사람만 한 번 더 그린다(상한 있음)."""
     s = GameService(tmp_path, in_memory=True)
@@ -142,7 +154,7 @@ async def test_missing_portraits_redrawn_once_when_asked(tmp_path):
         calls.append(prompt)
         return None if len(calls) <= 2 else real_image()  # 처음 두 장 실패
 
-    s.portraits = PortraitStore(tmp_path / "portraits", ImageClient(tracer=s.llm.tracer, generator=flaky))
+    s.portraits = PortraitStore(tmp_path / "portraits", no_emotions(ImageClient(tracer=s.llm.tracer, generator=flaky)))
     game_id, view = s.new_game("demo_db_deleted")
     await s.portraits.wait(game_id)
     n = len(view.characters)
@@ -157,7 +169,7 @@ async def test_missing_portraits_redrawn_once_when_asked(tmp_path):
         calls.append(prompt)
         return None
 
-    s.portraits = PortraitStore(tmp_path / "portraits2", ImageClient(tracer=s.llm.tracer, generator=broken))
+    s.portraits = PortraitStore(tmp_path / "portraits2", no_emotions(ImageClient(tracer=s.llm.tracer, generator=broken)))
     game2, _ = s.new_game("demo_db_deleted")
     await s.portraits.wait(game2)
     for _ in range(5):
@@ -235,8 +247,13 @@ async def test_library_keeps_photos_after_clear_by_job_group(tmp_path):
     s.clear(game_id)
     assert s.portraits.urls(game_id) == {}  # 판 그림은 지움
 
-    lines = (library / "index.jsonl").read_text(encoding="utf-8").splitlines()
+    all_lines = (library / "index.jsonl").read_text(encoding="utf-8").splitlines()
+    lines = [x for x in all_lines if json.loads(x)["kind"] == "base"]
     assert len(lines) == len(case.characters)  # 보관함 사진은 남음
+    emo = [json.loads(x) for x in all_lines if json.loads(x)["kind"] == "emotion"]
+    assert len(emo) == len(case.characters) * len(s.portraits.images.emotions)
+    base_files = {json.loads(x)["file"] for x in lines}
+    assert all(r["emotion"] in s.portraits.images.emotions and r["base_file"] in base_files for r in emo)
     outfits = sorted(ch.appearance.get("outfit", "") for ch in case.characters)
     assert sorted(json.loads(x)["appearance"].get("outfit", "") for x in lines) == outfits
     for line in lines:
@@ -265,6 +282,24 @@ def test_jpeg_portrait_served_with_jpeg_type(tmp_path, svc):
             assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
     finally:
         service_mod._SERVICE = None
+
+
+async def test_expression_uses_base_photo_as_reference():
+    """표정 사진은 기본 사진을 512×512보다 작게 줄여 input_image_0으로 넣는다 (같은 얼굴 유지)."""
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = request.content
+        return httpx.Response(200, json={"success": True, "result": {"image": base64.b64encode(real_image("JPEG")).decode()}})
+
+    images = ImageClient(models_config=CF_CONFIG, api_key="tok", account_id="acc", transport=httpx.MockTransport(handler))
+    ref = ref_image(compact(real_image(), max_size=(480, 640), quality=80))
+    w, h = Image.open(io.BytesIO(ref)).size
+    assert w < 512 and h < 512
+    assert await images.generate(expression_prompt("angry"), seed=1, ref_images=[ref])
+    body = seen["body"]
+    assert b'name="input_image_0"' in body and ref in body
+    assert b"exact same person" in body and b"angry expression" in body
 
 
 def test_compact_makes_small_webp():
