@@ -1,0 +1,29 @@
+/* 정보 화면. 법적 표기라 14px 이상, 숨기지 않는다. 읽는 면은 종이. 토큰만 사용. */
+.about { max-width: 960px; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-7); display: grid; gap: var(--space-4); }
+.about-head { display: grid; gap: var(--space-3); }
+.about-head h1 { font-size: 28px; }
+.back { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; width: fit-content; font-size: var(--text-m); }
+.block { padding: var(--space-5); display: grid; gap: var(--space-3); }
+.block h2 { font-size: var(--text-xl); }
+.block p, .plain li { max-width: 68ch; text-wrap: pretty; }
+.block .sub { color: var(--muted); font-size: var(--text-m); }
+.plain { display: grid; gap: var(--space-3); }
+
+.table-wrap { overflow-x: auto; }
+.credits { width: 100%; border-collapse: collapse; font-size: var(--text-s); line-height: 1.5; }
+.credits th, .credits td { padding: var(--space-3) var(--space-3); text-align: left; vertical-align: top; }
+.credits thead th { font-weight: 700; border-bottom: 2px solid var(--line-strong); white-space: nowrap; }
+.credits tbody tr + tr > * { border-top: 1px solid var(--line); }
+.credits tbody th { font-weight: 700; }
+.credits a { font-size: var(--text-s); }
+
+@media (max-width: 720px) {
+  .block { padding: var(--space-4); }
+  .credits thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .credits, .credits tbody, .credits tr, .credits th, .credits td { display: block; }
+  .credits tbody tr { padding: var(--space-3) 0; }
+  .credits tbody tr + tr { border-top: 1px solid var(--line-strong); }
+  .credits tbody tr + tr > * { border-top: 0; }
+  .credits th, .credits td { padding: 2px 0; }
+  .credits td::before { content: attr(data-label) ' '; color: var(--muted); }
+}

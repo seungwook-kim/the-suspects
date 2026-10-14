@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수첩 · 증거 보드 목업 | The Suspects</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;700&family=Nanum+Gothic+Coding&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/pages/notebook.css">
+</head>
+<body>
+
+<div class="mock-tools" role="toolbar" aria-label="목업 도구">
+  <span class="tools-label">목업 도구</span>
+  <div class="seg" role="group" aria-label="테마">
+    <button type="button" data-set-theme="light" aria-pressed="true">밝음</button>
+    <button type="button" data-set-theme="dark" aria-pressed="false">어두움</button>
+  </div>
+  <div class="seg" role="group" aria-label="분위기">
+    <button type="button" data-set-mood="normal" aria-pressed="true">보통</button>
+    <button type="button" data-set-mood="comic" aria-pressed="false">코믹</button>
+    <button type="button" data-set-mood="serious" aria-pressed="false">진지</button>
+  </div>
+  <a href="index.html">목차</a>
+</div>
+
+<div class="game nb-page">
+
+  <header class="status-strip">
+    <strong class="case-title">증거 보드</strong>
+    <span class="clock">1일차 · 09:35</span>
+    <span class="ap"><span class="pips" aria-hidden="true"></span>행동 <b data-ap-now>10</b>/12</span>
+    <div class="spacer">
+      <a class="btn" href="investigate.html"><span class="btn-label"><i data-icon="arrow-left"></i><span class="t">수사로</span></span></a>
+      <button type="button" class="btn menu-btn" popovertarget="menu-pop" aria-label="메뉴 열기"><span class="btn-label"><i data-icon="list"></i><span class="t">메뉴</span></span></button>
+    </div>
+  </header>
+
+  <div class="board-tabs">
+    <div class="tabs" role="tablist" aria-label="보드 보기">
+      <button type="button" class="tab" role="tab" id="tab-evidence" aria-controls="panel-evidence" aria-selected="true">증거 <span class="tab-badge">6</span></button>
+      <button type="button" class="tab" role="tab" id="tab-statements" aria-controls="panel-statements" aria-selected="false" tabindex="-1">진술 <span class="tab-badge">7</span></button>
+      <button type="button" class="tab" role="tab" id="tab-contra" aria-controls="panel-contra" aria-selected="false" tabindex="-1">모순 <span class="tab-badge" data-contra-count>3</span></button>
+    </div>
+  </div>
+
+  <main class="board" id="main" data-board>
+    <svg class="board-lines" aria-hidden="true" data-board-lines></svg>
+
+    <section class="paper col col-ev" id="panel-evidence" role="tabpanel" aria-labelledby="tab-evidence">
+      <header class="col-head"><h2>증거 <span class="mono">6</span></h2><p>누르면 어긋나는 진술과 잇습니다.</p></header>
+      <div class="col-body card-list" data-col>
+        <button type="button" class="evidence-card" data-ev="audit">
+          <span class="card-head"><strong>감사 로그 30분 공백</strong><span class="kind">로그</span></span>
+          <span class="card-body">운영 DB 접근 기록이 어젯밤 23:40부터 00:10까지 비어 있다.</span>
+          <span class="sel-label"><i data-icon="seal-check"></i><span class="cmp-text">비교 중</span></span>
+        </button>
+        <button type="button" class="evidence-card" data-ev="card">
+          <span class="card-head"><strong>서버실 출입카드 기록</strong><span class="kind">기록</span></span>
+          <span class="card-body">지하 1층 서버실 앞 복도에서 23:12에 한소라의 카드가 태그되었다.</span>
+          <span class="sel-label"><i data-icon="seal-check"></i><span class="cmp-text">비교 중</span></span>
+        </button>
+        <button type="button" class="evidence-card" data-ev="console">
+          <span class="card-head"><strong>서버실 콘솔 로그인 기록</strong><span class="kind">기록</span></span>
+          <span class="card-body">서버실 콘솔에 공용 관리자 계정으로 23:48에 로그인한 흔적이 있다.</span>
+          <span class="sel-label"><i data-icon="seal-check"></i><span class="cmp-text">비교 중</span></span>
+        </button>
+        <button type="button" class="evidence-card" data-ev="cctv-b1">
+          <span class="card-head"><strong>지하 1층 CCTV: 추성만의 이동</strong><span class="kind">영상</span></span>
+          <span class="card-body">청소 카트를 끈 추성만이 23:20경 복도를 지나간다.</span>
+          <span class="sel-label"><i data-icon="seal-check"></i><span class="cmp-text">비교 중</span></span>
+        </button>
+        <button type="button" class="evidence-card" data-ev="checklist">
+          <span class="card-head"><strong>청소 점검표의 빈 칸</strong><span class="kind">문서</span></span>
+          <span class="card-body">지하 1층 서버실 앞 칸만 서명이 비어 있다.</span>
+          <span class="sel-label"><i data-icon="seal-check"></i><span class="cmp-text">비교 중</span></span>
+        </button>
+        <button type="button" class="evidence-card" data-ev="cctv-hall">
+          <span class="card-head"><strong>복도 CCTV: 카드 전달 장면</strong><span class="kind">영상</span></span>
+          <span class="card-body">누군가 복도에서 카드를 건네받는 장면. 얼굴은 보이지 않는다.</span>
+          <span class="sel-label"><i data-icon="seal-check"></i><span class="cmp-text">비교 중</span></span>
+        </button>
+      </div>
+    </section>
+
+    <section class="paper col col-st" id="panel-statements" role="tabpanel" aria-labelledby="tab-statements" hidden>
+      <header class="col-head"><h2>진술 <span class="mono">7</span></h2><p>인물별 진술 · 줄 끝 칸은 증거 충분도</p></header>
+      <div class="col-body" data-col>
+
+        <section class="suspect-group">
+          <header class="s-head">
+            <span class="s-thumb"><img src="../assets/portraits/p3.webp" alt="" width="40" height="54"></span>
+            <span class="s-who"><b>고태식</b><span>DBA</span></span>
+            <span class="s-gauge"><span class="cells" role="img" aria-label="충분도 2/5"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span><span class="mono" aria-hidden="true">2/5</span></span>
+          </header>
+          <button type="button" class="st-card contra" data-st="s-tae" data-conflict="audit">
+            <span class="card-head"><span class="who">고태식</span><span class="mono muted">1일차 09:18</span></span>
+            <span class="card-body">"<span class="hl dbl">감사 로그는 어젯밤 내내 정상으로 찍혔다</span>고 알고 있습니다."</span>
+            <span class="flag-line"><span class="stamp" style="margin:0">모순</span>감사 로그 30분 공백과 어긋남</span>
+            <span class="pair-note">어긋나는 증거: <b>감사 로그 30분 공백</b></span>
+            <span class="sel-label"><i data-icon="seal-check"></i><span class="cmp-text">비교 중</span></span>
+          </button>
+        </section>
+
+        <section class="suspect-group">
+          <header class="s-head">
+            <span class="s-thumb"><img src="../assets/portraits/p2.webp" alt="" width="40" height="54"></span>
+            <span class="s-who"><b>남궁철</b><span>야간 경비원</span></span>
+            <span class="s-gauge"><span class="cells" role="img" aria-label="충분도 1/5"><i class="on"></i><i></i><i></i><i></i><i></i></span><span class="mono" aria-hidden="true">1/5</span></span>
+          </header>
+          <button type="button" class="st-card" data-st="s-nam">
+            <span class="card-head"><span class="who">남궁철</span><span class="mono muted">1일차 09:10</span></span>
+            <span class="card-body">"순찰은 자정 전에 한 번 돌았습니다. 지하 쪽은 문만 확인했고요."</span>
+          </button>
+        </section>
+
+        <section class="suspect-group">
+          <header class="s-head">
+            <span class="s-thumb"><span class="avatar-pending" role="img" aria-label="서도윤, 사진 준비 중"><span class="ap-initial">서</span></span></span>
+            <span class="s-who"><b>서도윤</b><span>신입 개발자 · 사진 준비 중</span></span>
+            <span class="s-gauge"><span class="cells" role="img" aria-label="충분도 1/5"><i class="on"></i><i></i><i></i><i></i><i></i></span><span class="mono" aria-hidden="true">1/5</span></span>
+          </header>
+          <button type="button" class="st-card contra" data-st="s-do" data-conflict="card">
+            <span class="card-head"><span class="who">서도윤</span><span class="mono muted">1일차 09:02</span></span>
+            <span class="card-body">"<span class="hl dbl">서버실은 권한이 없어서 들어간 적이 없어요.</span>"</span>
+            <span class="flag-line"><span class="stamp" style="margin:0">모순</span>서버실 출입카드 기록과 어긋남</span>
+            <span class="pair-note">어긋나는 증거: <b>서버실 출입카드 기록</b></span>
+            <span class="sel-label"><i data-icon="seal-check"></i><span class="cmp-text">비교 중</span></span>
+          </button>
+        </section>
+
+        <section class="suspect-group">
+          <header class="s-head">
+            <span class="s-thumb"><span class="avatar-pending" role="img" aria-label="윤석진, 사진 준비 중"><span class="ap-initial">윤</span></span></span>
+            <span class="s-who"><b>윤석진</b><span>시니어 백엔드 개발자 · 사진 준비 중</span></span>
+            <span class="s-gauge"><span class="cells" role="img" aria-label="충분도 0/5"><i></i><i></i><i></i><i></i><i></i></span><span class="mono" aria-hidden="true">0/5</span></span>
+          </header>
+          <p class="s-empty">아직 진술이 없다. 심문하면 여기에 기록된다.</p>
+        </section>
+
+        <section class="suspect-group">
+          <header class="s-head">
+            <span class="s-thumb"><img src="../assets/portraits/p5.webp" alt="" width="40" height="54"></span>
+            <span class="s-who"><b>추성만</b><span>야간 청소원</span></span>
+            <span class="s-gauge"><span class="cells" role="img" aria-label="충분도 2/5"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span><span class="mono" aria-hidden="true">2/5</span></span>
+          </header>
+          <button type="button" class="st-card" data-st="s-chu">
+            <span class="card-head"><span class="who">추성만</span><span class="mono muted">1일차 09:22</span></span>
+            <span class="card-body">"청소는 지하 1층부터 시작해서 위로 올라갑니다. 늘 그 순서예요."</span>
+          </button>
+        </section>
+
+        <section class="suspect-group">
+          <header class="s-head">
+            <span class="s-thumb"><img src="../assets/portraits/p1.webp" alt="" width="40" height="54"></span>
+            <span class="s-who"><b>한소라</b><span>프로덕트 매니저</span></span>
+            <span class="s-gauge"><span class="cells" role="img" aria-label="충분도 1/5"><i class="on"></i><i></i><i></i><i></i><i></i></span><span class="mono" aria-hidden="true">1/5</span></span>
+          </header>
+          <button type="button" class="st-card contra" data-st="s-sora" data-conflict="card">
+            <span class="card-head"><span class="who">한소라</span><span class="mono muted">1일차 09:34</span></span>
+            <span class="card-body">"바로 로비로 내려가서 택시 탔어요. <span class="hl dbl">서버실은 근처에도 안 갔고요.</span>"</span>
+            <span class="flag-line"><span class="stamp" style="margin:0">모순</span>서버실 출입카드 기록과 어긋남</span>
+            <span class="pair-note">어긋나는 증거: <b>서버실 출입카드 기록</b></span>
+            <span class="sel-label"><i data-icon="seal-check"></i><span class="cmp-text">비교 중</span></span>
+          </button>
+          <button type="button" class="st-card" data-st="s-sora2">
+            <span class="card-head"><span class="who">한소라</span><span class="mono muted">1일차 09:30</span></span>
+            <span class="card-body">"개발팀 몇 분이랑 같이 있었어요. 저는 기획서 마무리하느라요."</span>
+          </button>
+          <button type="button" class="st-card" data-st="s-sora3">
+            <span class="card-head"><span class="who">한소라</span><span class="mono muted">1일차 09:26</span></span>
+            <span class="card-body">"평소처럼 열한 시쯤 나왔어요. 오픈 전날이라 좀 늦었죠."</span>
+          </button>
+        </section>
+
+        <section class="suspect-group">
+          <header class="s-head">
+            <span class="s-thumb"><span class="avatar-pending" role="img" aria-label="황지호, 사진 준비 중"><span class="ap-initial">황</span></span></span>
+            <span class="s-who"><b>황지호</b><span>외주 개발자 · 사진 준비 중</span></span>
+            <span class="s-gauge"><span class="cells" role="img" aria-label="충분도 0/5"><i></i><i></i><i></i><i></i><i></i></span><span class="mono" aria-hidden="true">0/5</span></span>
+          </header>
+          <p class="s-empty">아직 진술이 없다. 심문하면 여기에 기록된다.</p>
+        </section>
+
+      </div>
+    </section>
+
+    <section class="paper col col-co" id="panel-contra" role="tabpanel" aria-labelledby="tab-contra" hidden>
+      <header class="col-head"><h2>모순 <span class="mono" data-contra-count>3</span></h2><p>어긋난 진술과 증거의 쌍</p></header>
+      <div class="col-body card-list" data-col>
+        <button type="button" class="contra-card" data-pair-st="s-sora" data-pair-ev="card">
+          <span class="cc-head"><span class="stamp">모순</span><b class="title hl">한소라의 진술</b></span>
+          <span class="cc-line"><span class="lab">진술</span><span>"서버실은 근처에도 안 갔고요."</span></span>
+          <span class="cc-line"><span class="lab">증거</span><span>서버실 출입카드 기록</span></span>
+          <span class="cc-act"><i data-icon="notebook"></i>나란히 보기</span>
+        </button>
+        <button type="button" class="contra-card" data-pair-st="s-do" data-pair-ev="card">
+          <span class="cc-head"><span class="stamp">모순</span><b class="title hl">서도윤의 진술</b></span>
+          <span class="cc-line"><span class="lab">진술</span><span>"서버실은 권한이 없어서 들어간 적이 없어요."</span></span>
+          <span class="cc-line"><span class="lab">증거</span><span>서버실 출입카드 기록</span></span>
+          <span class="cc-act"><i data-icon="notebook"></i>나란히 보기</span>
+        </button>
+        <button type="button" class="contra-card" data-pair-st="s-tae" data-pair-ev="audit">
+          <span class="cc-head"><span class="stamp">모순</span><b class="title hl">고태식의 진술</b></span>
+          <span class="cc-line"><span class="lab">진술</span><span>"감사 로그는 어젯밤 내내 정상으로 찍혔다고 알고 있습니다."</span></span>
+          <span class="cc-line"><span class="lab">증거</span><span>감사 로그 30분 공백</span></span>
+          <span class="cc-act"><i data-icon="notebook"></i>나란히 보기</span>
+        </button>
+        <p class="co-note">모순은 "누가 범인인가"를 뜻하지 않습니다. 말과 기록이 어긋난 곳일 뿐입니다.</p>
+      </div>
+    </section>
+  </main>
+
+</div>
+
+<div id="menu-pop" class="paper menu" popover aria-label="메뉴" data-standard-menu data-current="notebook">
+  <a class="btn btn-quiet" href="interrogation.html"><span class="btn-label"><i data-icon="chat-circle-text"></i>심문 화면</span></a>
+</div>
+
+<div class="scrim" data-scrim></div>
+<div class="toast-stack" role="status" aria-live="polite" id="toasts"></div>
+<p class="sr-only" id="sr-live" role="status" aria-live="polite"></p>
+
+<script src="js/icons.js"></script>
+<script src="js/mock.js"></script>
+<script src="js/pages/notebook.js"></script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+/* 최종 추리 전용 배치. 색은 토큰만. 문서 스크롤 화면(고정 높이 아님), 하단 CTA 막대는 sticky.
+   지목: 7명 한 줄(1200px 이상) / 4열(721~1199) / 2열(720 이하). 증거 끼우기: 조서 + 증거 목록 2열(900 이상), 그 아래는 한 열. */
+body { min-height: 100dvh; display: flex; flex-direction: column; }
+.game { display: flex; flex-direction: column; flex: 1; padding: 0 var(--space-4); }
+.status-strip { margin: 0 calc(-1 * var(--space-4)); }
+.status-strip .btn { min-height: 44px; }
+.status-strip .case-title { white-space: nowrap; }
+@media (max-width: 899px) { .pips { display: none; } }
+@media (max-width: 720px) {
+  .status-strip { position: sticky; top: 0; z-index: var(--z-sticky); min-height: 48px; gap: var(--space-3); }
+  .status-strip .case-title { display: none; }
+  .status-strip .btn-label .t { display: none; }
+  .status-strip .btn { padding: 0 var(--space-3); }
+}
+.fin-main { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: var(--space-4) 0 var(--space-5); }
+.eyebrow { font-size: var(--text-s); color: var(--muted); }
+.col-head { padding: var(--space-3) var(--space-4) var(--space-2); border-bottom: 1px solid var(--line); }
+.col-head h2 { font-size: var(--text-l); display: flex; align-items: baseline; gap: var(--space-2); }
+.col-head p { font-size: var(--text-s); color: var(--muted); margin-top: 2px; }
+.mock-note { font-size: var(--text-s); color: var(--muted); }
+
+/* ---- 1단계: 지목 ---- */
+.fin-head { display: grid; gap: var(--space-2); margin-bottom: var(--space-4); max-width: 60ch; }
+.fin-head h1 { font-size: 28px; }
+.lead { font-size: var(--text-m); color: var(--ink); }
+.suspects { display: grid; gap: var(--space-3); grid-template-columns: repeat(7, minmax(0, 1fr)); }
+@media (max-width: 1199px) { .suspects { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .suspects { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.suspects .person.is-tile { transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out); cursor: pointer; }
+.suspects .person.is-tile:hover { background: color-mix(in srgb, var(--ink) 5%, var(--surface)); }
+.suspects .person.is-tile:active { transform: scale(0.98); }
+.suspects .person-role { min-height: 2.7em; }
+.person-photo > .avatar-pending, .df-photo > .avatar-pending { border: 0; border-radius: 0; }
+html[data-mood='comic'] .suspects li:nth-child(odd) .person.is-tile { transform: rotate(var(--tilt)); }
+html[data-mood='comic'] .suspects li:nth-child(even) .person.is-tile { transform: rotate(calc(var(--tilt) * -1)); }
+html[data-mood='comic'] .suspects .person.is-tile[aria-pressed='true'] { transform: none; }
+@media (max-width: 720px) { html[data-mood='comic'] .suspects .person.is-tile { transform: none !important; } .suspects .person.is-tile { min-height: 44px; } }
+
+/* 미리보기: 지목하면 이어질 3단계를 보여 준다(투명도 없이 실제 2단계와 같은 모양) */
+.preview { margin-top: calc(var(--tab-h) + var(--space-4)); padding: var(--space-4) var(--space-5); display: grid; gap: var(--space-3); }
+.preview h2 { font-size: var(--text-l); }
+.prev-steps summary { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; cursor: pointer; font-weight: 700; list-style: none; }
+.prev-steps summary::-webkit-details-marker { display: none; }
+.prev-steps summary .icon { transition: transform var(--dur-fast) var(--ease-out); }
+.prev-steps[open] summary .icon { transform: rotate(180deg); }
+@media (min-width: 721px) { .prev-steps summary { display: none; } }
+.prev-list { display: grid; gap: var(--space-4); grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 899px) { .prev-list { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); } }
+.prev-list li { display: grid; gap: var(--space-2); align-content: start; justify-items: start; }
+.prev-box { width: 100%; min-height: 52px; display: flex; align-items: center; padding: var(--space-2) var(--space-3); border: 1.5px dashed var(--line-strong); border-radius: var(--radius-m); font-size: 15px; color: var(--muted); }
+.prev-lives { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-3); font-size: var(--text-m); }
+@media (max-width: 720px) { .preview { padding: var(--space-4); } }
+
+/* ---- 하단 CTA 막대 ---- */
+.fin-bar {
+  position: sticky; bottom: 0; z-index: var(--z-sticky); margin: 0 calc(-1 * var(--space-4)); padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap;
+  background: var(--bg); border-top: 1px solid var(--line-strong);
+}
+.bar-note { font-size: var(--text-s); max-width: 46ch; }
+.bar-btns { display: flex; gap: var(--space-2); margin-left: auto; }
+.bar-btns .btn { min-height: 52px; }
+.bar-btns .btn-cta { min-width: 220px; }
+@media (max-width: 720px) {
+  .fin-bar { gap: var(--space-2); }
+  .bar-note { max-width: none; }
+  .bar-btns { width: 100%; }
+  .bar-btns .btn-cta { flex: 1; min-width: 0; }
+}
+
+/* ---- 2단계: 조서 + 증거 ---- */
+.build { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 899px) { .build { grid-template-columns: minmax(0, 1fr); } }
+.dossier-fin { padding: var(--space-5); display: grid; gap: var(--space-4); }
+@media (max-width: 720px) { .dossier-fin { padding: var(--space-4); } }
+.df-top { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); min-height: 28px; }
+.df-who { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+@media (max-width: 720px) { .df-who { grid-template-columns: 112px minmax(0, 1fr); } }
+.df-photo { aspect-ratio: 3 / 4; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-s); background: var(--bg); }
+.df-photo img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+.df-id { display: grid; gap: var(--space-1); align-content: start; }
+.df-id h1 { font-size: 28px; }
+.df-id .role { color: var(--muted); font-size: var(--text-s); }
+.lives { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+.lives-text { font-size: var(--text-m); font-weight: 400; }
+.lives-text b { font: 700 var(--text-l) var(--font-mono); }
+
+.verdict { padding: var(--space-3) var(--space-4); border: 1.5px solid var(--line-strong); border-radius: var(--radius-m); display: grid; gap: var(--space-1); }
+.verdict.wrong { border-style: dashed; border-width: 2px; }
+.v-line { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-m); }
+.v-line b { font-weight: 700; }
+.v-reason { font-size: 15px; padding-left: calc(1.25em + var(--space-2)); }
+
+.slots { display: grid; gap: var(--space-3); }
+.slot { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: var(--space-1) var(--space-3); align-items: start; }
+.slot-label {
+  display: inline-grid; place-items: center; min-height: 28px; padding: 0 var(--space-2); border: 1.5px solid var(--line-strong); border-radius: var(--radius-s);
+  font-size: var(--text-s); font-weight: 700; background: var(--surface);
+}
+.slot-q { font-size: var(--text-m); padding-top: 2px; }
+.slot-box {
+  grid-column: 2; display: flex; align-items: center; gap: var(--space-2); min-height: 52px; padding: var(--space-2) var(--space-3);
+  border: 1.5px dashed var(--line-strong); border-radius: var(--radius-m); font-size: 15px; color: var(--muted);
+}
+.slot.is-now .slot-box { border-style: solid; border-width: 3px; color: var(--ink); }
+.slot.is-filled .slot-box { border-style: solid; border-width: 1.5px; color: var(--ink); background: var(--surface); }
+.slot.is-now .slot-label { border-width: 3px; }
+.slot.is-filled .slot-label { border-style: double; border-width: 3px; }
+.slot-box .icon { flex: none; }
+@media (max-width: 720px) { .slot { grid-template-columns: minmax(0, 1fr); } .slot-box { grid-column: 1; } .slot-label { justify-self: start; } }
+
+.ev-panel { overflow: hidden; }
+@media (min-width: 900px) { .ev-panel { position: sticky; top: calc(var(--tools-h) + var(--space-3)); max-height: calc(100dvh - 220px); display: flex; flex-direction: column; } .ev-panel .card-list { overflow: auto; min-height: 0; } }
+.evidence-card .ev-tag { display: block; margin-top: var(--space-2); font-size: var(--text-s); font-weight: 700; }
+.evidence-card .ev-tag[hidden] { display: none; }
+.evidence-card > span { display: block; }
+.evidence-card > .card-head { display: flex; }
+.evidence-card > .pending-label { display: none; }
+.evidence-card.selected > .pending-label { display: inline-flex; }
+.evidence-card[aria-disabled='true'] { border-style: dashed; color: var(--muted); cursor: not-allowed; }
+.evidence-card[aria-disabled='true'] .card-body { color: var(--muted); }
+.evidence-card[aria-disabled='true']:hover { background: var(--surface); }
+@media (max-width: 720px) { .evidence-card:nth-child(n) { transform: none; } }
+
+/* ---- 3단계: 결과 카드 ---- */
+.result-card { max-width: 640px; margin: 0 auto; padding: var(--space-6); display: grid; gap: var(--space-4); }
+@media (max-width: 720px) { .result-card { padding: var(--space-4); } }
+.rc-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.rc-head h1 { font-size: 32px; }
+.stamp.big { font-size: var(--text-m); padding: var(--space-1) var(--space-4); border-width: 3px; border-style: double; letter-spacing: 0.12em; transform: rotate(-4deg); margin: 0; }
+.rc-who { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+.rc-case { font-size: var(--text-s); color: var(--muted); }
+.rc-name { font-size: var(--text-l); margin-top: var(--space-1); }
+.rc-name span { font-size: var(--text-s); color: var(--muted); font-weight: 400; }
+.rc-meta { font-size: var(--text-s); margin-top: var(--space-3); }
+.rc-basis { display: grid; gap: var(--space-2); border-top: 1px solid var(--line); padding-top: var(--space-3); }
+.rc-basis li { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: var(--space-3); align-items: center; font-size: var(--text-m); }
+.rc-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.rc-actions .btn { min-height: 52px; }
+@media (max-width: 720px) { .rc-actions .btn { flex: 1 1 100%; } .rc-who { grid-template-columns: 112px minmax(0, 1fr); } }
+
+/* 폴더 탭(공통 .has-tab): 증거 목록·결과 카드 윗선을 맞춘다 */
+@media (min-width: 900px) { .build .ev-panel { margin-top: calc(var(--tab-h, 28px) + var(--space-2)); } }
+.result-card.has-tab { margin-top: calc(var(--tab-h, 28px) + var(--space-5)); }
+.slot-label { background: transparent; }

@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>심문 화면 목업 | The Suspects</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;700&family=Nanum+Gothic+Coding&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/pages/interrogation.css">
+</head>
+<body>
+
+<div class="mock-tools" role="toolbar" aria-label="목업 도구">
+  <span class="tools-label">목업 도구</span>
+  <div class="seg" role="group" aria-label="테마">
+    <button type="button" data-set-theme="light" aria-pressed="true">밝음</button>
+    <button type="button" data-set-theme="dark" aria-pressed="false">어두움</button>
+  </div>
+  <div class="seg" role="group" aria-label="분위기">
+    <button type="button" data-set-mood="normal" aria-pressed="true">보통</button>
+    <button type="button" data-set-mood="comic" aria-pressed="false">코믹</button>
+    <button type="button" data-set-mood="serious" aria-pressed="false">진지</button>
+  </div>
+  <button type="button" class="btn" style="min-height:36px" popovertarget="demo-pop" aria-label="데모 동작 열기"><span class="btn-label"><i data-icon="caret-down"></i>데모 동작</span></button>
+  <a href="index.html">목차</a>
+</div>
+
+<div class="game">
+
+  <header class="status-strip">
+    <a class="btn only-phone back-btn" href="investigate.html" aria-label="심문 끝내기, 수사 화면으로"><span class="btn-label"><i data-icon="arrow-left"></i></span></a>
+    <strong class="case-title">사라진 운영 DB</strong>
+    <span class="clock">1일차 09:35</span>
+    <span class="ap"><span class="pips" aria-hidden="true"></span>행동 <b data-ap-now>10</b>/12</span>
+    <div class="spacer">
+      <button type="button" class="btn map-open map-btn" data-open="map" aria-label="이 장소 열기"><span class="btn-label"><i data-icon="map-trifold"></i><span class="t">이 장소</span></span></button>
+      <button type="button" class="btn only-wide" id="end-day"><span class="btn-label"><i data-icon="moon"></i>하루 끝내기</span></button>
+      <button type="button" class="btn menu-btn" popovertarget="menu-pop" aria-label="메뉴 열기"><span class="btn-label"><i data-icon="list"></i><span class="t">메뉴</span></span></button>
+    </div>
+  </header>
+
+  <aside class="drawer map-col" data-drawer="map" data-drawer-mq="(max-width: 1099px)" aria-labelledby="map-title">
+    <div class="drawer-head">
+      <h2 id="map-title">이 장소</h2>
+      <button type="button" class="btn close" data-close aria-label="이 장소 닫기" style="min-height:44px;min-width:44px;padding:0"><span class="btn-label"><i data-icon="x"></i></span></button>
+    </div>
+    <div class="drawer-body">
+      <section>
+        <h3>현재 장소</h3>
+        <p class="here-name"><i data-icon="map-trifold"></i>3층 개발팀 사무실</p>
+      </section>
+      <section>
+        <h3>이 장소에 있는 사람</h3>
+        <ul>
+          <li><button type="button" class="btn btn-quiet person-tile is-active" style="display:grid"><span class="thumb"><img src="../assets/portraits/p1.webp" alt="" width="48" height="64"></span><span><span class="name">한소라</span><span class="role">심문 중</span></span></button></li>
+          <li><button type="button" class="btn btn-quiet person-tile" style="display:grid"><span class="thumb"><span class="avatar-pending"><span class="ap-initial">서</span><span class="ap-label">사진 준비 중</span></span></span><span><span class="name">서도윤</span><span class="role">신입 개발자 · 사진 준비 중</span></span></button></li>
+          <li><button type="button" class="btn btn-quiet person-tile" style="display:grid"><span class="thumb"><span class="avatar-pending"><span class="ap-initial">윤</span><span class="ap-label">사진 준비 중</span></span></span><span><span class="name">윤석진</span><span class="role">시니어 백엔드 개발자 · 사진 준비 중</span></span></button></li>
+        </ul>
+      </section>
+      <a class="btn btn-quiet" href="investigate.html"><span class="btn-label"><i data-icon="map-trifold"></i>수사 화면에서 이동</span></a>
+    </div>
+  </aside>
+
+  <main class="stage-col" id="main">
+    <div class="dossier-wrap">
+      <section class="paper dossier has-tab" aria-label="심문 조서: 한소라">
+        <span class="folder-tab">사건 01</span>
+        <div class="dossier-body">
+
+          <div class="dossier-top">
+            <a class="btn" href="investigate.html"><span class="btn-label"><i data-icon="arrow-left"></i>심문 끝내기</span></a>
+          </div>
+
+          <div class="portrait-box">
+            <span class="portrait-clip" aria-hidden="true"><i data-icon="paperclip"></i></span>
+            <div class="portrait" data-portrait data-portrait-base="../assets/portraits/p1" data-portrait-alt="한소라, AI로 생성한 가상의 인물 사진">
+              <img class="is-front" src="../assets/portraits/p1.webp" alt="한소라, AI로 생성한 가상의 인물 사진" width="480" height="640">
+              <img src="../assets/portraits/p1.webp" alt="" aria-hidden="true" width="480" height="640">
+              <div class="away-cover">자리를 비움<br>2번 행동 뒤에<br>다시 말 걸 수 있음</div>
+            </div>
+          </div>
+
+          <div class="dossier-head">
+            <span class="emotion-chip"><span>표정</span> <b data-emotion-label>평온</b></span>
+            <h2>한소라</h2>
+            <p class="role">프로덕트 매니저 · 29세</p>
+            <p class="meta">
+              <span class="status-text" data-thinking hidden>생각하는 중</span>
+              <span class="pending" data-pending hidden><i data-icon="paperclip-fill"></i><span>제시 대기: <b data-pending-name></b></span></span>
+            </p>
+          </div>
+
+          <div class="dossier-log">
+            <details class="earlier" id="earlier" open>
+              <summary><i data-icon="caret-down"></i><span>이전 문답 2개</span></summary>
+              <div class="qa">
+                <p class="q"><b>형사</b>어제 몇 시쯤 퇴근하셨나요?</p>
+                <p class="a"><b>한소라</b>평소처럼 열한 시쯤 나왔어요. 오픈 전날이라 좀 늦었죠.</p>
+              </div>
+              <div class="qa">
+                <p class="q"><b>형사</b>퇴근 전에 혼자 남아 계셨나요?</p>
+                <p class="a"><b>한소라</b>개발팀 몇 분이랑 같이 있었어요. 저는 기획서 마무리하느라요.</p>
+              </div>
+            </details>
+          </div>
+
+          <div class="dossier-now" aria-live="polite">
+            <p class="q"><b class="who">형사</b><span class="said">퇴근하고 서버실 쪽으로 가신 적은 없습니까?</span></p>
+            <p class="a"><b class="who">한소라</b><span class="said">아니요. 바로 로비로 내려가서 택시 탔어요. <span class="claim is-flagged" id="claim" data-default-flagged>서버실은 근처에도 안 갔고요.</span><span class="stamp" aria-hidden="true">모순</span></span></p>
+          </div>
+
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <aside class="paper drawer note-col" data-drawer="note" data-drawer-mq="(max-width: 720px)" aria-labelledby="note-title">
+    <div class="drawer-head">
+      <h2 id="note-title">수첩</h2>
+      <button type="button" class="btn close" data-close aria-label="수첩 닫기" style="min-height:44px;min-width:44px;padding:0"><span class="btn-label"><i data-icon="x"></i></span></button>
+    </div>
+    <div class="tabs" role="tablist" aria-label="수첩 탭">
+      <button type="button" class="tab" role="tab" id="tab-evidence" aria-controls="panel-evidence" aria-selected="true">증거 <span class="tab-badge">6</span></button>
+      <button type="button" class="tab" role="tab" id="tab-statements" aria-controls="panel-statements" aria-selected="false" tabindex="-1">진술 <span class="tab-badge">5</span></button>
+      <button type="button" class="tab" role="tab" id="tab-contra" aria-controls="panel-contra" aria-selected="false" tabindex="-1">모순 <span class="tab-badge is-new" data-contra-count>2</span></button>
+      <button type="button" class="tab" role="tab" id="tab-gauge" aria-controls="panel-gauge" aria-selected="false" tabindex="-1">충분도</button>
+    </div>
+    <div class="nb-body">
+
+      <div role="tabpanel" id="panel-evidence" aria-labelledby="tab-evidence">
+        <p class="nb-note">카드를 눌러 고르면 "증거 제시"에서 바로 쓸 수 있습니다.</p>
+        <div class="card-list" data-evidence-list>
+          <button type="button" class="evidence-card" data-evidence="audit" aria-pressed="false">
+            <span class="card-head"><strong>감사 로그 30분 공백</strong><span class="kind">로그</span></span>
+            <span class="card-body">운영 DB 접근 기록이 어젯밤 23:40부터 00:10까지 비어 있다.</span>
+            <span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span>
+          </button>
+          <button type="button" class="evidence-card" data-evidence="card" aria-pressed="false">
+            <span class="card-head"><strong>서버실 출입카드 기록</strong><span class="kind">기록</span></span>
+            <span class="card-body">지하 1층 서버실 앞 복도에서 23:12에 한소라의 카드가 태그되었다.</span>
+            <span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span>
+          </button>
+          <button type="button" class="evidence-card" data-evidence="console" aria-pressed="false">
+            <span class="card-head"><strong>서버실 콘솔 로그인 기록</strong><span class="kind">기록</span></span>
+            <span class="card-body">서버실 콘솔에 공용 관리자 계정으로 23:48에 로그인한 흔적이 있다.</span>
+            <span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span>
+          </button>
+          <button type="button" class="evidence-card" data-evidence="cctv-b1" aria-pressed="false">
+            <span class="card-head"><strong>지하 1층 CCTV: 추성만의 이동</strong><span class="kind">영상</span></span>
+            <span class="card-body">청소 카트를 끈 추성만이 23:20경 복도를 지나간다.</span>
+            <span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span>
+          </button>
+          <button type="button" class="evidence-card" data-evidence="checklist" aria-pressed="false">
+            <span class="card-head"><strong>청소 점검표의 빈 칸</strong><span class="kind">문서</span></span>
+            <span class="card-body">지하 1층 서버실 앞 칸만 서명이 비어 있다.</span>
+            <span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span>
+          </button>
+          <button type="button" class="evidence-card" data-evidence="cctv-hall" aria-pressed="false">
+            <span class="card-head"><strong>복도 CCTV: 카드 전달 장면</strong><span class="kind">영상</span></span>
+            <span class="card-body">누군가 복도에서 카드를 건네받는 장면. 얼굴은 보이지 않는다.</span>
+            <span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span>
+          </button>
+        </div>
+      </div>
+
+      <div role="tabpanel" id="panel-statements" aria-labelledby="tab-statements" hidden>
+        <div class="card-list">
+          <article class="st-card contra" id="st-now">
+            <div class="card-head"><span class="who">한소라</span><span class="mono muted">1일차 09:34</span></div>
+            <p class="card-body">"바로 로비로 내려가서 택시 탔어요. 서버실은 근처에도 안 갔고요."</p>
+            <p class="flag-line"><span class="stamp" style="margin:0">모순</span>서버실 출입카드 기록과 어긋남</p>
+          </article>
+          <article class="st-card">
+            <div class="card-head"><span class="who">한소라</span><span class="mono muted">1일차 09:30</span></div>
+            <p class="card-body">"개발팀 몇 분이랑 같이 있었어요. 저는 기획서 마무리하느라요."</p>
+          </article>
+          <article class="st-card">
+            <div class="card-head"><span class="who">한소라</span><span class="mono muted">1일차 09:26</span></div>
+            <p class="card-body">"평소처럼 열한 시쯤 나왔어요. 오픈 전날이라 좀 늦었죠."</p>
+          </article>
+          <article class="st-card">
+            <div class="card-head"><span class="who">남궁철</span><span class="mono muted">1일차 09:10</span></div>
+            <p class="card-body">"순찰은 자정 전에 한 번 돌았습니다. 지하 쪽은 문만 확인했고요."</p>
+          </article>
+          <article class="st-card contra">
+            <div class="card-head"><span class="who">서도윤</span><span class="mono muted">1일차 09:02</span></div>
+            <p class="card-body">"서버실은 권한이 없어서 들어간 적이 없어요."</p>
+            <p class="flag-line"><span class="stamp" style="margin:0">모순</span>서버실 출입카드 기록과 어긋남</p>
+          </article>
+        </div>
+      </div>
+
+      <div role="tabpanel" id="panel-contra" aria-labelledby="tab-contra" hidden>
+        <div class="card-list" data-contra-list>
+          <article class="contra-card" data-contra="new">
+            <p><span class="stamp">모순</span><span class="title hl">한소라의 진술</span></p>
+            <p class="card-body">진술: "서버실은 근처에도 안 갔고요."</p>
+            <p class="card-body">증거: 서버실 출입카드 기록 (23:12 지하 1층 복도 태그)</p>
+          </article>
+          <article class="contra-card">
+            <p><span class="stamp">모순</span><span class="title hl">서도윤의 진술</span></p>
+            <p class="card-body">진술: "서버실은 권한이 없어서 들어간 적이 없어요."</p>
+            <p class="card-body">증거: 서버실 출입카드 기록</p>
+          </article>
+        </div>
+      </div>
+
+      <div role="tabpanel" id="panel-gauge" aria-labelledby="tab-gauge" hidden>
+        <p class="nb-note">용의자별 증거 충분도 (5칸)</p>
+        <div data-gauge></div>
+      </div>
+
+    </div>
+  </aside>
+
+  <section class="actionbar" aria-label="행동">
+    <div class="chips-row">
+      <span class="chips-label" id="chips-label">추천 질문</span>
+      <div class="chips" aria-labelledby="chips-label">
+        <button type="button" class="chip" data-ask="어젯밤 서버실 근처에서 누구를 보셨나요?">어젯밤 누구를 보셨나요?</button>
+        <button type="button" class="chip" data-ask="감사 로그에 대해 아는 것이 있습니까?">감사 로그에 대해</button>
+        <button type="button" class="chip" data-ask="운영 DB 계정은 누가 쓰나요?">운영 DB 계정은 누가 쓰나요?</button>
+      </div>
+    </div>
+    <div class="action-rows">
+      <form class="ask-row" id="ask-form" autocomplete="off">
+        <label class="sr-only" for="ask-input">직접 질문</label>
+        <input class="field" id="ask-input" type="text" maxlength="200" placeholder="한소라에게 직접 질문">
+        <button type="submit" class="btn btn-cta" id="ask-btn" aria-disabled="true"><span class="btn-label"><i data-icon="paper-plane-tilt"></i>질문</span><small class="btn-reason">질문을 입력하세요</small></button>
+      </form>
+      <div class="tool-row">
+        <button type="button" class="btn only-phone" data-open="note"><span class="btn-label"><i data-icon="notebook"></i>수첩</span><small class="btn-reason">모순 <span data-contra-count>2</span></small></button>
+        <button type="button" class="btn" id="present-btn" popovertarget="evidence-picker"><span class="btn-label"><i data-icon="paperclip"></i>증거 제시</span><small class="btn-reason" data-present-reason hidden></small></button>
+        <button type="button" class="btn" aria-disabled="true"><span class="btn-label"><i data-icon="mask-happy"></i>블러핑</span><small class="btn-reason">쓸 주장이 없음</small></button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- 증거 제시 목록: 증거만 담는다. 데스크톱은 popover, 휴대폰은 같은 요소가 하단 시트 -->
+<div id="evidence-picker" class="paper picker" popover aria-label="제시할 증거 고르기">
+  <div class="drawer-head"><h2>한소라에게 제시할 증거</h2>
+    <button type="button" class="btn" popovertarget="evidence-picker" popovertargetaction="hide" aria-label="닫기" style="min-height:44px;min-width:44px;padding:0"><span class="btn-label"><i data-icon="x"></i></span></button>
+  </div>
+  <div class="card-list" data-evidence-list data-picker-list></div>
+  <div class="picker-foot">
+    <button type="button" class="btn btn-cta" id="confirm-present" aria-disabled="true"><span class="btn-label"><i data-icon="paperclip-fill"></i>이 증거를 한소라에게 제시</span><small class="btn-reason">증거를 고르세요</small></button>
+  </div>
+</div>
+
+<div id="menu-pop" class="paper menu" popover aria-label="메뉴" data-standard-menu data-current="interrogation">
+  <button type="button" class="btn btn-quiet"><span class="btn-label"><i data-icon="floppy-disk"></i>저장</span></button>
+  <button type="button" class="btn btn-quiet only-phone" id="end-day-menu"><span class="btn-label"><i data-icon="moon"></i>하루 끝내기</span></button>
+</div>
+
+<div id="demo-pop" class="paper demo-pop" popover aria-label="데모 동작">
+  <p style="font-weight:700;margin-bottom:var(--space-2)">표정 전환 (크로스페이드 180ms)</p>
+  <div class="seg" role="group" aria-label="표정" style="flex-wrap:wrap;margin-bottom:var(--space-4)">
+    <button type="button" data-emotion="neutral" aria-pressed="true">평온</button>
+    <button type="button" data-emotion="nervous" aria-pressed="false">긴장</button>
+    <button type="button" data-emotion="flustered" aria-pressed="false">당황</button>
+    <button type="button" data-emotion="angry" aria-pressed="false">분노</button>
+    <button type="button" data-emotion="sad" aria-pressed="false">슬픔</button>
+    <button type="button" data-emotion="happy" aria-pressed="false">기쁨</button>
+  </div>
+  <div style="display:flex;gap:var(--space-2);flex-wrap:wrap">
+    <button type="button" class="btn btn-cta" id="demo-contra"><span class="btn-label"><i data-icon="seal-check"></i>모순 발견 연출 다시 보기</span></button>
+    <button type="button" class="btn" id="demo-away"><span class="btn-label">자리 비움 켜기/끄기</span></button>
+    <button type="button" class="btn" id="demo-reset"><span class="btn-label">처음 상태로</span></button>
+  </div>
+</div>
+
+<div class="scrim" data-scrim></div>
+<div class="toast-stack" role="status" aria-live="polite" id="toasts"></div>
+<p class="sr-only" id="sr-live" role="status" aria-live="polite"></p>
+
+<script src="js/icons.js"></script>
+<script src="js/mock.js"></script>
+</body>
+</html>

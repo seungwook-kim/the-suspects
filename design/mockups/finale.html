@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>최종 추리 목업 | The Suspects</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;700&family=Nanum+Gothic+Coding&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/pages/finale.css">
+</head>
+<body>
+
+<div class="mock-tools" role="toolbar" aria-label="목업 도구">
+  <span class="tools-label">목업 도구</span>
+  <div class="seg" role="group" aria-label="테마">
+    <button type="button" data-set-theme="light" aria-pressed="true">밝음</button>
+    <button type="button" data-set-theme="dark" aria-pressed="false">어두움</button>
+  </div>
+  <div class="seg" role="group" aria-label="분위기">
+    <button type="button" data-set-mood="normal" aria-pressed="true">보통</button>
+    <button type="button" data-set-mood="comic" aria-pressed="false">코믹</button>
+    <button type="button" data-set-mood="serious" aria-pressed="false">진지</button>
+  </div>
+  <div class="seg" role="group" aria-label="단계 보기">
+    <button type="button" data-jump="pick" aria-pressed="true">1 지목</button>
+    <button type="button" data-jump="build" aria-pressed="false">2 증거</button>
+    <button type="button" data-jump="wrong" aria-pressed="false">오답</button>
+    <button type="button" data-jump="result" aria-pressed="false">결과</button>
+  </div>
+  <a href="index.html">목차</a>
+</div>
+
+<div class="game fin-page">
+
+  <header class="status-strip">
+    <strong class="case-title">최종 추리</strong>
+    <span class="clock">1일차 · 09:35</span>
+    <span class="ap"><span class="pips" aria-hidden="true"></span>행동 <b data-ap-now>10</b>/12</span>
+    <div class="spacer">
+      <a class="btn" href="investigate.html" data-strip-back><span class="btn-label"><i data-icon="arrow-left"></i><span class="t">더 수사하기</span></span></a>
+      <button type="button" class="btn menu-btn" popovertarget="menu-pop" aria-label="메뉴 열기"><span class="btn-label"><i data-icon="list"></i><span class="t">메뉴</span></span></button>
+    </div>
+  </header>
+
+  <main class="fin-main" id="main">
+
+    <!-- 1단계: 지목 -->
+    <section class="stage" data-stage="pick" aria-labelledby="pick-title">
+      <header class="fin-head">
+        <h1 id="pick-title">지목할 사람을 고르세요</h1>
+        <p class="lead">용의자 7명을 이름순으로 놓았습니다. 한 명을 지목하면 기회 · 수단 · 동기를 증거로 밝혀야 하고, 틀릴 수 있는 기회는 3번입니다.</p>
+      </header>
+      <ul class="suspects" data-suspects aria-label="용의자"></ul>
+
+      <section class="paper has-tab preview" aria-labelledby="prev-title">
+        <span class="folder-tab">사건 01</span>
+        <h2 id="prev-title">지목하면 이렇게 진행됩니다</h2>
+        <details class="prev-steps" data-prev open>
+          <summary><i data-icon="caret-down"></i><span>세 칸을 증거로 채웁니다</span></summary>
+          <ol class="prev-list">
+            <li><span class="slot-label">기회</span><p class="slot-q">그 사람은 범행 시각에 서버실 근처에 있었다.</p><div class="prev-box">증거 1개를 끼웁니다</div></li>
+            <li><span class="slot-label">수단</span><p class="slot-q">그 사람은 운영 DB를 지울 수 있는 계정에 접근했다.</p><div class="prev-box">증거 1개를 끼웁니다</div></li>
+            <li><span class="slot-label">동기</span><p class="slot-q">그 사람에게는 기록을 지울 이유가 있었다.</p><div class="prev-box">증거 1개를 끼웁니다</div></li>
+          </ol>
+          <p class="prev-lives"><span>틀릴 수 있는 기회는 3번입니다. 증거가 맞지 않으면 1번씩 줄어듭니다.</span><span class="cells is-lg" role="img" aria-label="기회 3번"><i class="on"></i><i class="on"></i><i class="on"></i></span></p>
+        </details>
+      </section>
+    </section>
+
+    <!-- 2단계: 증거 끼우기 -->
+    <section class="stage" data-stage="build" aria-labelledby="build-title" hidden>
+      <div class="build">
+
+        <article class="paper dossier-fin has-tab" aria-labelledby="build-title">
+          <header class="df-top">
+            <span class="folder-tab">사건 01 · 최종 추리 조서</span>
+            <span class="stamp" aria-hidden="true">지목</span>
+          </header>
+          <div class="df-who">
+            <div class="df-photo" data-accused-photo></div>
+            <div class="df-id">
+              <h1 id="build-title" data-accused-name>한소라</h1>
+              <p class="role" data-accused-role>프로덕트 매니저</p>
+              <p class="lives" aria-live="polite">
+                <span class="lives-text">기회 3번 중 <b data-lives>3</b>번 남음</span>
+                <span class="cells is-lg lives-cells" role="img" aria-label="남은 기회 3번" data-lives-cells><i class="on"></i><i class="on"></i><i class="on"></i></span>
+              </p>
+            </div>
+          </div>
+
+          <div class="verdict" data-verdict hidden aria-live="polite"></div>
+
+          <ol class="slots" data-slots>
+            <li class="slot" data-slot="0"><span class="slot-label">기회</span><p class="slot-q">그 사람은 범행 시각에 서버실 근처에 있었다.</p><div class="slot-box"></div></li>
+            <li class="slot" data-slot="1"><span class="slot-label">수단</span><p class="slot-q">그 사람은 운영 DB를 지울 수 있는 계정에 접근했다.</p><div class="slot-box"></div></li>
+            <li class="slot" data-slot="2"><span class="slot-label">동기</span><p class="slot-q">그 사람에게는 기록을 지울 이유가 있었다.</p><div class="slot-box"></div></li>
+          </ol>
+          <p class="mock-note">목업: 지목한 인물과 상관없이 같은 예시 정답을 씁니다.</p>
+        </article>
+
+        <section class="paper ev-panel" aria-labelledby="ev-title">
+          <header class="col-head">
+            <h2 id="ev-title">증거 <span class="mono">6</span></h2>
+            <p data-ev-help>기회를 밝힐 증거를 고르세요.</p>
+          </header>
+          <div class="card-list" data-ev-list>
+            <button type="button" class="evidence-card" data-ev="audit"><span class="card-head"><strong>감사 로그 30분 공백</strong><span class="kind">로그</span></span><span class="card-body">운영 DB 접근 기록이 어젯밤 23:40부터 00:10까지 비어 있다.</span><span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span><span class="ev-tag" data-ev-tag></span></button>
+            <button type="button" class="evidence-card" data-ev="card"><span class="card-head"><strong>서버실 출입카드 기록</strong><span class="kind">기록</span></span><span class="card-body">지하 1층 서버실 앞 복도에서 23:12에 한소라의 카드가 태그되었다.</span><span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span><span class="ev-tag" data-ev-tag></span></button>
+            <button type="button" class="evidence-card" data-ev="console"><span class="card-head"><strong>서버실 콘솔 로그인 기록</strong><span class="kind">기록</span></span><span class="card-body">서버실 콘솔에 공용 관리자 계정으로 23:48에 로그인한 흔적이 있다.</span><span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span><span class="ev-tag" data-ev-tag></span></button>
+            <button type="button" class="evidence-card" data-ev="cctv-b1"><span class="card-head"><strong>지하 1층 CCTV: 추성만의 이동</strong><span class="kind">영상</span></span><span class="card-body">청소 카트를 끈 추성만이 23:20경 복도를 지나간다.</span><span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span><span class="ev-tag" data-ev-tag></span></button>
+            <button type="button" class="evidence-card" data-ev="checklist"><span class="card-head"><strong>청소 점검표의 빈 칸</strong><span class="kind">문서</span></span><span class="card-body">지하 1층 서버실 앞 칸만 서명이 비어 있다.</span><span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span><span class="ev-tag" data-ev-tag></span></button>
+            <button type="button" class="evidence-card" data-ev="cctv-hall"><span class="card-head"><strong>복도 CCTV: 카드 전달 장면</strong><span class="kind">영상</span></span><span class="card-body">누군가 복도에서 카드를 건네받는 장면. 얼굴은 보이지 않는다.</span><span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span><span class="ev-tag" data-ev-tag></span></button>
+          </div>
+        </section>
+
+      </div>
+    </section>
+
+    <!-- 3단계: 결과 카드 미리보기 -->
+    <section class="stage" data-stage="result" aria-labelledby="res-title" hidden>
+      <article class="paper result-card has-tab">
+        <span class="folder-tab">사건 01 · 결과 카드</span>
+        <header class="rc-head">
+          <h1 id="res-title" data-res-title>사건 해결</h1>
+          <span class="stamp big" aria-hidden="true" data-res-stamp>사건 종결</span>
+        </header>
+        <div class="rc-who">
+          <div class="df-photo" data-res-photo></div>
+          <div>
+            <p class="rc-case">사라진 운영 DB · 사건 01</p>
+            <p class="rc-name"><b data-res-name>한소라</b> <span data-res-role>프로덕트 매니저</span></p>
+            <p class="rc-meta mono" data-res-meta>기회 3번 중 3번 남음 · 1일차 · 행동 2번</p>
+          </div>
+        </div>
+        <ol class="rc-basis" data-res-basis></ol>
+        <p class="mock-note">목업: 실제 결과 카드는 사건 정보만 남기고 대화 기록은 지웁니다.</p>
+        <div class="rc-actions">
+          <button type="button" class="btn" aria-disabled="true"><span class="btn-label"><i data-icon="floppy-disk"></i>결과 카드 저장</span><small class="btn-reason">목업은 저장하지 않음</small></button>
+          <a class="btn btn-cta" href="start.html"><span class="btn-label">새 사건 고르기</span></a>
+        </div>
+      </article>
+    </section>
+
+  </main>
+
+  <div class="fin-bar" data-bar>
+    <p class="bar-note" data-bar-note>지목하면 되돌릴 수 없습니다.</p>
+    <div class="bar-btns">
+      <a class="btn" href="investigate.html" data-bar-back><span class="btn-label"><i data-icon="arrow-left"></i>더 수사하기</span></a>
+      <button type="button" class="btn btn-cta" data-bar-go aria-disabled="true"><span class="btn-label"><i data-icon="seal-check"></i><span data-bar-label>이 사람을 지목한다</span></span><small class="btn-reason" data-bar-reason>한 명을 고르세요</small></button>
+    </div>
+  </div>
+
+</div>
+
+<div id="menu-pop" class="paper menu" popover aria-label="메뉴" data-standard-menu data-current="finale"></div>
+
+<div class="toast-stack" role="status" aria-live="polite" id="toasts"></div>
+<p class="sr-only" id="sr-live" role="status" aria-live="polite"></p>
+
+<script src="js/icons.js"></script>
+<script src="js/mock.js"></script>
+<script src="js/pages/finale.js"></script>
+</body>
+</html>

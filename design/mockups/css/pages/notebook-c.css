@@ -1,0 +1,109 @@
+/* 방향 C "생활 흔적" 비교 페이지. 이 페이지만 예외로 색 토큰을 덮어쓴다(메모지 3색은 종류 구분에만).
+ * 증거 = 흰 종이, 진술 = 연두, 모순 = 분홍. 기울기는 종이 뒷면(::after)만 돌리고 글자는 항상 수평. */
+:root {
+  --memo-evidence: #FBFAF5;
+  --memo-statement: #D3EBC4;
+  --memo-contra: #FFCFD8;
+  --board-shade: rgba(0, 0, 0, 0);
+  --tape: rgba(255, 255, 255, 0.55);
+}
+:root[data-theme='dark'] {
+  --memo-evidence: #2A2D2C;
+  --memo-statement: #2C3A2A;
+  --memo-contra: #4A2D35;
+  --board-shade: rgba(20, 25, 28, 0.62);
+  --tape: rgba(231, 236, 232, 0.28);
+}
+html[data-mood='comic'] { --tilt: 2.2deg; }
+.tools-note { font-size: var(--text-s); color: var(--muted); }
+
+.game { min-height: calc(100dvh - var(--tools-h)); display: grid; grid-template-rows: auto 1fr; }
+.status-strip .btn { min-height: 44px; }
+.board-wrap { padding: var(--space-4); display: grid; gap: var(--space-3); align-content: start; }
+.board-tabs { display: none; }
+
+.board {
+  display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-5); align-items: start;
+  padding: var(--space-5);
+  background: linear-gradient(var(--board-shade), var(--board-shade)), url('../../../assets/ext/cork.webp') center / cover;
+  border: 2px solid var(--line-strong); border-radius: var(--radius-m);
+}
+.col { display: grid; gap: var(--space-4); align-content: start; min-width: 0; }
+.col-label {
+  display: inline-flex; align-items: center; gap: var(--space-2); width: fit-content; min-height: 36px; padding: 0 var(--space-3);
+  background: var(--surface); color: var(--ink); border: 1.5px solid var(--line-strong); border-radius: var(--radius-s);
+  font-size: var(--text-m); font-weight: 700;
+}
+.memos { display: grid; gap: var(--space-4); }
+#col-evidence .memos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* 메모지: 종이 뒷면만 기울인다 */
+.memo, .board .evidence-card {
+  position: relative; isolation: isolate; display: block; width: 100%; padding: var(--space-4) var(--space-4) var(--space-3);
+  background: transparent; border: 0; border-radius: var(--radius-s); text-align: left; color: var(--ink);
+  transform: none; box-shadow: none;
+}
+.board .evidence-card:nth-child(n), .board .evidence-card:hover { transform: none; background: transparent; }
+.memo::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: var(--radius-s);
+  background: var(--memo-bg); border: 1px solid var(--line-strong); box-shadow: 0 1px 0 var(--line), 0 4px 8px rgba(0, 0, 0, 0.18);
+  transform: rotate(var(--memo-rot, 0deg)); transition: transform var(--dur-fast) var(--ease-out);
+}
+.memos > .memo:nth-child(odd)::after { --memo-rot: var(--tilt); }
+.memos > .memo:nth-child(even)::after { --memo-rot: calc(var(--tilt) * -0.8); }
+.memo::before { /* 마스킹 테이프(코믹에서만 보임) */
+  content: ''; position: absolute; top: -9px; left: 50%; width: 52px; height: 16px; margin-left: -26px; opacity: var(--deco); pointer-events: none;
+  background: var(--tape); border: 1px solid var(--line); border-radius: 2px; transform: rotate(calc(var(--tilt) * 0.6));
+}
+.memo-evidence { --memo-bg: var(--memo-evidence); }
+.memo-statement { --memo-bg: var(--memo-statement); }
+.memo-contra { --memo-bg: var(--memo-contra); }
+.board .evidence-card:hover::after { box-shadow: 0 1px 0 var(--line), 0 8px 12px rgba(0, 0, 0, 0.22); }
+.board .evidence-card.selected { border: 0; box-shadow: none; }
+.board .evidence-card.selected::after { transform: none; border: 3px solid var(--ink); }
+.board .evidence-card.selected::before { opacity: 0; }
+.board .evidence-card .card-body, .memo .card-body { margin-top: var(--space-1); font-size: 15px; text-wrap: pretty; }
+
+.suspect-tag {
+  display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; width: fit-content; max-width: 100%; margin-bottom: var(--space-3); padding: 4px var(--space-3);
+  background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: var(--radius-s); font-size: var(--text-s);
+}
+.suspect-tag strong { font-size: var(--text-m); }
+.group { display: grid; align-content: start; }
+.suspect-tag .cells { --cell-w: 10px; --cell-h: 16px; gap: 3px; }
+
+.memo .who { font-weight: 700; }
+.memo-statement .stamp { margin: 0 0 0 var(--space-2); }
+.memo .flag-line { margin-top: var(--space-2); font-size: var(--text-s); font-weight: 700; }
+.contra-title { display: flex; align-items: center; gap: var(--space-2); font-weight: 700; }
+.contra-title .stamp { margin: 0; }
+.memo-contra .side { margin-top: var(--space-1); font-size: 15px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2); align-items: baseline; }
+.memo-contra .side b { padding: 0 var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-s); font-size: 13px; font-weight: 700; }
+.dotted-link { display: block; height: 18px; margin: 2px 0 2px 22px; border-left: 2px dotted var(--ink); }
+.board-note { width: fit-content; padding: 4px var(--space-3); background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: var(--radius-s); font-size: var(--text-s); }
+
+/* 721~1099px: 증거 | (진술 위, 모순 아래) */
+@media (max-width: 1099px) {
+  .board { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'ev st' 'ev co'; }
+  #col-evidence { grid-area: ev; } #col-statements { grid-area: st; } #col-contra { grid-area: co; }
+  #col-evidence .memos { grid-template-columns: minmax(0, 1fr); }
+  .board { gap: var(--space-5) var(--space-4); padding: var(--space-4); }
+}
+/* 720px 이하: 세그먼트 탭 하나, 기울기 0 */
+@media (max-width: 720px) {
+  .board-wrap { padding: var(--space-3); }
+  .board-tabs { display: flex; background: var(--bg); }
+  .board { display: block; padding: var(--space-4) var(--space-3); }
+  .col:not([data-active]) { display: none; }
+  .memos > .memo::after { --memo-rot: 0deg !important; }
+  .memo::before { transform: none; }
+  .status-strip { flex-wrap: wrap; row-gap: 0; padding-top: var(--space-2); padding-bottom: var(--space-2); }
+  .status-strip .spacer .t { display: none; }
+}
+.memo .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); }
+@media (max-width: 720px) {
+  .tools-note { display: none; }
+  .status-strip { flex-wrap: nowrap; gap: var(--space-3); padding-block: 0; }
+  .status-strip .case-title, .status-strip .pips { display: none; }
+  .col-label { display: none; }
+}

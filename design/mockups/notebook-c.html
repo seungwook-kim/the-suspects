@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ko" data-theme="light" data-mood="comic">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수첩 방향 C 비교 목업 | The Suspects</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;700&family=Nanum+Gothic+Coding&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/pages/notebook-c.css">
+</head>
+<body>
+
+<div class="mock-tools" role="toolbar" aria-label="목업 도구">
+  <span class="tools-label">목업 도구</span>
+  <div class="seg" role="group" aria-label="테마">
+    <button type="button" data-set-theme="light" aria-pressed="true">밝음</button>
+    <button type="button" data-set-theme="dark" aria-pressed="false">어두움</button>
+  </div>
+  <div class="seg" role="group" aria-label="분위기">
+    <button type="button" data-set-mood="normal" aria-pressed="false">보통</button>
+    <button type="button" data-set-mood="comic" aria-pressed="true">코믹</button>
+    <button type="button" data-set-mood="serious" aria-pressed="false">진지</button>
+  </div>
+  <span class="tools-note">방향 C 비교 페이지(코믹이 기본). 같은 내용의 방향 A는 notebook.html</span>
+  <a href="index.html">목차</a>
+</div>
+
+<div class="game">
+
+  <header class="status-strip">
+    <strong class="case-title">사라진 운영 DB</strong>
+    <span class="clock">1일차 · 09:35</span>
+    <span class="ap"><span class="pips" aria-hidden="true"></span>행동 <b data-ap-now>10</b>/12</span>
+    <div class="spacer">
+      <button type="button" class="btn menu-btn" popovertarget="menu-pop" aria-label="메뉴 열기"><span class="btn-label"><i data-icon="list"></i><span class="t">메뉴</span></span></button>
+    </div>
+  </header>
+
+  <main class="board-wrap" id="main">
+    <h1 class="sr-only">수첩 증거 보드</h1>
+
+    <div class="tabs board-tabs" role="tablist" aria-label="수첩 보기">
+      <button type="button" class="tab" role="tab" id="tab-c-evidence" aria-controls="col-evidence" aria-selected="true">증거 <span class="tab-badge">6</span></button>
+      <button type="button" class="tab" role="tab" id="tab-c-statements" aria-controls="col-statements" aria-selected="false" tabindex="-1">진술 <span class="tab-badge">5</span></button>
+      <button type="button" class="tab" role="tab" id="tab-c-contra" aria-controls="col-contra" aria-selected="false" tabindex="-1">모순 <span class="tab-badge is-new">2</span></button>
+    </div>
+
+    <div class="board">
+
+      <section class="col" id="col-evidence" role="tabpanel" aria-labelledby="h-evidence" data-active>
+        <h2 class="col-label" id="h-evidence"><i data-icon="paperclip"></i>증거 <span class="mono">6</span></h2>
+        <div class="memos">
+          <button type="button" class="evidence-card memo memo-evidence" aria-pressed="false">
+            <span class="card-head"><strong>감사 로그 30분 공백</strong><span class="kind">로그</span></span>
+            <span class="card-body">운영 DB 접근 기록이 어젯밤 23:40부터 00:10까지 비어 있다.</span>
+            <span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span>
+          </button>
+          <button type="button" class="evidence-card memo memo-evidence" aria-pressed="false">
+            <span class="card-head"><strong>서버실 출입카드 기록</strong><span class="kind">기록</span></span>
+            <span class="card-body">지하 1층 서버실 앞 복도에서 23:12에 한소라의 카드가 태그되었다.</span>
+            <span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span>
+          </button>
+          <button type="button" class="evidence-card memo memo-evidence" aria-pressed="false">
+            <span class="card-head"><strong>서버실 콘솔 로그인 기록</strong><span class="kind">기록</span></span>
+            <span class="card-body">서버실 콘솔에 공용 관리자 계정으로 23:48에 로그인한 흔적이 있다.</span>
+            <span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span>
+          </button>
+          <button type="button" class="evidence-card memo memo-evidence" aria-pressed="false">
+            <span class="card-head"><strong>지하 1층 CCTV: 추성만의 이동</strong><span class="kind">영상</span></span>
+            <span class="card-body">청소 카트를 끈 추성만이 23:20경 복도를 지나간다.</span>
+            <span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span>
+          </button>
+          <button type="button" class="evidence-card memo memo-evidence" aria-pressed="false">
+            <span class="card-head"><strong>청소 점검표의 빈 칸</strong><span class="kind">문서</span></span>
+            <span class="card-body">지하 1층 서버실 앞 칸만 서명이 비어 있다.</span>
+            <span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span>
+          </button>
+          <button type="button" class="evidence-card memo memo-evidence" aria-pressed="false">
+            <span class="card-head"><strong>복도 CCTV: 카드 전달 장면</strong><span class="kind">영상</span></span>
+            <span class="card-body">누군가 복도에서 카드를 건네받는 장면. 얼굴은 보이지 않는다.</span>
+            <span class="pending-label"><i data-icon="paperclip-fill"></i>제시 대기</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="col" id="col-statements" role="tabpanel" aria-labelledby="h-statements">
+        <h2 class="col-label" id="h-statements"><i data-icon="chat-circle-text"></i>진술 <span class="mono">5</span></h2>
+
+        <div class="group">
+          <p class="suspect-tag"><strong>한소라</strong><span class="cells" role="img" aria-label="증거 충분도 5칸 중 2칸"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span><span class="mono">충분도 2/5</span></p>
+          <div class="memos">
+            <article class="memo memo-statement">
+              <div class="card-head"><span class="who">한소라</span><span class="mono muted">1일차 09:34</span></div>
+              <p class="card-body">"바로 로비로 내려가서 택시 탔어요. <span class="claim is-flagged">서버실은 근처에도 안 갔고요.</span>"<span class="stamp">모순</span></p>
+              <p class="flag-line">서버실 출입카드 기록과 어긋남</p>
+            </article>
+            <article class="memo memo-statement">
+              <div class="card-head"><span class="who">한소라</span><span class="mono muted">1일차 09:30</span></div>
+              <p class="card-body">"개발팀 몇 분이랑 같이 있었어요. 저는 기획서 마무리하느라요."</p>
+            </article>
+            <article class="memo memo-statement">
+              <div class="card-head"><span class="who">한소라</span><span class="mono muted">1일차 09:26</span></div>
+              <p class="card-body">"평소처럼 열한 시쯤 나왔어요. 오픈 전날이라 좀 늦었죠."</p>
+            </article>
+          </div>
+        </div>
+
+        <div class="group">
+          <p class="suspect-tag"><strong>남궁철</strong><span class="cells" role="img" aria-label="증거 충분도 5칸 중 1칸"><i class="on"></i><i></i><i></i><i></i><i></i></span><span class="mono">충분도 1/5</span></p>
+          <div class="memos">
+            <article class="memo memo-statement">
+              <div class="card-head"><span class="who">남궁철</span><span class="mono muted">1일차 09:10</span></div>
+              <p class="card-body">"순찰은 자정 전에 한 번 돌았습니다. 지하 쪽은 문만 확인했고요."</p>
+            </article>
+          </div>
+        </div>
+
+        <div class="group">
+          <p class="suspect-tag"><strong>서도윤</strong><span class="cells" role="img" aria-label="증거 충분도 5칸 중 1칸"><i class="on"></i><i></i><i></i><i></i><i></i></span><span class="mono">충분도 1/5</span></p>
+          <div class="memos">
+            <article class="memo memo-statement">
+              <div class="card-head"><span class="who">서도윤</span><span class="mono muted">1일차 09:02</span></div>
+              <p class="card-body">"<span class="claim is-flagged">서버실은 권한이 없어서 들어간 적이 없어요.</span>"<span class="stamp">모순</span></p>
+              <p class="flag-line">서버실 출입카드 기록과 어긋남</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="col" id="col-contra" role="tabpanel" aria-labelledby="h-contra">
+        <h2 class="col-label" id="h-contra"><i data-icon="seal-check"></i>모순 <span class="mono">2</span></h2>
+        <div class="memos">
+          <article class="memo memo-contra">
+            <p class="contra-title"><span class="stamp">모순</span><span class="hl">한소라의 진술</span></p>
+            <p class="side"><b>진술</b>"서버실은 근처에도 안 갔고요."</p>
+            <span class="dotted-link" aria-hidden="true"></span>
+            <p class="side"><b>증거</b>서버실 출입카드 기록 (23:12 지하 1층 복도 태그)</p>
+          </article>
+          <article class="memo memo-contra">
+            <p class="contra-title"><span class="stamp">모순</span><span class="hl">서도윤의 진술</span></p>
+            <p class="side"><b>진술</b>"서버실은 권한이 없어서 들어간 적이 없어요."</p>
+            <span class="dotted-link" aria-hidden="true"></span>
+            <p class="side"><b>증거</b>서버실 출입카드 기록</p>
+          </article>
+        </div>
+        <p class="board-note">진술과 증거는 점선 한 줄로만 잇습니다.</p>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<div id="menu-pop" class="paper menu" popover data-standard-menu data-current="notebook" aria-label="메뉴">
+  <a class="btn btn-quiet" href="notebook.html"><span class="btn-label"><i data-icon="notebook"></i>방향 A 수첩 보기</span></a>
+</div>
+
+<script src="js/icons.js"></script>
+<script src="js/mock.js"></script>
+<script>
+(function () {
+  /* 이 페이지는 코믹이 기본값이다. mock.js의 저장값(다른 페이지에 번지지 않게 저장은 하지 않음)보다 먼저 보이게 한다. */
+  document.documentElement.setAttribute('data-mood', 'comic');
+  document.querySelectorAll('[data-set-mood]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-set-mood') === 'comic')); });
+  var cards = document.querySelectorAll('.evidence-card');
+  cards.forEach(function (c) { c.addEventListener('click', function () {
+    var on = c.getAttribute('aria-pressed') !== 'true';
+    cards.forEach(function (o) { o.classList.remove('selected'); o.setAttribute('aria-pressed', 'false'); });
+    if (on) { c.classList.add('selected'); c.setAttribute('aria-pressed', 'true'); }
+  }); });
+  var tabs = document.querySelectorAll('.board-tabs [role=tab]');
+  tabs.forEach(function (t) { t.addEventListener('click', function () {
+    tabs.forEach(function (o) {
+      var on = o === t; o.setAttribute('aria-selected', String(on)); o.tabIndex = on ? 0 : -1;
+      var col = document.getElementById(o.getAttribute('aria-controls'));
+      if (on) col.setAttribute('data-active', ''); else col.removeAttribute('data-active');
+    });
+  }); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수사 화면 목업 | The Suspects</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;700&family=Nanum+Gothic+Coding&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/pages/investigate.css">
+</head>
+<body>
+
+<div class="mock-tools" role="toolbar" aria-label="목업 도구">
+  <span class="tools-label">목업 도구</span>
+  <div class="seg" role="group" aria-label="테마">
+    <button type="button" data-set-theme="light" aria-pressed="true">밝음</button>
+    <button type="button" data-set-theme="dark" aria-pressed="false">어두움</button>
+  </div>
+  <div class="seg" role="group" aria-label="분위기">
+    <button type="button" data-set-mood="normal" aria-pressed="true">보통</button>
+    <button type="button" data-set-mood="comic" aria-pressed="false">코믹</button>
+    <button type="button" data-set-mood="serious" aria-pressed="false">진지</button>
+  </div>
+  <a href="index.html">목차</a>
+</div>
+
+<div class="game invest-page">
+
+  <header class="status-strip">
+    <strong class="case-title">사라진 운영 DB</strong>
+    <span class="clock">1일차 · 09:35</span>
+    <span class="ap"><span class="pips" aria-hidden="true"></span>행동 <b data-ap-now>10</b>/12</span>
+    <div class="spacer">
+      <button type="button" class="btn only-wide" id="end-day"><span class="btn-label"><i data-icon="moon"></i>하루 끝내기</span></button>
+      <button type="button" class="btn menu-btn" popovertarget="menu-pop" aria-label="메뉴 열기"><span class="btn-label"><i data-icon="list"></i><span class="t">메뉴</span></span></button>
+    </div>
+  </header>
+
+  <section class="drawer paper map-sheet" data-drawer="map" data-drawer-mq="(max-width: 720px)" aria-labelledby="map-title">
+    <div class="drawer-head">
+      <h2 id="map-title">지도</h2>
+      <button type="button" class="btn close" data-close aria-label="지도 닫기" style="min-height:44px;min-width:44px;padding:0"><span class="btn-label"><i data-icon="x"></i></span></button>
+    </div>
+    <p class="map-help">실선으로 이어진 칸이 지금 갈 수 있는 곳입니다. 점선 칸은 다른 장소를 거쳐야 합니다.</p>
+    <div class="map-board" data-map>
+      <svg class="map-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" data-map-lines></svg>
+    </div>
+    <ul class="legend" aria-label="범례">
+      <li><span class="sw sw-here"></span>현재 위치</li>
+      <li><span class="sw sw-link"></span>지금 갈 수 있음</li>
+      <li><span class="sw sw-far"></span>경유 필요</li>
+    </ul>
+  </section>
+
+  <main class="stage-col" id="main">
+    <nav class="place-chips" aria-label="이동할 장소">
+      <ul data-place-chips></ul>
+    </nav>
+    <section class="paper place-card has-tab" aria-labelledby="place-name" data-place-card></section>
+  </main>
+
+  <aside class="paper drawer note-col" data-drawer="note" data-drawer-mq="(max-width: 720px)" aria-labelledby="note-title">
+    <div class="drawer-head">
+      <h2 id="note-title">수첩</h2>
+      <button type="button" class="btn close" data-close aria-label="수첩 닫기" style="min-height:44px;min-width:44px;padding:0"><span class="btn-label"><i data-icon="x"></i></span></button>
+    </div>
+    <div class="tabs" role="tablist" aria-label="수첩 탭">
+      <button type="button" class="tab" role="tab" id="tab-evidence" aria-controls="panel-evidence" aria-selected="true">증거 <span class="tab-badge">6</span></button>
+      <button type="button" class="tab" role="tab" id="tab-statements" aria-controls="panel-statements" aria-selected="false" tabindex="-1">진술 <span class="tab-badge">4</span></button>
+      <button type="button" class="tab" role="tab" id="tab-contra" aria-controls="panel-contra" aria-selected="false" tabindex="-1">모순 <span class="tab-badge" data-contra-count>2</span></button>
+      <button type="button" class="tab" role="tab" id="tab-gauge" aria-controls="panel-gauge" aria-selected="false" tabindex="-1">충분도</button>
+    </div>
+    <div class="nb-body">
+      <div role="tabpanel" id="panel-evidence" aria-labelledby="tab-evidence">
+        <p class="nb-note">증거 제시는 심문 화면에서 합니다. 여기서는 모은 증거를 읽습니다.</p>
+        <div class="card-list">
+          <article class="evidence-card"><span class="card-head"><strong>감사 로그 30분 공백</strong><span class="kind">로그</span></span><span class="card-body">운영 DB 접근 기록이 어젯밤 23:40부터 00:10까지 비어 있다.</span></article>
+          <article class="evidence-card"><span class="card-head"><strong>서버실 출입카드 기록</strong><span class="kind">기록</span></span><span class="card-body">지하 1층 서버실 앞 복도에서 23:12에 한소라의 카드가 태그되었다.</span></article>
+          <article class="evidence-card"><span class="card-head"><strong>서버실 콘솔 로그인 기록</strong><span class="kind">기록</span></span><span class="card-body">서버실 콘솔에 공용 관리자 계정으로 23:48에 로그인한 흔적이 있다.</span></article>
+          <article class="evidence-card"><span class="card-head"><strong>지하 1층 CCTV: 추성만의 이동</strong><span class="kind">영상</span></span><span class="card-body">청소 카트를 끈 추성만이 23:20경 복도를 지나간다.</span></article>
+          <article class="evidence-card"><span class="card-head"><strong>청소 점검표의 빈 칸</strong><span class="kind">문서</span></span><span class="card-body">지하 1층 서버실 앞 칸만 서명이 비어 있다.</span></article>
+          <article class="evidence-card"><span class="card-head"><strong>복도 CCTV: 카드 전달 장면</strong><span class="kind">영상</span></span><span class="card-body">누군가 복도에서 카드를 건네받는 장면. 얼굴은 보이지 않는다.</span></article>
+        </div>
+      </div>
+      <div role="tabpanel" id="panel-statements" aria-labelledby="tab-statements" hidden>
+        <div class="card-list">
+          <article class="st-card contra"><div class="card-head"><span class="who">한소라</span><span class="mono muted">1일차 09:34</span></div><p class="card-body">"바로 로비로 내려가서 택시 탔어요. 서버실은 근처에도 안 갔고요."</p><p class="flag-line"><span class="stamp" style="margin:0">모순</span>서버실 출입카드 기록과 어긋남</p></article>
+          <article class="st-card"><div class="card-head"><span class="who">한소라</span><span class="mono muted">1일차 09:30</span></div><p class="card-body">"개발팀 몇 분이랑 같이 있었어요. 저는 기획서 마무리하느라요."</p></article>
+          <article class="st-card"><div class="card-head"><span class="who">남궁철</span><span class="mono muted">1일차 09:10</span></div><p class="card-body">"순찰은 자정 전에 한 번 돌았습니다. 지하 쪽은 문만 확인했고요."</p></article>
+          <article class="st-card contra"><div class="card-head"><span class="who">서도윤</span><span class="mono muted">1일차 09:02</span></div><p class="card-body">"서버실은 권한이 없어서 들어간 적이 없어요."</p><p class="flag-line"><span class="stamp" style="margin:0">모순</span>서버실 출입카드 기록과 어긋남</p></article>
+        </div>
+      </div>
+      <div role="tabpanel" id="panel-contra" aria-labelledby="tab-contra" hidden>
+        <div class="card-list">
+          <article class="contra-card"><p><span class="stamp">모순</span><span class="title hl">한소라의 진술</span></p><p class="card-body">진술: "서버실은 근처에도 안 갔고요."</p><p class="card-body">증거: 서버실 출입카드 기록</p></article>
+          <article class="contra-card"><p><span class="stamp">모순</span><span class="title hl">서도윤의 진술</span></p><p class="card-body">진술: "서버실은 권한이 없어서 들어간 적이 없어요."</p><p class="card-body">증거: 서버실 출입카드 기록</p></article>
+        </div>
+      </div>
+      <div role="tabpanel" id="panel-gauge" aria-labelledby="tab-gauge" hidden>
+        <p class="nb-note">용의자별 증거 충분도 (5칸)</p>
+        <div data-gauge></div>
+      </div>
+    </div>
+  </aside>
+
+  <section class="actionbar" aria-label="수사 행동">
+    <div class="tool-row">
+      <button type="button" class="btn" data-open="map"><span class="btn-label"><i data-icon="map-trifold"></i>지도</span></button>
+      <button type="button" class="btn" data-open="note"><span class="btn-label"><i data-icon="notebook"></i>수첩</span><small class="btn-reason">모순 <span data-contra-count>2</span></small></button>
+      <button type="button" class="btn btn-cta" data-primary><span class="btn-label"></span><small class="btn-reason"></small></button>
+    </div>
+  </section>
+
+</div>
+
+<div id="menu-pop" class="paper menu" popover aria-label="메뉴" data-standard-menu data-current="investigate">
+  <button type="button" class="btn btn-quiet"><span class="btn-label"><i data-icon="floppy-disk"></i>저장</span></button>
+  <button type="button" class="btn btn-quiet only-phone" id="end-day-menu"><span class="btn-label"><i data-icon="moon"></i>하루 끝내기</span></button>
+</div>
+
+<div class="scrim" data-scrim></div>
+<div class="toast-stack" role="status" aria-live="polite" id="toasts"></div>
+<p class="sr-only" id="sr-live" role="status" aria-live="polite"></p>
+
+<script src="js/icons.js"></script>
+<script src="js/mock.js"></script>
+<script src="js/pages/investigate.js"></script>
+</body>
+</html>

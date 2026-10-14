@@ -1,0 +1,42 @@
+/* 목차 전용 배치 */
+.index { max-width: 1120px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-8); display: grid; gap: var(--space-7); }
+.index h1 { font-size: var(--text-xl); }
+.index h2 { font-size: var(--text-l); margin-bottom: var(--space-3); }
+.index .lead { color: var(--muted); margin-top: var(--space-1); }
+.screens { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.screen-card { display: grid; grid-template-rows: auto 1fr; overflow: hidden; text-decoration: none; color: var(--ink); }
+.screen-card .thumb { aspect-ratio: 16 / 10; background: var(--bg); border-bottom: 1px solid var(--line); display: grid; place-items: center; overflow: hidden; }
+.screen-card .thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+.screen-card .thumb .wip { color: var(--muted); font-size: var(--text-s); font-weight: 700; border: 1.5px dashed var(--line-strong); padding: var(--space-1) var(--space-3); border-radius: var(--radius-s); }
+.screen-card .info { padding: var(--space-3) var(--space-4) var(--space-4); display: grid; gap: var(--space-1); align-content: start; }
+.screen-card .title { display: flex; justify-content: space-between; gap: var(--space-2); align-items: baseline; font-weight: 700; font-size: var(--text-m); }
+.screen-card .who { font-size: 13px; color: var(--muted); font-weight: 400; white-space: nowrap; }
+.screen-card .desc { font-size: var(--text-s); }
+.screen-card:hover { background: color-mix(in srgb, var(--ink) 5%, var(--surface)); }
+.screen-card:focus-visible { outline-offset: 3px; }
+.swatches { width: 100%; border-collapse: collapse; font-size: var(--text-s); }
+.swatches th, .swatches td { text-align: left; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); vertical-align: middle; }
+.swatches th { font-weight: 700; color: var(--muted); }
+.swatches .chipbox { display: inline-block; width: 56px; height: 28px; border: 1px solid var(--line-strong); border-radius: var(--radius-s); vertical-align: middle; }
+.swatches code { font-family: var(--font-mono); font-size: 13px; }
+.swatch-wrap { padding: var(--space-2) var(--space-3); overflow-x: auto; }
+.type-specimen { padding: var(--space-5); display: grid; gap: var(--space-3); }
+.type-specimen .big { font-size: var(--text-xl); }
+.type-specimen .nums { font-family: var(--font-mono); font-size: var(--text-xl); overflow-wrap: anywhere; }
+.icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: var(--space-2); padding: var(--space-4); }
+.icon-grid li { display: grid; justify-items: center; gap: var(--space-1); padding: var(--space-3) var(--space-1); border: 1px solid var(--line); border-radius: var(--radius-s); font-family: var(--font-mono); font-size: 12px; text-align: center; overflow-wrap: anywhere; }
+.icon-grid .icon { width: 28px; height: 28px; }
+.links { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.decisions { padding: var(--space-4) var(--space-5); }
+.decisions summary { cursor: pointer; list-style: none; min-height: 44px; display: flex; align-items: center; }
+.decisions summary::-webkit-details-marker { display: none; }
+.decisions summary h2 { margin: 0; }
+.decisions summary::after { content: '+'; margin-left: auto; font: 400 var(--text-xl) / 1 var(--font-mono); }
+.decisions[open] summary::after { content: '-'; }
+.decisions ul { display: grid; gap: var(--space-2); margin-top: var(--space-2); }
+.decisions li + li { border-top: 1px solid var(--line); padding-top: var(--space-2); }
+@media (max-width: 720px) {
+  .screens { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+  .screen-card .thumb { aspect-ratio: 2 / 1; }
+  .screen-card .title { flex-direction: column; gap: 0; }
+  .screen-card .info { padding: var(--space-2) var(--space-3) var(--space-3); } .index { padding-top: var(--space-4); gap: var(--space-6); } .decisions { padding: var(--space-3) var(--space-4); } .type-specimen .big, .type-specimen .nums { font-size: var(--text-l); } }

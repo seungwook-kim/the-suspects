@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>브리핑 목업 | The Suspects</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;700&family=Nanum+Gothic+Coding&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/pages/briefing.css">
+</head>
+<body>
+
+<div class="mock-tools" role="toolbar" aria-label="목업 도구">
+  <span class="tools-label">목업 도구</span>
+  <div class="seg" role="group" aria-label="테마">
+    <button type="button" data-set-theme="light" aria-pressed="true">밝음</button>
+    <button type="button" data-set-theme="dark" aria-pressed="false">어두움</button>
+  </div>
+  <div class="seg" role="group" aria-label="분위기">
+    <button type="button" data-set-mood="normal" aria-pressed="true">보통</button>
+    <button type="button" data-set-mood="comic" aria-pressed="false">코믹</button>
+    <button type="button" data-set-mood="serious" aria-pressed="false">진지</button>
+  </div>
+  <a href="index.html">목차</a>
+</div>
+
+<div class="photo-strip brief-strip">
+  <img src="../assets/ext/blinds-warm.webp" alt="" width="1024" height="684">
+</div>
+
+<main class="brief" id="main">
+
+  <section class="paper case-sheet has-tab" aria-labelledby="case-h">
+    <span class="folder-tab">사건 01</span>
+    <h1 id="case-h">사라진 운영 DB</h1>
+    <div class="overview">
+      <p>오픈 전날 밤, 운영 DB의 사용자 테이블이 지워졌다. 감사 로그는 23:40부터 00:10까지 비어 있다.</p>
+      <p>그 밤 건물에는 일곱 명이 있었다. 진술과 기록을 맞대어 어긋나는 곳을 찾아라.</p>
+    </div>
+    <dl class="facts">
+      <div><dt>시각</dt><dd class="mono">1일차 09:00</dd></div>
+      <div><dt>기한</dt><dd class="mono">남은 4일</dd></div>
+      <div><dt>행동</dt><dd class="mono">12회/일</dd></div>
+    </dl>
+  </section>
+
+  <section class="people" aria-labelledby="people-h">
+    <h2 id="people-h">등장인물 7명</h2>
+    <p class="ai-notice"><span class="icon-wrap"><i data-icon="info"></i></span><span>등장인물 사진은 AI가 만든 가상의 인물입니다. 실존 인물과 관계없습니다.</span></p>
+
+    <ul class="suspects">
+      <li class="paper suspect-card">
+        <article class="person is-row">
+          <div class="person-photo"><img src="../assets/portraits/p1.webp" alt="한소라, AI로 생성한 가상의 인물 사진" width="480" height="640"></div>
+          <h3 class="person-name">한소라</h3><p class="person-role">프로덕트 매니저 · 29세</p><p class="person-line">오픈 일정을 총괄한다. 그날 밤 늦게까지 회사에 있었다.</p>
+        </article>
+      </li>
+      <li class="paper suspect-card">
+        <article class="person is-row">
+          <div class="person-photo"><img src="../assets/portraits/p2.webp" alt="남궁철, AI로 생성한 가상의 인물 사진" width="480" height="640"></div>
+          <h3 class="person-name">남궁철</h3><p class="person-role">야간 경비원 · 58세</p><p class="person-line">출입 기록과 순찰을 맡는다. 건물 구조를 가장 잘 안다.</p>
+        </article>
+      </li>
+      <li class="paper suspect-card">
+        <article class="person is-row">
+          <div class="person-photo"><img src="../assets/portraits/p3.webp" alt="고태식, AI로 생성한 가상의 인물 사진" width="480" height="640"></div>
+          <h3 class="person-name">고태식</h3><p class="person-role">DBA · 45세</p><p class="person-line">운영 DB 계정과 백업을 관리한다. 말수가 적다.</p>
+        </article>
+      </li>
+      <li class="paper suspect-card">
+        <article class="person is-row">
+          <div class="person-photo"><img src="../assets/portraits/p5.webp" alt="추성만, AI로 생성한 가상의 인물 사진" width="480" height="640"></div>
+          <h3 class="person-name">추성만</h3><p class="person-role">야간 청소원 · 54세</p><p class="person-line">밤마다 지하와 복도를 돈다. 건물에서 일한 지 10년째다.</p>
+        </article>
+      </li>
+      <li class="paper suspect-card">
+        <article class="person is-row">
+          <div class="avatar-pending" role="img" aria-label="서도윤, 사진 준비 중"><span class="ap-initial">서</span><span class="ap-label">사진 준비 중</span></div>
+          <h3 class="person-name">서도윤</h3><p class="person-role">신입 개발자 · 26세<span class="pp-note"> · 사진 준비 중</span></p><p class="person-line">입사 석 달째. 오픈 준비 작업을 도왔다.</p>
+        </article>
+      </li>
+      <li class="paper suspect-card">
+        <article class="person is-row">
+          <div class="avatar-pending" role="img" aria-label="윤석진, 사진 준비 중"><span class="ap-initial">윤</span><span class="ap-label">사진 준비 중</span></div>
+          <h3 class="person-name">윤석진</h3><p class="person-role">시니어 백엔드 개발자 · 41세<span class="pp-note"> · 사진 준비 중</span></p><p class="person-line">서버 구조를 설계했다. 오픈 책임자 중 한 명이다.</p>
+        </article>
+      </li>
+      <li class="paper suspect-card">
+        <article class="person is-row">
+          <div class="avatar-pending" role="img" aria-label="황지호, 사진 준비 중"><span class="ap-initial">황</span><span class="ap-label">사진 준비 중</span></div>
+          <h3 class="person-name">황지호</h3><p class="person-role">외주 개발자 · 34세<span class="pp-note"> · 사진 준비 중</span></p><p class="person-line">외주로 합류했다. 오픈 대응 작업을 돕는다.</p>
+        </article>
+      </li>
+    </ul>
+  </section>
+
+  <div class="start-bar">
+    <a class="btn btn-cta" href="investigate.html"><span class="btn-label"><i data-icon="notebook"></i>수사 시작</span></a>
+  </div>
+
+  <footer class="brief-foot">
+    <a href="about.html">정보 · 사진 출처</a> <span>(상단 배경 사진: RaeAllen, CC BY 2.0)</span>
+  </footer>
+</main>
+
+<script src="js/icons.js"></script>
+<script src="js/mock.js"></script>
+</body>
+</html>

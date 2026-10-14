@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시작 화면 목업 | The Suspects</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;700&family=Nanum+Gothic+Coding&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/pages/start.css">
+</head>
+<body>
+
+<div class="mock-tools" role="toolbar" aria-label="목업 도구">
+  <span class="tools-label">목업 도구</span>
+  <div class="seg" role="group" aria-label="테마">
+    <button type="button" data-set-theme="light" aria-pressed="true">밝음</button>
+    <button type="button" data-set-theme="dark" aria-pressed="false">어두움</button>
+  </div>
+  <div class="seg" role="group" aria-label="분위기">
+    <button type="button" data-set-mood="normal" aria-pressed="true">보통</button>
+    <button type="button" data-set-mood="comic" aria-pressed="false">코믹</button>
+    <button type="button" data-set-mood="serious" aria-pressed="false">진지</button>
+  </div>
+  <a href="index.html">목차</a>
+</div>
+
+<div class="photo-strip" style="--strip-h: 160px; --strip-h-phone: 96px">
+  <img src="../assets/ext/corridor-fluor.webp" alt="" width="1024" height="683">
+</div>
+
+<main class="start" id="main">
+  <header class="start-head">
+    <h1>The Suspects</h1>
+    <p class="lead">오늘은 어떤 사건을 맡을까요?</p>
+    <p class="ai-notice"><span class="icon-wrap"><i data-icon="info"></i></span><span>등장인물 사진은 AI가 만든 가상의 인물입니다. 실존 인물과 관계없습니다.</span></p>
+  </header>
+
+  <section aria-labelledby="cases-h">
+    <h2 id="cases-h" class="sr-only">사건 고르기</h2>
+    <div class="cases" role="radiogroup" aria-label="사건">
+      <button type="button" class="case" role="radio" aria-checked="true" data-case>
+        <span class="case-icon"><i data-icon="database"></i></span>
+        <span class="case-text">
+          <span class="case-no mono">사건 01</span>
+          <strong>사라진 운영 DB</strong>
+          <span class="desc">오픈 전날 밤 운영 DB가 지워졌다. 감사 로그도 비었다.</span>
+        </span>
+        <span class="case-on"><i data-icon="check-circle"></i>선택됨</span>
+      </button>
+      <button type="button" class="case" role="radio" aria-checked="false" data-case>
+        <span class="case-icon"><i data-icon="buildings"></i></span>
+        <span class="case-text">
+          <span class="case-no mono">사건 02</span>
+          <strong>아파트 살인사건</strong>
+          <span class="desc">단지 안에서 일어난 사건. 이웃 모두가 서로를 알고 있다.</span>
+        </span>
+        <span class="case-on"><i data-icon="check-circle"></i>선택됨</span>
+      </button>
+      <button type="button" class="case" role="radio" aria-checked="false" data-case>
+        <span class="case-icon"><i data-icon="package"></i></span>
+        <span class="case-text">
+          <span class="case-no mono">사건 03</span>
+          <strong>택배 도난 소동</strong>
+          <span class="desc">현관 앞 택배가 계속 사라진다. 범인은 누구일까?</span>
+        </span>
+        <span class="case-on"><i data-icon="check-circle"></i>선택됨</span>
+      </button>
+      <button type="button" class="case" role="radio" aria-checked="false" data-case>
+        <span class="case-icon"><i data-icon="bed"></i></span>
+        <span class="case-text">
+          <span class="case-no mono">사건 04</span>
+          <strong>호텔 밀실</strong>
+          <span class="desc">안에서 잠긴 객실에서 투숙객이 사라졌다.</span>
+        </span>
+        <span class="case-on"><i data-icon="check-circle"></i>선택됨</span>
+      </button>
+    </div>
+
+    <form class="custom" id="custom-form" autocomplete="off">
+      <div class="custom-head">
+        <label for="custom-input"><strong>직접 만들기</strong></label>
+        <span class="kind">실험실</span>
+        <span class="muted note">결과가 들쭉날쭉할 수 있어요.</span>
+        <span class="count mono muted" id="custom-count" aria-live="polite">80자 남음</span>
+      </div>
+      <div class="custom-row">
+        <input class="field" id="custom-input" type="text" maxlength="80" placeholder="예: 고등학교 축제 날 사라진 상장">
+        <button type="submit" class="btn" id="custom-btn" aria-disabled="true"><span class="btn-label"><i data-icon="paper-plane-tilt"></i>사건 생성</span><small class="btn-reason">주제를 입력하세요</small></button>
+      </div>
+    </form>
+  </section>
+
+  <section class="options" aria-label="옵션">
+    <fieldset>
+      <legend>분위기</legend>
+      <div class="seg" role="group" aria-label="분위기">
+        <button type="button" data-set-mood="comic" aria-pressed="false">코믹</button>
+        <button type="button" data-set-mood="normal" aria-pressed="true">보통</button>
+        <button type="button" data-set-mood="serious" aria-pressed="false">진지</button>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>난이도</legend>
+      <div class="seg" role="group" aria-label="난이도" data-opt>
+        <button type="button" aria-pressed="false">쉬움</button>
+        <button type="button" aria-pressed="true">보통</button>
+        <button type="button" aria-pressed="false">어려움</button>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>플레이 시간</legend>
+      <div class="seg" role="group" aria-label="플레이 시간" data-opt>
+        <button type="button" aria-pressed="false">20분</button>
+        <button type="button" aria-pressed="true">40분</button>
+        <button type="button" aria-pressed="false">1시간</button>
+      </div>
+    </fieldset>
+  </section>
+
+  <div class="go">
+    <div class="go-side">
+      <button type="button" class="btn" aria-disabled="true"><span class="btn-label"><i data-icon="floppy-disk"></i>이어하기</span><small class="btn-reason">저장된 사건 없음</small></button>
+      <button type="button" class="btn" aria-disabled="true"><span class="btn-label"><i data-icon="notebook"></i>클리어 이력</span><small class="btn-reason">아직 클리어한 사건 없음</small></button>
+    </div>
+    <div class="go-main-wrap">
+      <a class="btn btn-cta go-main" id="go-main" href="briefing.html"><span class="btn-label"><i data-icon="chat-circle-text"></i>사건 시작</span><small class="btn-reason" id="go-reason" hidden>사건을 고르세요</small></a>
+    </div>
+  </div>
+
+  <footer class="start-foot">
+    <p>자유 입력에는 개인정보를 적지 마세요. 클리어하면 사건 데이터는 삭제됩니다.</p>
+    <p><a href="about.html">정보 · 사진 출처</a> <span>(상단 배경 사진: OiMax, CC BY 2.0)</span></p>
+  </footer>
+</main>
+
+<script src="js/icons.js"></script>
+<script src="js/mock.js"></script>
+<script>
+(function () {
+  var cases = document.querySelectorAll('[data-case]');
+  var go = document.getElementById('go-main'), why = document.getElementById('go-reason');
+  function syncGo() {
+    var any = !!document.querySelector('[data-case][aria-checked="true"]');
+    go.setAttribute('aria-disabled', String(!any)); why.hidden = any;
+    if (any) go.setAttribute('href', 'briefing.html'); else go.removeAttribute('href');
+  }
+  cases.forEach(function (c) { c.addEventListener('click', function () {
+    var was = c.getAttribute('aria-checked') === 'true';
+    cases.forEach(function (o) { o.setAttribute('aria-checked', String(o === c && !was)); });
+    syncGo();
+  }); });
+  go.addEventListener('click', function (e) { if (go.getAttribute('aria-disabled') === 'true') e.preventDefault(); });
+  document.querySelectorAll('[data-opt]').forEach(function (g) {
+    var bs = g.querySelectorAll('button');
+    bs.forEach(function (b) { b.addEventListener('click', function () { bs.forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); }); }); });
+  });
+  var inp = document.getElementById('custom-input'), btn = document.getElementById('custom-btn'), cnt = document.getElementById('custom-count');
+  inp.addEventListener('input', function () {
+    var n = inp.value.length; cnt.textContent = (80 - n) + '자 남음';
+    var on = n > 0; btn.setAttribute('aria-disabled', String(!on)); btn.classList.toggle('btn-cta', on);
+    var r = btn.querySelector('.btn-reason'); if (r) r.hidden = on;
+  });
+  document.getElementById('custom-form').addEventListener('submit', function (e) { e.preventDefault(); });
+})();
+</script>
+</body>
+</html>
