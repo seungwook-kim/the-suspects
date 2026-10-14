@@ -153,6 +153,7 @@ function newView(gameId: string): PlayerView {
     clock: DAY_START,
     actions_left: MAX_ACTIONS,
     player_location: 'loc_lobby',
+    visited_locations: ['loc_lobby'],
     locations: structuredClone(LOCATIONS),
     characters: structuredClone(CHARACTERS),
     evidence: [],
@@ -296,7 +297,8 @@ function addEvidence(g: MockGame, e: PublicEvidence): AgEvent[] {
 async function* runAction(g: MockGame, a: Action): AsyncGenerator<AgEvent> {
   const v = g.view
   yield { type: 'RUN_STARTED', runId: nid('run') }
-  if (v.actions_left <= 0 && a.type !== 'hint') {
+  const freeMove = a.type === 'move' && (v.visited_locations ?? [v.player_location]).includes(a.location_id)
+  if (v.actions_left <= 0 && a.type !== 'hint' && !freeMove) {
     yield* speak('narrator', null, '오늘 쓸 수 있는 행동을 모두 썼다. 하루를 마무리해야 한다.')
     yield { type: 'RUN_FINISHED' }
     return
@@ -310,9 +312,19 @@ async function* runAction(g: MockGame, a: Action): AsyncGenerator<AgEvent> {
         yield* speak('narrator', null, '그곳으로 바로 갈 수는 없다. 이어진 장소로 이동하자.')
         break
       }
+      // 처음 가는 장소만 행동을 쓴다(서버 규칙 actions.move_revisit = 0 과 같다)
+      const visited = v.visited_locations ?? (v.visited_locations = [v.player_location])
+      const first = !visited.includes(loc.id)
       v.player_location = loc.id
       yield delta({ op: 'replace', path: '/player_location', value: loc.id })
-      yield* spend(g, 15)
+      if (first) {
+        visited.push(loc.id)
+        yield delta({ op: 'add', path: '/visited_locations/-', value: loc.id })
+        yield* spend(g, 15)
+      } else if (v.phase === 'briefing') {
+        v.phase = 'day'
+        yield delta({ op: 'replace', path: '/phase', value: 'day' })
+      }
       yield* speak('narrator', null, `${loc.name}에 도착했다. ${loc.description}`)
       const here = v.characters.filter((c) => c.location_id === loc.id)
       if (here.length >= 2) {

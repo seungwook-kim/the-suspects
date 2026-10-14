@@ -197,3 +197,28 @@ async def test_save_and_load_bundle(svc):
     assert len(view.notebook.evidence_ids) == len(before)
     live = svc.store.load_live(game_id)
     assert svc.rag.count_slot(live.slot_id) > 0  # 기억도 같은 묶음으로 복원
+
+
+async def test_move_costs_action_only_on_first_visit(svc):
+    """처음 가는 장소만 행동 1(시간도 흐름), 가 본 장소로 다시 가면 행동·시간이 그대로다."""
+    game_id, view = svc.new_game("demo_db_deleted", {"difficulty": "easy"})
+    start = view.player_location
+    assert view.visited_locations == [start]
+    st = svc.store.load_live(game_id)
+    nxt = next(l.id for l in svc.cases["demo_db_deleted"].locations if l.id in st.unlocked_locations and l.id != start)
+
+    await collect(svc.act(game_id, {"type": "move", "location_id": nxt}))
+    s1 = svc.store.load_live(game_id)
+    assert s1.actions_left == st.actions_left - 1 and s1.clock > st.clock
+    assert set(s1.visited_locations) == {start, nxt}
+
+    evs = await collect(svc.act(game_id, {"type": "move", "location_id": start}))
+    s2 = svc.store.load_live(game_id)
+    assert not errors(evs)
+    assert s2.player_location == start
+    assert (s2.actions_left, s2.clock) == (s1.actions_left, s1.clock)
+
+    # 행동을 다 써도 가 본 곳으로는 갈 수 있다
+    svc.store.save_live(s2.model_copy(update={"actions_left": 0}))
+    evs = await collect(svc.act(game_id, {"type": "move", "location_id": nxt}))
+    assert not errors(evs) and svc.store.load_live(game_id).player_location == nxt

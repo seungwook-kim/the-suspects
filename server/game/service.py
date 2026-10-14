@@ -265,7 +265,7 @@ class GameService:
             )
         inv = self.cfg.investigation
         state = GameState(
-            game_id=game_id, slot_id=slot, case_id=case.case_id, player_location=case.start_location_id,
+            game_id=game_id, slot_id=slot, case_id=case.case_id, player_location=case.start_location_id, visited_locations=[case.start_location_id],
             unlocked_locations=unlocked, npc_states=npc_states, reputation=self.cfg.reputation.start,
             difficulty=difficulty, max_days=act_rules.investigation_days(self.cfg, difficulty),
             actions_left=act_rules.new_day_actions(self.cfg), clock=inv["day_start_minute"], id_salt=new_salt(),
@@ -322,6 +322,8 @@ class GameService:
         cost_kind = {"move": "move", "investigate": "investigate", "ask": "ask", "chip": "ask",
                      "present": "present_evidence", "bluff": "bluff", "warrant": "warrant",
                      "hint": "hint", "apologize": "default"}.get(kind)
+        if kind == "move":
+            cost_kind = act_rules.move_kind(state, action.get("location_id"))
         if cost_kind is None:
             yield eb.run_error(f"모르는 행동입니다: {kind}", code="bad_action")
             yield eb.run_finished()
@@ -379,6 +381,8 @@ class GameService:
         ds = state.director_state
         ds["same_place"] = 0 if loc != state.player_location else ds.get("same_place", 0) + 1
         state.player_location = loc
+        if loc not in state.visited_locations:
+            state.visited_locations.append(loc)
         name = next(l.name for l in case.locations if l.id == loc)
         here = [C.char(case, n).name for n, ns in state.npc_states.items() if ns.visible and ns.location_id == loc]
         self._say(events, eb, "narrator", None, f"{name}(으)로 왔다." + (f" {', '.join(here)}이(가) 있다." if here else ""))

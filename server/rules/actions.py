@@ -8,6 +8,7 @@ from server.schemas import GameState
 # 행동 이름 -> actions.* 설정 키. 숫자는 설정에서만 읽는다.
 _KIND_TO_KEY = {
     "move": "default",
+    "move_revisit": "move_revisit",
     "investigate": "default",
     "ask": "default",
     "present_evidence": "default",
@@ -25,6 +26,16 @@ _KIND_TO_KEY = {
 def action_cost(cfg: GameConfig, kind: str) -> int:
     """행동 종류의 낮 행동 소모량. 모르는 종류는 KeyError."""
     return getattr(cfg.actions, _KIND_TO_KEY[kind])
+
+
+def visited(state: GameState) -> set[str]:
+    """한 번이라도 가 본 장소. 지금 있는 곳은 늘 포함한다(이 기록이 없던 옛 저장본 대비)."""
+    return set(state.visited_locations) | {state.player_location}
+
+
+def move_kind(state: GameState, location_id: str | None) -> str:
+    """이동 행동의 비용 종류. 처음 가는 장소는 move, 가 본 장소는 move_revisit."""
+    return "move_revisit" if location_id in visited(state) else "move"
 
 
 def can_perform(cfg: GameConfig, state: GameState, kind: str) -> tuple[bool, str]:

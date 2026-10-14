@@ -203,7 +203,7 @@ export function Main({ g, theme, onToggleTheme, onFinale, onHome, onAbout }: Pro
             onDropEvidence={present}
           />
         ) : (
-          <PlaceCard state={state} busy={busy} onInvestigate={() => void act({ type: 'investigate', location_id: view.player_location })} onTalk={talk} onMove={move} onChip={chip} />
+          <PlaceCard state={state} busy={busy} onInvestigate={() => void act({ type: 'investigate', location_id: view.player_location })} onTalk={talk} onMove={move} />
         )}
       </main>
 

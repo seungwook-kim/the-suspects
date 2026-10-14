@@ -8,6 +8,21 @@ async function drain(s: ClientState, it: AsyncIterable<AgEvent>): Promise<Client
   return s
 }
 
+describe('목 모드 이동 비용', () => {
+  it('처음 가는 장소만 행동 1, 가 본 장소로 돌아가면 행동·시각이 그대로다', { timeout: 15000 }, async () => {
+    const { game_id, view } = await mockApi.createGame('demo_db_deleted')
+    let s: ClientState = applyEvent(initialClientState, { type: 'STATE_SNAPSHOT', snapshot: view })
+    expect(s.view!.visited_locations).toEqual(['loc_lobby'])
+    s = await drain(s, mockApi.action(game_id, { type: 'move', location_id: 'loc_office' }))
+    const after = { left: s.view!.actions_left, clock: s.view!.clock }
+    expect(after.left).toBe(11)
+    expect(s.view!.visited_locations).toEqual(['loc_lobby', 'loc_office'])
+    s = await drain(s, mockApi.action(game_id, { type: 'move', location_id: 'loc_lobby' }))
+    expect(s.view!.player_location).toBe('loc_lobby')
+    expect({ left: s.view!.actions_left, clock: s.view!.clock }).toEqual(after)
+  })
+})
+
 describe('목 모드 한 판', () => {
   it('조사 -> 질문 -> 증거 제시(모순) -> 밤 -> 최종 추리 -> 결과 카드', { timeout: 30000 }, async () => {
     const { game_id, view } = await mockApi.createGame('demo_db_deleted')

@@ -31,9 +31,8 @@ export function ActionBar({ view, npc, busy, locked, selectedEvidence, onSelectE
   const blocked = busy ? '답을 기다리는 중' : locked ? '등을 돌렸다' : out ? '오늘 행동을 다 썼음' : null
   const askReason = blocked ?? (!text.trim() ? '질문을 입력하세요' : null)
   const bluffReason = blocked ?? (view.bluff_claims.length === 0 ? '쓸 주장이 없음' : null)
-  // 이 사람에게 쓸 추천 질문을 앞에 둔다
-  const chips = [...view.chips].sort((a, b) => Number(b.target_npc === npc.id) - Number(a.target_npc === npc.id))
-  const nameOf = (id: string) => view.characters.find((c) => c.id === id)?.name ?? ''
+  // 추천 질문은 지금 심문 중인 사람 것만 보여 준다(다른 사람 것까지 섞이면 어지럽다)
+  const chips = view.chips.filter((c) => c.target_npc === npc.id)
 
   const submit = () => {
     const t = text.trim()
@@ -52,8 +51,7 @@ export function ActionBar({ view, npc, busy, locked, selectedEvidence, onSelectE
               <button key={c.id} type="button" className="chip" disabled={!!blocked} onClick={() => onChip(c.id, c.target_npc)}>
                 {c.kind === 'present' && <Icon name="paperclip" />}
                 {c.kind === 'bluff' && <Icon name="mask-happy" />}
-                {chipText(c.label, nameOf(c.target_npc))}
-                {c.target_npc !== npc.id && <span className="chip-to">· {nameOf(c.target_npc)}</span>}
+                {chipText(c.label, npc.name)}
               </button>
             ))}
           </div>

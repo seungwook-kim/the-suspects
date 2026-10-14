@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from server.game.masking import IdMasker
+from server.rules.actions import visited as act_visited
 from server.schemas import (
     CaseBible,
     Chip,
@@ -132,6 +133,7 @@ def build_view(
         actions_total=actions_total,
         max_days=state.max_days,
         player_location=state.player_location,
+        visited_locations=sorted(act_visited(state)),
         locations=locations,
         characters=characters,
         evidence=evidence,

@@ -118,6 +118,7 @@ CaseJob = {
 - `GET /api/games/{id}/portraits` → `{pending: boolean, urls: {인물 id: 주소}, emotions: {인물 id: {표정: 주소}}}`. 화면은 빠진 사진이 있으면 3초마다 묻고,
   `pending=false`가 되면(다 그렸거나 그리지 않는 중) 멈춘다(최대 3분). 서버는 그리는 중이 아닌데 빠진 사람이 있으면
   (서버 재시작으로 끊김 등) 그 사람만 한 번 더 그린다(한 판에 최대 2번).
+- `PlayerView.visited_locations: string[]` — 한 번이라도 가 본 장소 id. 처음 가는 장소로의 이동만 행동 1을 쓰고, 여기 있는 곳으로 다시 가면 행동과 시간이 그대로다(F.1 `actions.move_revisit`).
 - `PublicCharacter.portrait_emotions: {표정: 주소} | null` — 같은 얼굴의 표정 사진(그린 것만). 서버는 그 인물의 그 감정이 처음 나올 때 그린다(약 10초).
   화면은 감정에 맞는 표정 사진이 있으면 그것을, 없으면 기본 사진(`portrait_url`)을 쓴다. 행동이 끝날 때마다 사진 상태를 다시 묻는다.
 - 사진에는 감정 효과를 얹지 않는다(PRD §9.4, 2026-10-14 변경). 표정이 바뀌면 180ms 크로스페이드, 이름 옆에 표정 글자 칩.

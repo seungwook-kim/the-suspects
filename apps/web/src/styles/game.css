@@ -60,11 +60,13 @@
 .map .dot.talk:hover circle, .map .dot.active circle { fill: var(--ink); stroke-width: 2; }
 .map .dot.talk:hover .dot-text, .map .dot.active .dot-text { fill: var(--surface); }
 .map .dot-text { font: 700 10px var(--font-body); fill: var(--ink); }
+.map .node-fresh { fill: var(--ink); }
 .map-legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); padding-top: var(--space-3); font-size: var(--text-s); color: var(--muted); }
 .map-legend li { display: inline-flex; align-items: center; gap: var(--space-2); }
 .sw { width: 22px; height: 14px; border-radius: var(--radius-s); border: 1.5px solid var(--line-strong); display: inline-block; background: var(--surface); }
 .sw-here { background: color-mix(in srgb, var(--ink) 10%, var(--surface)); border-width: 3px; }
 .sw-far { border-style: dashed; }
+.sw-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); display: inline-block; margin: 0 7px; }
 .side-drawer .map, .sheet .map { max-height: 56dvh; }
 .sheet .map-section { overflow: auto; }
 

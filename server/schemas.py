@@ -318,6 +318,7 @@ class GameState(BaseModel):
     clock: int = 9 * 60  # game minutes
     player_location: str
     unlocked_locations: list[str] = Field(default_factory=list)
+    visited_locations: list[str] = Field(default_factory=list)  # 한 번이라도 가 본 장소(다시 가는 이동은 행동을 쓰지 않는다)
     npc_states: dict[str, NPCState] = Field(default_factory=dict)
     reputation: int = 0
     reputation_gain_today: int = 0
@@ -500,6 +501,7 @@ class PlayerView(BaseModel):
     actions_total: int = 12  # 하루 전체 행동 수 (상태바 "7/12"의 분모)
     max_days: int = 3
     player_location: str
+    visited_locations: list[str] = Field(default_factory=list)  # 가 본 장소. 처음 가는 곳만 이동에 행동을 쓴다
     locations: list[PublicLocation]
     characters: list[PublicCharacter]
     evidence: list[PublicEvidence]

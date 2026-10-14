@@ -15,7 +15,8 @@ interface Props {
   onTalk: (npcId: string) => void
 }
 
-/** 지도: 장소 칸과 이어진 길. 현재 위치는 굵은 잉크 테두리, 지금 갈 수 있는 곳은 실선, 거쳐야 하는 곳은 점선(색 없이 모양으로 구별). */
+/** 지도: 장소 칸과 이어진 길. 현재 위치는 굵은 잉크 테두리, 지금 갈 수 있는 곳은 실선, 거쳐야 하는 곳은 점선(색 없이 모양으로 구별).
+ * 아직 안 가 본 곳은 오른쪽 위 작은 점: 처음 갈 때만 행동을 쓴다. */
 export function MapPanel({ view, interrogeeId, locked, onMove, onTalk }: Props) {
   const ids = view.locations.map((l) => l.id)
   const edges = useMemo(() => {
@@ -30,6 +31,7 @@ export function MapPanel({ view, interrogeeId, locked, onMove, onTalk }: Props) 
     [ids.join('|'), edges],
   )
   const here = view.locations.find((l) => l.id === view.player_location)
+  const visited = new Set(view.visited_locations ?? [view.player_location])
   const reachable = new Set<string>(here?.connections ?? [])
   for (const l of view.locations) if (l.connections.includes(view.player_location)) reachable.add(l.id)
 
@@ -48,6 +50,7 @@ export function MapPanel({ view, interrogeeId, locked, onMove, onTalk }: Props) 
           if (!p) return null
           const isHere = l.id === view.player_location
           const can = reachable.has(l.id)
+          const fresh = !visited.has(l.id)
           const people = view.characters.filter((c) => c.location_id === l.id)
           return (
             <g
@@ -62,12 +65,13 @@ export function MapPanel({ view, interrogeeId, locked, onMove, onTalk }: Props) 
                 onClick={() => !locked && can && onMove(l.id)}
                 tabIndex={can && !locked ? 0 : -1}
                 role="button"
-                aria-label={`${l.name}${isHere ? ' (현재 위치)' : can ? ', 이동' : ', 다른 장소를 거쳐야 함'}`}
+                aria-label={`${l.name}${isHere ? ' (현재 위치)' : can ? (fresh ? ', 이동 (처음 가는 곳, 행동 1)' : ', 이동 (가 본 곳, 행동 없음)') : ', 다른 장소를 거쳐야 함'}`}
                 onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && !locked && can && onMove(l.id)}
               />
               <text x={NW / 2} y={19} textAnchor="middle" className="node-name" pointerEvents="none">
                 {l.name}
               </text>
+              {fresh && <circle cx={NW - 9} cy={9} r={3.5} className="node-fresh" pointerEvents="none" />}
               {people.map((c, i) => {
                 const x = NW / 2 - ((people.length - 1) * 21) / 2 + i * 21
                 const talkable = isHere && !locked
@@ -99,6 +103,7 @@ export function MapPanel({ view, interrogeeId, locked, onMove, onTalk }: Props) 
         <li><span className="sw sw-here" />현재 위치</li>
         <li><span className="sw sw-can" />지금 갈 수 있음</li>
         <li><span className="sw sw-far" />거쳐야 함</li>
+        <li><span className="sw-dot" />처음 가는 곳(행동 1, 다시 가면 무료)</li>
       </ul>
     </div>
   )

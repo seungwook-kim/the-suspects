@@ -92,6 +92,8 @@ export interface PlayerView {
   clock: number
   actions_left: number
   player_location: string
+  /** 한 번이라도 가 본 장소. 처음 가는 곳만 이동에 행동을 쓴다 */
+  visited_locations?: string[]
   locations: PublicLocation[]
   characters: PublicCharacter[]
   evidence: PublicEvidence[]

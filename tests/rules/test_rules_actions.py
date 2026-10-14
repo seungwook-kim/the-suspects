@@ -5,7 +5,7 @@ from server.rules import actions
 
 @pytest.mark.parametrize(
     "kind,cost",
-    [("move", 1), ("ask", 1), ("bluff", 1), ("warrant", 2), ("confrontation", 3), ("report", 1), ("stakeout", 0), ("hint", 0)],
+    [("move", 1), ("move_revisit", 0), ("ask", 1), ("bluff", 1), ("warrant", 2), ("confrontation", 3), ("report", 1), ("stakeout", 0), ("hint", 0)],
 )
 def test_costs(cfg, kind, cost):
     assert actions.action_cost(cfg, kind) == cost
@@ -55,3 +55,13 @@ def test_confrontation_and_stakeout_limits(cfg, state):
 def test_days(cfg):
     assert actions.investigation_days(cfg, "hard") == 2
     assert actions.new_day_actions(cfg) == 12
+
+
+def test_move_costs_only_first_visit(cfg, state):
+    s = state.model_copy(update={"player_location": "a", "visited_locations": ["a", "b"]})
+    assert actions.move_kind(s, "c") == "move"
+    assert actions.move_kind(s, "b") == "move_revisit"
+    assert actions.move_kind(s.model_copy(update={"visited_locations": []}), "a") == "move_revisit"  # 지금 있는 곳은 가 본 곳
+    free = actions.spend(cfg, s.model_copy(update={"actions_left": 0}), "move_revisit")
+    assert free.actions_left == 0 and free.action_no == s.action_no
+

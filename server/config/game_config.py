@@ -34,6 +34,7 @@ class ActionsCfg(_Base):
     report: int
     stakeout: int
     hint: int
+    move_revisit: int = 0  # 이미 가 본 장소로 다시 가는 이동
 
 
 class RumorThreshold(_Base):

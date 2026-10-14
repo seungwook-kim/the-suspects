@@ -3,7 +3,6 @@ import type { PlayerView } from '../api/types'
 import { Portrait } from '../character/Portrait'
 import type { ClientState, DialogueLine } from '../state/reducer'
 import { useTypewriter } from './DialogueBox'
-import { chipText } from '../util/format'
 import { Icon } from './Icon'
 
 const ROLE_LABEL: Record<string, string> = { narrator: '내레이션', partner: '파트너', chief: '반장', npc: '' }
@@ -14,18 +13,17 @@ interface Props {
   onInvestigate: () => void
   onTalk: (npcId: string) => void
   onMove: (locationId: string) => void
-  onChip: (chipId: string, npcId: string) => void
 }
 
-/** 수사 화면 가운데: 지금 있는 장소 카드(설명·현장 조사·이곳의 사람·추천 질문·단톡방) */
-export function PlaceCard({ state, busy, onInvestigate, onTalk, onMove, onChip }: Props) {
+/** 수사 화면 가운데: 지금 있는 장소 카드(설명·현장 조사·이곳의 사람·단톡방). 추천 질문은 그 사람을 심문할 때 행동바에 나온다 */
+export function PlaceCard({ state, busy, onInvestigate, onTalk, onMove }: Props) {
   const view = state.view!
   const loc = view.locations.find((l) => l.id === view.player_location)
   const here = view.characters.filter((c) => c.location_id === view.player_location)
   const reachable = view.locations.filter((l) => l.id !== view.player_location && (loc?.connections.includes(l.id) || l.connections.includes(view.player_location)))
   const line = state.dialogue && state.dialogue.role !== 'npc' ? state.dialogue : null
   const out = view.actions_left <= 0
-  const nameOf = (id: string) => view.characters.find((c) => c.id === id)?.name ?? ''
+  const visited = new Set(view.visited_locations ?? [view.player_location])
 
   return (
     <section className="paper place-card has-tab" aria-labelledby="place-name">
@@ -79,26 +77,9 @@ export function PlaceCard({ state, busy, onInvestigate, onTalk, onMove, onChip }
           <ul className="chip-row">
             {reachable.map((l) => (
               <li key={l.id}>
-                <button type="button" className="chip" disabled={busy} onClick={() => onMove(l.id)}>
+                <button type="button" className="chip" disabled={busy || (out && !visited.has(l.id))} onClick={() => onMove(l.id)}>
                   <Icon name="map-trifold" />{l.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {view.chips.length > 0 && (
-        <div className="pc-block">
-          <h3 className="section-title">추천 질문</h3>
-          <ul className="chip-row">
-            {view.chips.map((c) => (
-              <li key={c.id}>
-                <button type="button" className="chip" disabled={busy || out} onClick={() => onChip(c.id, c.target_npc)}>
-                  {c.kind === 'present' && <Icon name="paperclip" />}
-                  {c.kind === 'bluff' && <Icon name="mask-happy" />}
-                  {chipText(c.label, nameOf(c.target_npc))}
-                  <span className="chip-to">· {nameOf(c.target_npc)}</span>
+                  {!visited.has(l.id) && <span className="chip-to">· 처음 · 행동 1</span>}
                 </button>
               </li>
             ))}

@@ -121,6 +121,7 @@ actions:
   report: 1
   stakeout: 0
   hint: 0
+  move_revisit: 0   # 이미 가 본 장소로 다시 가는 이동. 처음 가는 곳만 행동을 쓴다(사용자 결정 2026-10-14)
 
 # F.2 형사 평판
 reputation:
