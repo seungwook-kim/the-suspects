@@ -15,6 +15,7 @@ API 키 대신, 이 PC에 설치·로그인된 AI 명령줄 도구를 모델처�
 
 - 사용자 메시지는 표준 입력으로 넘긴다 (명령줄 길이·따옴표 문제 회피).
 - 자리표시: {model} {effort} {system} {system_file} {schema}
+- env: 이번 호출에만 더할 환경 변수(예: 역할의 생각 끄기, client.py의 thinking 설정).
 - 출력이 JSON이면 structured_output(객체) → result(텍스트) 순으로 답을 찾고, 아니면 출력 전체를 답으로 본다.
 """
 
@@ -22,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -33,12 +35,14 @@ class CLIError(RuntimeError):
     pass
 
 
-def _run(args: list[str], stdin: str, cwd: Path, timeout_s: float) -> subprocess.CompletedProcess:
-    return subprocess.run(args, input=stdin.encode("utf-8"), capture_output=True, cwd=cwd, timeout=timeout_s)
+def _run(args: list[str], stdin: str, cwd: Path, timeout_s: float,
+         env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(args, input=stdin.encode("utf-8"), capture_output=True, cwd=cwd, timeout=timeout_s,
+                          env={**os.environ, **env} if env else None)
 
 
 async def call_cli(cli_cfg: dict, *, model: str, effort: str | None, system: str, user: str,
-                   schema: dict, timeout_s: float | None = None) -> tuple[str, int, int]:
+                   schema: dict, timeout_s: float | None = None, env: dict[str, str] | None = None) -> tuple[str, int, int]:
     """(답 텍스트, 입력 토큰, 출력 토큰). timeout_s는 역할별 값(긴 글을 쓰는 사건 작가 등)이 있으면 그것을 쓴다."""
     cwd = Path(cli_cfg.get("cwd") or "var/cli_workdir")
     if not cwd.is_absolute():
@@ -52,7 +56,8 @@ async def call_cli(cli_cfg: dict, *, model: str, effort: str | None, system: str
                   "schema": json.dumps(schema, ensure_ascii=False)}
         args = [str(a).format(**values) for a in cli_cfg["command"]]
         # 서브프로세스는 스레드에서: 이벤트 루프 종류(Windows Selector/Proactor)와 무관하게 동작
-        proc = await asyncio.to_thread(_run, args, user, cwd, float(timeout_s or cli_cfg.get("timeout_s", 90)))
+        proc = await asyncio.to_thread(_run, args, user, cwd, float(timeout_s or cli_cfg.get("timeout_s", 90)),
+                                       {str(k): str(v) for k, v in (env or {}).items()})
     finally:
         Path(system_file).unlink(missing_ok=True)
     out = proc.stdout.decode("utf-8", errors="replace").strip()

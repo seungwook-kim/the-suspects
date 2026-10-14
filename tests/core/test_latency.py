@@ -60,6 +60,7 @@ async def test_replay_resends_recorded_prompts_with_current_client():
     rows = await replay(LLMClient(api_key=""), recs, roles=("npc", "router", "night"), limit=10)
     assert [r["role"] for r in rows] == ["npc", "router"]
     assert rows[0]["before_s"] == 5.0 and rows[0]["out_before"] == 300 and not rows[0]["fallback"]
+    assert rows[0]["text"]  # 다시 받은 답 글도 남긴다(속도와 함께 품질을 보려고)
     assert "| npc | 5.0초 |" in render_replay(rows)
 
 

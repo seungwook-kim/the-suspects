@@ -74,3 +74,19 @@ def test_chat_model_passes_extra_body_role_over_profile(monkeypatch):
     cfg["profiles"]["alt"]["roles"]["npc"]["extra_body"] = {"b": 2}
     assert LLMClient(models_config=cfg, profile="alt")._chat_model("npc").extra_body == {"a": 1, "b": 2}
 
+
+
+def test_thinking_off_uses_profile_method_only_for_that_role(monkeypatch):
+    monkeypatch.setenv("TEST_ALT_LLM_KEY", "k-alt")
+    cfg = _api_cfg(send_effort=False, thinking_off={"extra_body": {"t": "off"}, "env": {"X": "0"}})
+    cfg["profiles"]["alt"]["roles"]["router"] = {"model": "m2", "thinking": "off"}
+    c = LLMClient(models_config=cfg, profile="alt")
+    assert c._chat_model("router").extra_body == {"t": "off"}
+    assert not c._chat_model("npc").extra_body  # 생각을 끄지 않은 역할은 그대로
+    assert c._thinking_off(c.role_config("router")) == {"extra_body": {"t": "off"}, "env": {"X": "0"}}
+    cfg["profiles"]["alt"]["roles"]["router"]["thinking"] = False  # YAML의 off는 False로 읽힌다
+    assert LLMClient(models_config=cfg, profile="alt")._chat_model("router").extra_body == {"t": "off"}
+    plain = _api_cfg()
+    plain["profiles"]["alt"]["roles"]["npc"]["thinking"] = "off"  # 끄는 방법이 없는 프로필은 바꾸지 않음
+    assert LLMClient(models_config=plain, profile="alt")._thinking_off(
+        LLMClient(models_config=plain, profile="alt").role_config("npc")) == {}

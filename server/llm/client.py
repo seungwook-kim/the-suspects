@@ -10,6 +10,11 @@ API 키가 없으면 가짜 LLM 모드: 호출자가 넘긴 fake 함수의 결�
 키는 기본으로 OPENROUTER_API_KEY에서 읽는다. 다른 OpenAI 호환 주소를 쓰는 프로필은 base_url과 함께
 api_key_env(키를 담은 환경 변수 이름)를 적는다. 그 주소가 OpenRouter식 추론 설정을 모르면 send_effort: false.
 주소마다 다른 추가 요청 값은 프로필·역할의 extra_body에 적으면 그대로 보낸다(역할 값이 우선).
+
+생각(추론) 끄기: 역할에 `thinking: off`를 적으면, 그 프로필의 `thinking_off`에 적힌 방법으로 끈다.
+  API 프로필은 thinking_off.extra_body(요청에 더할 값), 명령줄 프로필은 thinking_off.env(환경 변수).
+  어떤 값이 그 연결에서 생각을 끄는지는 공급자마다 달라서 커밋하지 않는 로컬 설정에만 적는다.
+  프로필에 thinking_off가 없으면 아무것도 바꾸지 않는다(모델 기본값).
 가짜 모드에서도 같은 검증·추적 경로를 통과하므로 키 없이 한 판을 끝까지 돌릴 수 있다.
 """
 
@@ -102,7 +107,8 @@ class LLMClient:
 
         rc = self.role_config(role)
         prof = self.cfg["profiles"][rc["_profile"]]
-        extra_body: dict[str, Any] = {**(prof.get("extra_body") or {}), **(rc.get("extra_body") or {})}
+        extra_body: dict[str, Any] = {**(prof.get("extra_body") or {}), **self._thinking_off(rc).get("extra_body", {}),
+                                      **(rc.get("extra_body") or {})}
         if rc.get("effort") and prof.get("send_effort", True):
             extra_body["reasoning"] = {"effort": rc["effort"]}  # OpenRouter 통합 추론 설정
         model = ChatOpenAI(
@@ -116,6 +122,12 @@ class LLMClient:
         )
         self._models[role] = model
         return model
+
+    def _thinking_off(self, rc: dict) -> dict:
+        """역할이 생각을 끄면 그 프로필의 끄는 방법({extra_body?, env?}), 아니면 빈 dict."""
+        if str(rc.get("thinking", "")).lower() not in ("off", "false"):
+            return {}
+        return dict(self.cfg["profiles"][rc["_profile"]].get("thinking_off") or {})
 
     # ------------------------------------------------------------------ main API
     async def structured(
@@ -193,7 +205,8 @@ class LLMClient:
             rc = self.role_config(role)
             text, it, ot = await call_cli(self.cfg["profiles"][self.profile]["cli"], model=rc["model"],
                                           effort=rc.get("effort"), system=sys, user=msg,
-                                          schema=schema.model_json_schema(), timeout_s=rc.get("timeout_s"))
+                                          schema=schema.model_json_schema(), timeout_s=rc.get("timeout_s"),
+                                          env=self._thinking_off(rc).get("env"))
             m = _JSON_RE.search(text)
             if not m:
                 raise ValueError("JSON 객체가 없습니다")

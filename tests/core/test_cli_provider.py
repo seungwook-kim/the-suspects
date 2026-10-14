@@ -80,3 +80,17 @@ def test_placeholder_model_stays_fake(tmp_path):
     cfg["profiles"]["dev"]["roles"]["npc"]["model"] = "<cheap-fast-model>"
     assert LLMClient(models_config=cfg, api_key="").fake_mode is True
     assert json.dumps(cfg)  # 설정 자체는 직렬화 가능
+
+
+async def test_thinking_off_env_reaches_the_tool(tmp_path):
+    cfg = _cfg(tmp_path, """
+        import json, os, sys
+        sys.stdin.buffer.read()
+        print(json.dumps({"structured_output": {"text": os.environ.get("TEST_THINK_OFF", "없음"), "emotion": "calm"}}))
+    """)
+    cfg["profiles"]["dev"]["thinking_off"] = {"env": {"TEST_THINK_OFF": "0"}}
+    plain, _ = await _ask(LLMClient(tracer=Tracer(), models_config=cfg, api_key=""))
+    assert plain.text == "없음"  # 역할이 생각을 끄지 않으면 환경 변수도 그대로
+    cfg["profiles"]["dev"]["roles"]["npc"]["thinking"] = "off"
+    off, _ = await _ask(LLMClient(tracer=Tracer(), models_config=cfg, api_key=""))
+    assert off.text == "0"

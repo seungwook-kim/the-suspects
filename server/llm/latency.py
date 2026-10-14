@@ -15,6 +15,7 @@
 
   uv run python -m server.llm.latency --since "2026-10-14 13:40" --until "2026-10-14 13:58"
   uv run python -m server.llm.latency --replay 4 --roles npc     # 최근 인물 답 요청 4개 다시 보내기
+  uv run python -m server.llm.latency --replay 4 --roles npc --thinking off   # 같은 요청을 생각 끄고
   uv run python -m server.llm.latency --speculative 2            # 칩 답 미리 만들기 효과 (A·B·C 방식 2번씩)
 """
 
@@ -175,7 +176,7 @@ def split_prompt(prompt: str) -> tuple[str, str]:
 
 async def replay(client: Any, records: list[dict], *, roles: Iterable[str] = ANSWER_ROLES, limit: int = 4) -> list[dict]:
     """기록된 요청 중 roles에 해당하는 최근 limit개를 지금 모델 설정으로 하나씩 다시 보낸다.
-    결과: {role, before_s(기록된 지연), after_s, out_before, out_after, fallback}."""
+    결과: {role, before_s(기록된 지연), after_s, out_before, out_after, fallback, text(다시 받은 답)}."""
     roles = tuple(roles)
     picked = [r for r in records if r.get("role") in roles and r.get("prompt") and _schema_for(r["role"])][-limit:]
     out = []
@@ -183,12 +184,13 @@ async def replay(client: Any, records: list[dict], *, roles: Iterable[str] = ANS
         schema = _schema_for(r["role"])
         system, user = split_prompt(r["prompt"])
         t0 = time.perf_counter()
-        _, fb = await client.structured(role=r["role"], bucket=r.get("bucket", "npc"), schema=schema, system=system,
+        res, fb = await client.structured(role=r["role"], bucket=r.get("bucket", "npc"), schema=schema, system=system,
                                         user=user, fake=lambda s=schema: _fake(s), fallback=lambda s=schema: _fake(s),
                                         node="latency_replay")
         rec = client.tracer.records[-1]
         out.append({"role": r["role"], "before_s": r["latency_s"], "after_s": time.perf_counter() - t0,
-                    "out_before": r.get("output_tokens", 0), "out_after": rec.output_tokens, "fallback": fb})
+                    "out_before": r.get("output_tokens", 0), "out_after": rec.output_tokens, "fallback": fb,
+                    "text": getattr(res, "text", "")})
     return out
 
 
@@ -203,10 +205,11 @@ def _fake(schema: type[BaseModel]) -> BaseModel:
 
 
 def render_replay(rows: list[dict]) -> str:
-    lines = ["| 역할 | 기록 | 다시 보냄 | 출력 토큰(기록→다시) | 대체 동작 |", "|:--|--:|--:|--:|:--|"]
+    lines = ["| 역할 | 기록 | 다시 보냄 | 출력 토큰(기록→다시) | 대체 동작 | 다시 받은 답 |", "|:--|--:|--:|--:|:--|:--|"]
     for r in rows:
+        text = (r.get("text") or "").replace("|", "/").replace("\n", " ")
         lines.append(f"| {r['role']} | {r['before_s']:.1f}초 | {r['after_s']:.1f}초 | "
-                     f"{r['out_before']}→{r['out_after']} | {'예' if r['fallback'] else ''} |")
+                     f"{r['out_before']}→{r['out_after']} | {'예' if r['fallback'] else ''} | {text} |")
     return "\n".join(lines) + "\n"
 
 
@@ -256,6 +259,8 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--until", help='"YYYY-MM-DD HH:MM" (로컬 시각)')
     ap.add_argument("--replay", type=int, default=0, help="다시 보낼 요청 수 (0이면 요약만). 진짜 모델 사용량이 든다")
     ap.add_argument("--roles", default=",".join(ANSWER_ROLES), help="다시 보낼 역할(쉼표로 구분)")
+    ap.add_argument("--thinking", choices=("default", "off"), default="default",
+                    help="다시 보낼 때 그 역할들의 생각(추론)을 끈다(프로필의 thinking_off 방법)")
     ap.add_argument("--speculative", type=int, default=0,
                     help="칩 답 미리 만들기 효과를 N번씩 잰다(임시 폴더의 새 판, 그림 끔). 진짜 모델 사용량이 든다")
     ap.add_argument("--read", type=float, default=8.0, help="--speculative C 방식의 읽는 시간(초)")
@@ -274,6 +279,10 @@ def main(argv: list[str] | None = None) -> None:
 
         load_dotenv()
         client = LLMClient(tracer=Tracer())  # 다시 보낸 호출은 var/traces.jsonl에 섞지 않는다
+        if args.thinking == "off":
+            for role in args.roles.split(","):
+                prof = client.cfg["profiles"].setdefault(client.profile, {})
+                prof.setdefault("roles", {}).setdefault(role, dict(client.role_config(role)))["thinking"] = "off"
         print(f"다시 보내기: 프로필 {client.profile}, 방식 {client.provider}" + (" (가짜 LLM)" if client.fake_mode else ""))
         rows = asyncio.run(replay(client, records, roles=args.roles.split(","), limit=args.replay))
         print(render_replay(rows))
