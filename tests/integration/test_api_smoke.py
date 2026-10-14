@@ -59,3 +59,14 @@ def test_bad_action_does_not_break_stream(client):
     evs = sse_events(client.post(f"/api/games/{game_id}/actions", json={"type": "teleport"}))
     assert evs[-1]["type"] == "RUN_FINISHED"
     assert client.get("/api/games/g_missing").status_code == 404
+
+
+def test_prepare_endpoint(client):
+    game_id = client.post("/api/games", json={"theme_id": "demo_db_deleted"}).json()["game_id"]
+    view = client.get(f"/api/games/{game_id}").json()
+    chip = next(c for c in view["chips"] if c["kind"] == "ask")
+    r = client.post(f"/api/games/{game_id}/prepare", json={"npc_id": chip["target_npc"]})
+    assert r.status_code == 200 and r.json()["prepared"] >= 1
+    assert client.post("/api/games/nope/prepare", json={"npc_id": "x"}).status_code == 404
+    evs = sse_events(client.post(f"/api/games/{game_id}/actions", json={"type": "chip", "chip_id": chip["id"]}))
+    assert evs[-1]["type"] == "RUN_FINISHED" and not [e for e in evs if e["type"] == "RUN_ERROR"]

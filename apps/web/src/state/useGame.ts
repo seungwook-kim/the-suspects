@@ -112,6 +112,13 @@ export function useGame() {
     dispatch({ kind: 'set_view', view })
   }, [])
 
+  // 심문 중인 인물의 추천 질문 답을 서버가 미리 만들게 알린다(PRD §14.1 추측 생성). 실패해도 게임은 그대로.
+  const prepare = useCallback((npcId: string) => {
+    const id = gameIdRef.current
+    if (!id || busyRef.current) return
+    api.prepare(id, npcId).catch(() => {})
+  }, [])
+
   const act = useCallback(
     (action: Action) => {
       const id = gameIdRef.current
@@ -207,7 +214,7 @@ export function useGame() {
     dispatch({ kind: 'reset' })
   }, [])
 
-  return { state, dispatch, startGame, act, endDay, finaleStep, save, load, openGame, fetchSources, clearGame, resetAll, resync, adoptGame, gameIdRef, portraitsPending }
+  return { state, dispatch, startGame, act, prepare, endDay, finaleStep, save, load, openGame, fetchSources, clearGame, resetAll, resync, adoptGame, gameIdRef, portraitsPending }
 }
 
 export type GameApi = ReturnType<typeof useGame>

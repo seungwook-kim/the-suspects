@@ -16,6 +16,7 @@
 | GET | `/api/games/{game_id}` | — | `PlayerView` |
 | GET | `/api/games/{game_id}/saves` | — | 세이브 슬롯 목록 `[{slot_id, name, kind, saved_at}]` |
 | POST | `/api/games/{game_id}/actions` | `Action` (아래) | SSE 이벤트 스트림 |
+| POST | `/api/games/{game_id}/prepare` | `{npc_id: string}` | `{prepared: number}` 심문 중인 인물의 질문 칩 답을 서버가 미리 만들기 시작한다(기다리지 않고 바로 응답). 화면은 심문을 시작할 때와 행동이 끝날 때마다 부른다. 실패해도 게임에는 영향 없음 (PRD §14.1 추측 생성) |
 | POST | `/api/games/{game_id}/night` | — | SSE 이벤트 스트림 (하루 끝내기: 밤 시뮬레이션 진행 → 아침) |
 | POST | `/api/games/{game_id}/save` | `{slot_name?: string}` | `{slot_id, saved_at}` |
 | POST | `/api/games/{game_id}/load` | `{slot_id}` | `PlayerView` |

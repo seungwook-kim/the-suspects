@@ -634,6 +634,9 @@ export const mockApi: Api = {
   async portraits() {
     return { pending: false, urls: {}, emotions: {} } // 목 모드는 AI 사진 없이 절차적 SVG
   },
+  async prepare() {
+    return { prepared: 0 } // 목은 답을 바로 만들므로 미리 만들 것이 없다
+  },
   async getGame(id) {
     let g = games.get(id)
     if (!g) {

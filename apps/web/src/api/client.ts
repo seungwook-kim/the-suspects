@@ -26,6 +26,8 @@ export interface Api {
   sources(gameId: string, statementId: string): Promise<SourceItem[]>
   getGame(gameId: string): Promise<PlayerView>
   portraits(gameId: string): Promise<PortraitStatus>
+  /** 심문 중인 인물의 추천 질문 답을 서버가 미리 만들게 알린다(기다리지 않음). */
+  prepare(gameId: string, npcId: string): Promise<{ prepared: number }>
   action(gameId: string, action: Action): AsyncIterable<AgEvent>
   night(gameId: string): AsyncIterable<AgEvent>
   finale(gameId: string, step: FinaleStep): AsyncIterable<AgEvent>
@@ -87,6 +89,7 @@ export const httpApi: Api = {
   sources: (id, st) => fetch(`${BASE}/games/${id}/sources/${encodeURIComponent(st)}`).then((r) => json<SourceItem[]>(r)),
   getGame: (id) => fetch(`${BASE}/games/${id}`).then((r) => json<PlayerView>(r)),
   portraits: (id) => fetch(`${BASE}/games/${id}/portraits`).then((r) => json<PortraitStatus>(r)),
+  prepare: async (id, npcId) => json(await post(`/games/${id}/prepare`, { npc_id: npcId })),
   action: (id, action) => stream(`/games/${id}/actions`, action),
   night: (id) => stream(`/games/${id}/night`),
   finale: (id, step) => stream(`/games/${id}/finale`, step),

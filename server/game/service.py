@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -26,12 +27,13 @@ from server.game.masking import IdMasker, new_salt
 from server.game.night_deps import build_night_deps
 from server.game.portrait_library import PortraitLibrary
 from server.game.portraits import PortraitStore
+from server.game.speculative import Speculator, TaggedLLM, state_key
 from server.game.view import build_view
 from server.graphs.night import run_night
-from server.graphs.turn import TurnDeps, run_turn
+from server.graphs.turn import PreparedAnswer, TurnDeps, prepare_answer, run_turn
 from server.llm.client import LLMClient
 from server.llm.images import ImageClient
-from server.llm.tracing import Tracer
+from server.llm.tracing import CallRecord, Tracer
 from server.rag.embedding import CachedEmbedding, HashEmbedding
 from server.rag.indexer import index_case
 from server.rag.relations import RelationGraph
@@ -45,6 +47,7 @@ from server.rules import gm_rules
 from server.rules import grade as grade_rules
 from server.rules import offtopic as off_rules
 from server.rules import reputation as rep_rules
+from server.rules import speculative as spec_rules
 from server.rules import sufficiency as suff_rules
 from server.rules import trust as trust_rules
 from server.rules import warrant as war_rules
@@ -108,6 +111,7 @@ class GameService:
         for case in self.cases.values():
             self._index_template(case)
         self.jobs: dict[str, dict] = {}  # 사건 생성 작업 (메모리, 서버 재시작 시 사라짐)
+        self.spec = Speculator()  # 추천 질문 답 미리 만들기 (메모리, 서버 재시작 시 사라짐)
         self.portraits = PortraitStore(data / "portraits", ImageClient(tracer=self.llm.tracer),
                                        library=None if in_memory else PortraitLibrary(data / "portrait_library"))
 
@@ -308,6 +312,7 @@ class GameService:
     # ================================================================= 행동
     async def act(self, game_id: str, action: dict) -> AsyncIterator[dict]:
         case, state, masker = self._load(game_id)
+        key = state_key(state)  # 행동 전 상태 (미리 만든 칩 답이 이 상태용인지 가른다)
         eb = EventBuilder()
         yield eb.run_started()
         before = self._view(case, state, masker)
@@ -334,8 +339,8 @@ class GameService:
             yield eb.run_error(msg, code=reason)
             yield eb.run_finished()
             return
-        _absorb(state, act_rules.spend(self.cfg, state, cost_kind))
-        state.clock += self.cfg.investigation["minutes_per_action"] * act_rules.action_cost(self.cfg, cost_kind)
+        prepared = await self._take_prepared(game_id, key, state, action) if kind == "chip" else None
+        self._spend(state, cost_kind)
         ds = state.director_state
         ds["actions_since_clue"] = ds.get("actions_since_clue", 0) + 1
         ds["actions_since_event"] = ds.get("actions_since_event", 10**6) + 1
@@ -346,7 +351,7 @@ class GameService:
             elif kind == "investigate":
                 self._do_investigate(case, state, masker, events, eb)
             elif kind in ("ask", "chip"):
-                await self._do_ask(case, state, masker, action, events, eb)
+                await self._do_ask(case, state, masker, action, events, eb, prepared=prepared)
             elif kind == "present":
                 await self._do_present(case, state, masker, action, events, eb)
             elif kind == "bluff":
@@ -364,6 +369,8 @@ class GameService:
         state.events_log.append({"type": "action", "day": state.day, "clock": state.clock, "kind": kind,
                                  "npc": action.get("npc_id")})
         after = self._view(case, state, masker)
+        self.spec.close(game_id)  # 행동을 했으니 이전 상태용 준비분은 끝. 화면이 새 상태로 다시 부른다
+        self._record_speculation(state)
         self.store.save_live(state)
         for ev in events:
             yield ev
@@ -372,6 +379,59 @@ class GameService:
             yield delta
         yield eb.custom("chips", {"chips": [c.model_dump() for c in after.chips]})
         yield eb.run_finished()
+
+    def _spend(self, state: GameState, cost_kind: str) -> None:
+        """행동 소모와 게임 속 시간 흐름 (실제 행동과 칩 답 미리 만들기가 같은 계산을 쓴다)."""
+        _absorb(state, act_rules.spend(self.cfg, state, cost_kind))
+        state.clock += self.cfg.investigation["minutes_per_action"] * act_rules.action_cost(self.cfg, cost_kind)
+
+    # ----------------------------------------------------------------- 추천 질문 답 미리 만들기 (PRD §14.1, 부록 F.15)
+    async def prepare(self, game_id: str, npc_id: str) -> dict:
+        """플레이어가 이 인물을 심문하는 중이다(화면이 알림). 이 인물의 질문 칩 답을 백그라운드로 미리 만든다.
+        게임 상태는 바꾸지 않는다. {"prepared": 새로 시작한 수}."""
+        case, state, masker = self._load(game_id)
+        stats = spec_rules.SpeculativeStats.model_validate(state.director_state.get("speculative") or {})
+        ns = state.npc_states.get(npc_id or "")
+        if (state.phase not in ("day", "briefing") or not spec_rules.is_enabled(self.cfg, stats)
+                or not ns or not ns.visible or ns.location_id != state.player_location
+                or (ns.turned_away_until is not None and state.action_no < ns.turned_away_until)
+                or not act_rules.can_perform(self.cfg, state, "ask")[0]):
+            return {"prepared": 0}
+        self._chips(case, state, masker)  # 칩 id는 상태로 정해진다 (행동할 때 다시 만들어도 같다)
+        picks = [(cid, d["text"]) for cid, d in state.director_state["chips"].items()
+                 if d["kind"] == "ask" and d["npc"] == npc_id][: self.cfg.speed.speculative_chip_count]
+        jobs = {cid: (lambda q=q: self._speculate(case, state, npc_id, q)) for cid, q in picks}
+        return {"prepared": self.spec.start(game_id, state_key(state), npc_id, jobs)}
+
+    async def _speculate(self, case: CaseBible, base: GameState, npc_id: str, text: str) -> PreparedAnswer:
+        st = base.model_copy(deep=True)  # 복사본에만 행동을 써서 그 시각의 사건 정보로 답하게 한다
+        if st.phase == "briefing":
+            st.phase = "day"
+        self._spend(st, "ask")
+        return await prepare_answer(case, st, npc_id, text, self._turn_deps(case, st, llm=TaggedLLM(self.llm)))
+
+    async def _take_prepared(self, game_id: str, key: tuple, state: GameState, action: dict) -> PreparedAnswer | None:
+        """누른 칩의 미리 만든 답. 아직 만드는 중이면 끝날 때까지 기다린다. 기다린 시간을 호출 기록에 남긴다."""
+        t0 = time.perf_counter()
+        prepared = await self.spec.take(game_id, key, action.get("chip_id") or "")
+        if prepared is not None:
+            self.llm.tracer.record(CallRecord(
+                ts=time.time(), role=prepared.role, bucket="npc", model="prepared", latency_s=time.perf_counter() - t0,
+                game_id=state.game_id, node="npc_prepared"))
+        return prepared
+
+    def _record_speculation(self, state: GameState) -> None:
+        """끝난 준비분의 (미리 만든 수, 쓴 수)를 이 판의 적중률 기록에 옮긴다. 낮으면 그 판에서 끈다(F.15)."""
+        shows = self.spec.drain(state.game_id)
+        if not shows:
+            return
+        stats = spec_rules.SpeculativeStats.model_validate(state.director_state.get("speculative") or {})
+        for prepared, used in shows:
+            stats = spec_rules.record_show(self.cfg, stats, prepared, used)
+            self.llm.tracer.record(CallRecord(
+                ts=time.time(), role="speculative", bucket="npc", model="code", latency_s=0.0, game_id=state.game_id,
+                node="speculative", extra={"prepared": prepared, "used": used, "disabled": stats.disabled}))
+        state.director_state["speculative"] = stats.model_dump(mode="json")
 
     # ----------------------------------------------------------------- 이동·조사
     async def _do_move(self, case, state, action, events, eb) -> None:
@@ -408,8 +468,8 @@ class GameService:
         events.append(eb.custom("notebook", {"added": {"evidence_ids": [masker.out("evidence", e) for e in new]}}))
 
     # ----------------------------------------------------------------- 대화
-    def _turn_deps(self, case: CaseBible, state: GameState) -> TurnDeps:
-        cfg, hold = self.cfg, {}
+    def _turn_deps(self, case: CaseBible, state: GameState, llm=None) -> TurnDeps:
+        cfg, hold, llm = self.cfg, {}, llm or self.llm
 
         def retrieve(game: GameState, npc_id: str, q: str) -> list[RetrievalHit]:
             hits = self._npc_search(case, game, npc_id, q)
@@ -422,7 +482,7 @@ class GameService:
             return ground_verdict(cfg, case_, v, reply.text, grounded)
 
         async def gm_llm_check(case_, game, npc_id, reply, verdict) -> bool:
-            out, _ = await self.llm.structured(
+            out, _ = await llm.structured(
                 role="gm_check", bucket="gm", schema=GMCheck,
                 system="추리 게임의 게임 마스터다. 인물의 대답이 그 인물이 알 수 있는 정보만 말했는지 판정한다.",
                 user=f"인물: {C.char(case_, npc_id).name}\n인물이 아는 것: {[h.content for h in hold.get('hits', [])]}\n"
@@ -489,7 +549,7 @@ class GameService:
             return {"evidence_ids": [masker.out("evidence", e) for e in new], "contradictions": []}
 
         return TurnDeps(
-            llm=self.llm, router=self.router, retrieve=retrieve, gm_code_check=gm_code_check,
+            llm=llm, router=self.router, retrieve=retrieve, gm_code_check=gm_code_check,
             fallback_line=lambda ch: gm_rules.fallback_line(cfg, ch), handle_offtopic=handle_offtopic,
             on_small_talk=on_small_talk, after_answer=after_answer,
             lie_guidance=lambda case_, npc_id, q: C.relevant_lies(case_, npc_id, q),
@@ -534,7 +594,7 @@ class GameService:
             raise _BadAction("그 사람은 여기 없어요.")
         return npc_id  # type: ignore[return-value]
 
-    async def _do_ask(self, case, state, masker, action, events, eb) -> None:
+    async def _do_ask(self, case, state, masker, action, events, eb, prepared: PreparedAnswer | None = None) -> None:
         chip_route = None
         if action.get("type") == "chip":
             d = state.director_state.get("chips", {}).get(action.get("chip_id"))
@@ -548,7 +608,8 @@ class GameService:
         else:
             npc_id, text = action.get("npc_id"), (action.get("text") or "").strip()[:300]
         npc_id = self._require_npc_here(state, npc_id)
-        game, evs, _ = await run_turn(case, state, npc_id, text, self._turn_deps(case, state), chip_route=chip_route)
+        game, evs, _ = await run_turn(case, state, npc_id, text, self._turn_deps(case, state), chip_route=chip_route,
+                                      prepared=prepared)
         _absorb(state, game)
         events.extend(evs)
 
@@ -720,6 +781,8 @@ class GameService:
             yield eb.run_finished()
             return
         state.phase = "night"
+        self.spec.close(game_id)
+        self._record_speculation(state)
         deps = build_night_deps(self, case)
         game, events = await run_night(case, state, deps)
         _absorb(state, game)
@@ -830,6 +893,7 @@ class GameService:
         self.rag.copy_slot(slot_id, new_live)
         state = self.store.activate_slot(game_id, slot_id, new_live)
         self.rag.delete_slot(old_live)
+        self.spec.forget(game_id)  # 불러온 슬롯은 다른 상태다
         return self._persist_view(self.cases[state.case_id], state)
 
     def sources(self, game_id: str, statement_id: str) -> list[dict]:

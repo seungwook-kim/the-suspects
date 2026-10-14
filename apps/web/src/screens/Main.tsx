@@ -86,6 +86,13 @@ export function Main({ g, theme, onToggleTheme, onFinale, onHome, onAbout }: Pro
   })
 
   const busy = state.running
+
+  // 심문을 시작할 때와 행동이 끝날 때마다: 그 인물의 추천 질문 답을 서버가 미리 만들어 두게 한다
+  const prepare = g.prepare
+  const npcId = npc?.id
+  useEffect(() => {
+    if (npcId && !busy) prepare(npcId)
+  }, [npcId, busy, prepare])
   const locked = !!(interrogee && state.turnAway[interrogee])
   const nameOf = (id: string) => view.characters.find((c) => c.id === id)?.name ?? ''
 

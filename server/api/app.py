@@ -37,6 +37,10 @@ class LoadReq(BaseModel):
     slot_id: str
 
 
+class PrepareReq(BaseModel):
+    npc_id: str
+
+
 def _service():
     from server.game.service import get_service
 
@@ -162,6 +166,16 @@ async def portrait_status(game_id: str) -> dict:
 @app.post("/api/games/{game_id}/actions")
 def act(game_id: str, action: dict) -> StreamingResponse:
     return _sse_response(_service().act(game_id, action))
+
+
+@app.post("/api/games/{game_id}/prepare")
+async def prepare(game_id: str, req: PrepareReq) -> dict:
+    """심문 중인 인물의 추천 질문 답을 미리 만들기 시작한다(PRD §14.1 추측 생성). 기다리지 않고 바로 돌아온다.
+    (async: 미리 만들기를 같은 이벤트 루프의 백그라운드 작업으로 돌리기 위해)"""
+    try:
+        return await _service().prepare(game_id, req.npc_id)
+    except StorageError as e:
+        raise HTTPException(404, str(e))
 
 
 @app.post("/api/games/{game_id}/night")

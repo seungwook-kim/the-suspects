@@ -5,9 +5,9 @@ from server.llm.latency import (load_records, percentile, questions, render_mark
                                 split_prompt, summarize)
 
 
-def _rec(role, lat, game="g1", ts=0.0, out=0, model="m", prompt=None, bucket="npc", fb=False):
+def _rec(role, lat, game="g1", ts=0.0, out=0, model="m", prompt=None, bucket="npc", fb=False, node=None, extra=None):
     return {"ts": ts, "role": role, "bucket": bucket, "model": model, "latency_s": lat, "output_tokens": out,
-            "game_id": game, "prompt": prompt, "fallback_used": fb}
+            "game_id": game, "prompt": prompt, "fallback_used": fb, "node": node, "extra": extra or {}}
 
 
 def test_percentile_nearest_rank():
@@ -61,3 +61,29 @@ async def test_replay_resends_recorded_prompts_with_current_client():
     assert [r["role"] for r in rows] == ["npc", "router"]
     assert rows[0]["before_s"] == 5.0 and rows[0]["out_before"] == 300 and not rows[0]["fallback"]
     assert "| npc | 5.0초 |" in render_replay(rows)
+
+
+def test_speculative_calls_are_not_waited_questions_and_hit_rate_is_reported():
+    recs = [_rec("npc", 4.0, node="npc:speculative"), _rec("npc", 4.2, node="npc:speculative"),
+            _rec("npc", 0.3, model="prepared", node="npc_prepared"),
+            _rec("speculative", 0.0, model="code", node="speculative", extra={"prepared": 2, "used": 1}),
+            _rec("npc", 5.0)]
+    qs = questions(recs)
+    assert [q["total"] for q in qs] == [0.3, 5.0] and qs[0]["prepared"] and not qs[1]["prepared"]
+    s = summarize(recs)
+    assert s["speculative"] == {"shows": 1, "prepared": 2, "used": 1, "hit_rate": 1.0, "discard_rate": 0.5}
+    assert s["roles"]["npc (미리 만듦)"]["n"] == 2 and s["roles"]["npc (미리 만든 답 사용)"]["n"] == 1
+    assert "speculative" not in s["roles"]
+    assert "적중률 100%" in render_markdown(s) and "버린 비율 50%" in render_markdown(s)
+
+
+async def test_measure_speculative_with_fake_llm(tmp_path):
+    from server.game.service import GameService
+    from server.llm.latency import measure_speculative, render_speculative
+
+    svc = GameService(tmp_path, in_memory=True)
+    rows = await measure_speculative(svc, rounds=1, read_s=0.0, settle_s=0.0)
+    assert [r["mode"] for r in rows] == ["A", "B", "C"] and not any(r["error"] for r in rows)
+    assert sum(1 for r in svc.llm.tracer.records if r.model == "prepared") == 2  # B·C는 미리 만든 답을 쓴다
+    assert "| C. 0초 읽고 누름 | 1 |" in render_speculative(rows, 0.0)
+

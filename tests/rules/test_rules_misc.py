@@ -80,10 +80,21 @@ def test_speculative_threshold_boundary(cfg):
     ok = speculative.SpeculativeStats()
     bad = speculative.SpeculativeStats()
     for i in range(20):
-        ok = speculative.record_show(cfg, ok, 2, 1)  # 정확히 0.5
-        bad = speculative.record_show(cfg, bad, 100, 49 if i == 0 else 50)  # 0.4995
+        ok = speculative.record_show(cfg, ok, 2, 1 if i % 2 else 0)  # 준비 20번 중 10번 씀 = 정확히 0.5
+        bad = speculative.record_show(cfg, bad, 2, 1 if i % 2 and i > 1 else 0)  # 9번 = 0.45
     assert speculative.hit_rate(ok) == 0.5 and not ok.disabled
-    assert bad.disabled
+    assert speculative.hit_rate(bad) == 0.45 and bad.disabled
+
+
+def test_speculative_hit_rate_counts_shows_not_answers(cfg):
+    st = speculative.SpeculativeStats()
+    for _ in range(20):
+        st = speculative.record_show(cfg, st, 2, 1)  # 매번 2개 만들고 1개 씀 (하나 누르면 상태가 바뀜)
+    assert speculative.hit_rate(st) == 1.0 and not st.disabled
+    assert speculative.discard_rate(st) == 0.5
+    assert speculative.discard_rate(speculative.SpeculativeStats()) is None
+    empty = speculative.record_show(cfg, speculative.SpeculativeStats(), 0, 0)  # 만든 게 없는 준비는 적중률에서 뺀다
+    assert speculative.hit_rate(empty) is None
 
 
 def test_speculative_window_slides(cfg):

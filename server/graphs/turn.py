@@ -7,13 +7,15 @@
                             └ 영장 → 영장 버튼 안내
 
 규칙 엔진·RAG·저장소는 TurnDeps로 주입받는다(테스트에서 가짜로 바꿔 끼울 수 있게).
+추천 질문 칩은 답을 미리 만들어 둘 수 있다(prepare_answer, PRD §14.1 추측 생성). 미리 만든 답(prepared)이 오면
+검색·인물 답·게임 마스터 LLM 검사를 건너뛰고 그 결과로 뒤처리(수첩·기억·증거)만 한다.
 그래프는 이벤트(AG-UI 형식 dict) 목록과 바뀐 게임 상태를 만든다. 전송은 API 계층이 한다.
 """
 
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -58,12 +60,25 @@ class TurnDeps:
     gm_llm_check: Callable[[CaseBible, GameState, str, NPCReply, GMVerdict], Awaitable[bool]] | None = None
 
 
+@dataclass
+class PreparedAnswer:
+    """미리 만든 인물 답 한 개(게임 상태는 건드리지 않은 결과)."""
+    npc_id: str
+    text: str
+    role: str
+    reply: NPCReply
+    verdict: GMVerdict
+    fallback_used: bool
+    hits: list[RetrievalHit] = field(default_factory=list)
+
+
 class TurnState(TypedDict, total=False):
     case: CaseBible
     game: GameState
     npc_id: str
     text: str
     chip_route: RouterOutput | None
+    prepared: PreparedAnswer | None
     route: RouterOutput
     hits: list[RetrievalHit]
     reply: NPCReply
@@ -146,21 +161,31 @@ def node_warrant_hint(s: TurnState) -> TurnState:
 
 def node_retrieve(s: TurnState) -> TurnState:
     deps: TurnDeps = s["deps"]
+    if s.get("prepared"):
+        s["hits"] = list(s["prepared"].hits)
+        return s
     with deps.llm.tracer.span("retrieval", s["game"].game_id):
         s["hits"] = deps.retrieve(s["game"], s["npc_id"], s["text"])
     return s
 
 
+def _answer_role(ch: Character, route: RouterOutput) -> str:
+    return "npc_minor" if ch.tier == "minor" else ("npc_hard" if route.difficulty == "hard" else "npc")
+
+
 async def node_npc_answer(s: TurnState) -> TurnState:
     deps: TurnDeps = s["deps"]
     case, game, npc_id = s["case"], s["game"], s["npc_id"]
+    if p := s.get("prepared"):
+        s["reply"], s["verdict"], s["fallback_used"] = p.reply.model_copy(deep=True), p.verdict, p.fallback_used
+        return s
     ch = _char(case, npc_id)
     ctx = npc_agent.NPCContext(
         character=ch, state=game.npc_states[npc_id], question=s["text"], hits=s.get("hits", []),
         case_brief=deps.case_brief(case, game), lie_guidance=deps.lie_guidance(case, npc_id, s["text"]),
         conversation_summary=game.conversation_summary,
     )
-    role = "npc_minor" if ch.tier == "minor" else ("npc_hard" if s["route"].difficulty == "hard" else "npc")
+    role = _answer_role(ch, s["route"])
     reply, verdict, fb = await npc_agent.answer(
         deps.llm, ctx, role=role,
         gm_code_check=lambda r: deps.gm_code_check(case, game, npc_id, r),
@@ -171,6 +196,8 @@ async def node_npc_answer(s: TurnState) -> TurnState:
 
 
 def gm_branch(s: TurnState) -> str:
+    if s.get("prepared"):  # 미리 만들 때 게임 마스터 LLM 검사까지 마쳤다
+        return "after_answer"
     v = s.get("verdict")
     if s.get("fallback_used") or v is None or not v.needs_llm_check or v.violations:
         return "after_answer"
@@ -272,9 +299,26 @@ TURN_GRAPH = build_turn_graph()
 
 
 async def run_turn(case: CaseBible, game: GameState, npc_id: str, text: str, deps: TurnDeps,
-                   chip_route: RouterOutput | None = None) -> tuple[GameState, list[dict], TurnState]:
+                   chip_route: RouterOutput | None = None,
+                   prepared: PreparedAnswer | None = None) -> tuple[GameState, list[dict], TurnState]:
     eb = EventBuilder()
+    if prepared is not None and (prepared.npc_id != npc_id or prepared.text != text or chip_route is None):
+        prepared = None  # 다른 질문용으로 만든 답은 쓰지 않는다
     init: TurnState = {"case": case, "game": game, "npc_id": npc_id, "text": text, "chip_route": chip_route,
-                       "events": [], "eb": eb, "deps": deps}
+                       "prepared": prepared, "events": [], "eb": eb, "deps": deps}
     out: TurnState = await TURN_GRAPH.ainvoke(init)
     return out["game"], out["events"], out
+
+
+async def prepare_answer(case: CaseBible, game: GameState, npc_id: str, text: str, deps: TurnDeps) -> PreparedAnswer:
+    """칩 질문의 답을 미리 만든다: 검색 → 인물 답 → (필요하면) 게임 마스터 LLM 검사.
+    실제 턴과 같은 노드를 그대로 쓴다. game은 호출자가 넘긴 복사본이어야 한다(뒤처리는 하지 않음)."""
+    route = RouterOutput(kind="investigate", target_npc=npc_id, via="chip")
+    s: TurnState = {"case": case, "game": game, "npc_id": npc_id, "text": text, "chip_route": route, "route": route,
+                    "events": [], "eb": EventBuilder(), "deps": deps}
+    node_retrieve(s)
+    await node_npc_answer(s)
+    if gm_branch(s) == "gm_llm":
+        await node_gm_llm(s)
+    return PreparedAnswer(npc_id=npc_id, text=text, role=_answer_role(_char(case, npc_id), route), reply=s["reply"],
+                          verdict=s["verdict"], fallback_used=s["fallback_used"], hits=list(s.get("hits", [])))
