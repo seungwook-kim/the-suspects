@@ -17,6 +17,7 @@ export const PORTRAIT_POLL_MAX_MS = 360_000
 export function useGame() {
   const [state, dispatch] = useReducer(clientReducer, initialClientState)
   const [portraitKick, setPortraitKick] = useState(0) // 행동이 끝날 때마다 +1 → 사진 상태를 다시 묻는다
+  const [portraitsPending, setPortraitsPending] = useState(false) // 서버가 초상화를 그리는 중이면 true("사진 준비 중" 표시)
   const gameIdRef = useRef<string | null>(null)
   const busyRef = useRef(false)
   const viewRef = useRef(state.view)
@@ -24,7 +25,10 @@ export function useGame() {
 
   const viewGameId = state.view?.game_id || null
   useEffect(() => {
-    if (!viewGameId) return
+    if (!viewGameId) {
+      setPortraitsPending(false)
+      return
+    }
     let alive = true
     let timer: number | undefined
     const started = Date.now()
@@ -33,11 +37,13 @@ export function useGame() {
         const st = await api.portraits(viewGameId)
         if (!alive) return
         dispatch({ kind: 'portraits', urls: st.urls ?? {}, emotions: st.emotions ?? {} })
+        setPortraitsPending(!!st.pending)
         if (!st.pending) return // 다 그렸거나(실패분은 SVG로 남음) 그리지 않는 중 → 멈춤
       } catch {
         /* 일시 오류는 다음 차례에 다시 */
       }
       if (alive && Date.now() - started < PORTRAIT_POLL_MAX_MS) timer = window.setTimeout(() => void poll(), PORTRAIT_POLL_MS)
+      else if (alive) setPortraitsPending(false) // 기다릴 만큼 기다렸다 → 남은 인물은 그림 얼굴로
     }
     void poll()
     return () => {
@@ -201,7 +207,7 @@ export function useGame() {
     dispatch({ kind: 'reset' })
   }, [])
 
-  return { state, dispatch, startGame, act, endDay, finaleStep, save, load, openGame, fetchSources, clearGame, resetAll, resync, adoptGame, gameIdRef }
+  return { state, dispatch, startGame, act, endDay, finaleStep, save, load, openGame, fetchSources, clearGame, resetAll, resync, adoptGame, gameIdRef, portraitsPending }
 }
 
 export type GameApi = ReturnType<typeof useGame>

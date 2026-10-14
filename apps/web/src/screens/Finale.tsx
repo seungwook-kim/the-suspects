@@ -1,5 +1,8 @@
 import { useCallback, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { DialogueBox } from '../components/DialogueBox'
+import { EvidenceCard } from '../components/EvidenceCard'
+import { Icon } from '../components/Icon'
 import { Overlays } from '../components/Overlays'
 import { Portrait } from '../character/Portrait'
 import { FINALE_STAGES, FINALE_STAGE_LABEL } from '../api/types'
@@ -10,6 +13,24 @@ interface Props {
   g: GameApi
   onBack: () => void
   onResult: () => void
+}
+
+const MAX_LIVES = 3
+
+/** 남은 기회 칸 + 글자 ("남은 기회 2/3"). 칸만으로는 알리지 않는다. */
+function LivesCells({ lives }: { lives: number }) {
+  return (
+    <span className="fin-lives">
+      <span className="cells is-lg" aria-hidden="true">
+        {Array.from({ length: MAX_LIVES }, (_, i) => (
+          <i key={i} className={i < lives ? 'on' : ''} />
+        ))}
+      </span>
+      <span className="fin-lives-text">
+        남은 기회 <b>{lives}/{MAX_LIVES}</b>
+      </span>
+    </span>
+  )
 }
 
 export function Finale({ g, onBack, onResult }: Props) {
@@ -32,24 +53,38 @@ export function Finale({ g, onBack, onResult }: Props) {
   // 1) 범인 지목
   if (!f && !ending) {
     return (
-      <div className="screen finale">
+      <div className="screen finale fin-pick">
         <p className="eyebrow">최종 추리 쇼</p>
-        <h1>범인은 이 중에 있다</h1>
-        <p className="muted">용의자를 모두 모았다. 한 명을 지목하면 기회·수단·동기를 증거로 밝혀야 한다. 목숨은 3개.</p>
-        <div className="suspect-grid">
+        <h1 className="fin-title">지목할 사람을 고르세요</h1>
+        <p className="fin-lead">용의자 {suspects.length}명을 이름순으로 놓았습니다. 한 명을 지목하면 기회 · 수단 · 동기를 증거로 밝혀야 합니다.</p>
+        <ul className="fin-suspects" aria-label="용의자">
           {suspects.map((c) => (
-            <button key={c.id} className={`suspect${pick === c.id ? ' on' : ''}`} onClick={() => setPick(c.id)}>
-              <Portrait seed={c.face_seed} appearance={c.appearance} emotion={state.emotions[c.id] ?? c.emotion} width={120} still portraitUrl={c.portrait_url} portraitEmotions={c.portrait_emotions} name={c.name} />
-              <strong>{c.name}</strong>
-              <span className="muted small">{c.role}</span>
-            </button>
+            <li key={c.id}>
+              <button type="button" className="person is-tile" aria-pressed={pick === c.id} onClick={() => setPick(c.id)}>
+                <div className="person-photo">
+                  <Portrait seed={c.face_seed} appearance={c.appearance} emotion={state.emotions[c.id] ?? c.emotion} still portraitUrl={c.portrait_url} portraitEmotions={c.portrait_emotions} name={c.name} />
+                </div>
+                <span className="person-name">{c.name}</span>
+                <span className="person-role">{c.role}</span>
+                <span className="sel-label"><Icon name="check-circle" />지목</span>
+              </button>
+            </li>
           ))}
-        </div>
-        <div className="brief-actions">
-          <button onClick={onBack}>← 더 수사하기</button>
-          <button className="primary big" disabled={!pick || busy} onClick={() => pick && void finaleStep({ type: 'start', accused_id: pick })}>
-            이 사람을 지목한다
-          </button>
+        </ul>
+        <p className="notice fin-hint">
+          <Icon name="info" />
+          <span>지목하면 기회 · 수단 · 동기를 증거로 밝혀야 합니다. 남은 기회 {MAX_LIVES}번이고, 증거가 맞지 않으면 1번씩 줄어듭니다.</span>
+        </p>
+        <div className="fin-bar">
+          <div className="actions">
+            <button type="button" className="btn" onClick={onBack}>
+              <span className="btn-label"><Icon name="arrow-left" />더 수사하기</span>
+            </button>
+            <button type="button" className="btn btn-cta btn-lg" disabled={!pick || busy} onClick={() => pick && void finaleStep({ type: 'start', accused_id: pick })}>
+              <span className="btn-label"><Icon name="seal-check" />이 사람을 지목한다</span>
+              {!pick && <small className="btn-reason">용의자를 고르세요</small>}
+            </button>
+          </div>
         </div>
         <Overlays state={state} dispatch={dispatch} />
       </div>
@@ -60,82 +95,121 @@ export function Finale({ g, onBack, onResult }: Props) {
   const filled = f?.filled ?? []
   const lives = f?.lives ?? 0
   const evidence = view.evidence
+  const last = f?.last?.result
 
-  return (
-    <div className="screen finale show">
-      <p className="eyebrow">최종 추리 쇼</p>
-      <div className="finale-top">
-        <div className="lives" aria-label={`목숨 ${lives}개`}>
-          {[0, 1, 2].map((i) => (
-            <span key={i} className={i < lives ? 'on' : 'off'}>♥</span>
-          ))}
-        </div>
-        <ol className="steps">
-          {FINALE_STAGES.map((s) => (
-            <li key={s} className={filled.includes(s) ? 'done' : stage === s ? 'now' : ''}>
-              {filled.includes(s) ? '✔ ' : ''}
-              {FINALE_STAGE_LABEL[s]}
-            </li>
-          ))}
-        </ol>
+  // 3) 엔딩: 사건 기록철의 결론 페이지
+  if (ending) {
+    const text = endingText(ending)
+    return (
+      <div className="screen finale fin-end">
+        <p className="eyebrow">최종 추리 쇼</p>
+        <article className={`paper has-tab fin-conclusion ending ${ending}`}>
+          <span className="folder-tab">결론</span>
+          <h1 className="fin-title">{text.title}</h1>
+          {accused && <p className="fin-conclusion-who">지목한 사람: <b>{accused.name}</b> <span>{accused.role}</span></p>}
+          <p className="fin-conclusion-body">{text.body}</p>
+          <div className="actions">
+            <button type="button" className="btn btn-cta btn-lg" onClick={onResult} disabled={busy}>
+              <span className="btn-label"><Icon name="notebook" />결과 카드 보기</span>
+            </button>
+          </div>
+        </article>
+        <Overlays state={state} dispatch={dispatch} />
       </div>
+    )
+  }
 
-      {accused && (
-        <div className={`finale-stage${f?.last?.result === 'wrong' ? ' hit' : ''}`}>
-          <Portrait seed={accused.face_seed} appearance={accused.appearance} emotion={emotion} speaking={typing} width={220} portraitUrl={accused.portrait_url} portraitEmotions={accused.portrait_emotions} name={accused.name} eager />
-          <div>
-            <div className="nameplate"><strong>{accused.name}</strong> <span>{accused.role}</span></div>
-            {line ? (
-              <DialogueBox key={line.messageId} line={line} speakerName={accused.name} onTyping={onTyping} />
-            ) : (
-              <div className="dialogue empty"><p>…</p></div>
+  // 2) 증거 제시 쇼 / 추리 확정
+  return (
+    <div className="screen finale fin-show">
+      <p className="eyebrow">최종 추리 쇼</p>
+      <div className="fin-build">
+        <article className="paper has-tab fin-dossier" aria-label="최종 추리 조서">
+          <span className="folder-tab">최종 추리 조서</span>
+          {accused && (
+            <div className="fin-who">
+              <div className="person-photo" style={{ '--photo-w': '136px' } as CSSProperties}>
+                <Portrait seed={accused.face_seed} appearance={accused.appearance} emotion={emotion} speaking={typing} portraitUrl={accused.portrait_url} portraitEmotions={accused.portrait_emotions} name={accused.name} eager />
+              </div>
+              <div className="fin-id">
+                <h1 className="fin-title">{accused.name}</h1>
+                <p className="fin-role">{accused.role}</p>
+                <div aria-live="polite"><LivesCells lives={lives} /></div>
+              </div>
+            </div>
+          )}
+
+          <ol className="fin-steps" aria-label="밝혀야 할 세 가지">
+            {FINALE_STAGES.map((s) => {
+              const done = filled.includes(s)
+              const now = !done && stage === s
+              return (
+                <li key={s} className={done ? 'is-done' : now ? 'is-now' : ''} aria-current={now ? 'step' : undefined}>
+                  <span className="fin-step-label">{FINALE_STAGE_LABEL[s]}</span>
+                  <span className="fin-step-state">
+                    {done ? <><Icon name="check-circle" />밝힘</> : now ? '지금 밝힐 차례' : '대기'}
+                  </span>
+                </li>
+              )
+            })}
+          </ol>
+
+          {accused && (
+            <div className="fin-speech">
+              {line ? (
+                <DialogueBox key={line.messageId} line={line} speakerName={accused.name} onTyping={onTyping} />
+              ) : (
+                <div className="dialogue empty"><span className="dialogue-who">{accused.name}</span><p className="dialogue-said">…</p></div>
+              )}
+            </div>
+          )}
+
+          <div aria-live="polite">
+            {last === 'correct' && (
+              <p className="fin-note"><Icon name="check-circle" /><span><b>맞음.</b> 증거가 들어맞았습니다. 다음 단계로 갑니다.</span></p>
+            )}
+            {(last === 'wrong' || last === 'rebutted') && (
+              <p className="fin-note is-wrong"><Icon name="warning-circle" /><span><b>틀림.</b> 증거가 맞지 않습니다. 남은 기회가 하나 줄어 {lives}/{MAX_LIVES}이 되었습니다.</span></p>
             )}
           </div>
-        </div>
-      )}
 
-      {f?.last?.result === 'correct' && !ending && <p className="ok-note">✔ 맞다! 다음 단계로.</p>}
-      {(f?.last?.result === 'wrong' || f?.last?.result === 'rebutted') && !ending && <p className="warn">✖ 증거가 맞지 않는다. 목숨이 하나 줄었다.</p>}
-
-      {!ending && stage !== 'done' && (
-        <section className="finale-ev">
-          <h3>{FINALE_STAGE_LABEL[stage]}를 밝힐 증거를 제시하세요</h3>
-          <div className="ev-row">
-            {evidence.map((e) => (
-              <button key={e.id} className={`ev-card${selEv === e.id ? ' selected' : ''}`} onClick={() => setSelEv(e.id)} disabled={busy}>
-                <strong>{e.name}</strong>
-                <span className="muted small">{e.content.slice(0, 54)}{e.content.length > 54 ? '…' : ''}</span>
+          {stage === 'done' && (
+            <div className="actions">
+              <button type="button" className="btn btn-cta btn-lg" disabled={busy} onClick={() => void finaleStep({ type: 'confirm' })}>
+                <span className="btn-label"><Icon name="seal-check" />추리 확정</span>
               </button>
-            ))}
-          </div>
-          <button
-            className="primary big"
-            disabled={!selEv || busy}
-            onClick={() => {
-              if (selEv) void finaleStep({ type: 'present', stage, evidence_id: selEv })
-              setSelEv(null)
-            }}
-          >
-            📎 증거 제시
-          </button>
-        </section>
-      )}
+            </div>
+          )}
+        </article>
 
-      {!ending && stage === 'done' && (
-        <div className="brief-actions">
-          <button className="primary big" disabled={busy} onClick={() => void finaleStep({ type: 'confirm' })}>
-            추리 확정 ▶
-          </button>
-        </div>
-      )}
-
-      {ending && (
-        <section className={`ending ${ending}`}>
-          <h2>{endingText(ending).title}</h2>
-          <p>{endingText(ending).body}</p>
-          <button className="primary big" onClick={onResult} disabled={busy}>결과 카드 보기 ▶</button>
-        </section>
-      )}
+        {stage !== 'done' && (
+          <section className="paper fin-ev" aria-labelledby="fin-ev-title">
+            <header className="fin-ev-head">
+              <h2 id="fin-ev-title">{FINALE_STAGE_LABEL[stage]}: 밝힐 증거를 제시하세요</h2>
+              <p>증거 {evidence.length}개 중 하나를 고르세요.</p>
+            </header>
+            <div className="card-list">
+              {evidence.map((e) => (
+                <EvidenceCard key={e.id} evidence={e} selected={selEv === e.id} clamp={80} disabled={busy} onClick={() => setSelEv(e.id)} />
+              ))}
+            </div>
+            <div className="fin-bar">
+              <button
+                type="button"
+                className="btn btn-cta btn-lg"
+                disabled={!selEv || busy}
+                onClick={() => {
+                  if (selEv) void finaleStep({ type: 'present', stage, evidence_id: selEv })
+                  setSelEv(null)
+                }}
+              >
+                <span className="btn-label"><Icon name="paperclip" />증거 제시</span>
+                {!selEv && <small className="btn-reason">증거를 고르세요</small>}
+              </button>
+            </div>
+          </section>
+        )}
+      </div>
       <Overlays state={state} dispatch={dispatch} />
     </div>
   )

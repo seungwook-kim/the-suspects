@@ -21,6 +21,7 @@ interface Props {
   onTyping: (typing: boolean) => void
 }
 
+/** 최종 추리 화면의 대사: 종이 면 위 "이름 + 대사" 조서 줄. 모양은 styles/finale.css 의 .dialogue… */
 export function DialogueBox({ line, speakerName, onTyping }: Props) {
   const { shown, typing } = useTypewriter(line.text)
   const active = typing || !line.done
@@ -31,10 +32,10 @@ export function DialogueBox({ line, speakerName, onTyping }: Props) {
   const name = line.role === 'npc' ? speakerName ?? '???' : ROLE_LABEL[line.role] ?? ''
   return (
     <div className={`dialogue role-${line.role}`} aria-live="polite">
-      <div className="who">{name}</div>
-      <p>
+      <span className="dialogue-who">{name}</span>
+      <p className="dialogue-said">
         {shown}
-        {active && <span className="caret">▌</span>}
+        {active && <span className="caret" aria-hidden="true">▌</span>}
       </p>
     </div>
   )

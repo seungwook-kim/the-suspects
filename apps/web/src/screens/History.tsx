@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import type { ClearHistory } from '../api/types'
+import { Icon } from '../components/Icon'
 import { ResultCard } from './Result'
 
 export function History({ onBack }: { onBack: () => void }) {
@@ -19,16 +20,18 @@ export function History({ onBack }: { onBack: () => void }) {
   return (
     <div className="screen history">
       <h1>클리어 이력</h1>
-      {err && <p className="warn">{err}</p>}
-      {!list && !err && <p className="muted">불러오는 중…</p>}
-      {list?.length === 0 && <p className="muted">아직 기록이 없습니다. 첫 사건을 해결해 보세요.</p>}
-      <div className="history-grid">
+      {err && <p className="warn-text" role="alert">{err}</p>}
+      {!list && !err && <p className="muted hist-note">불러오는 중…</p>}
+      {list?.length === 0 && <p className="paper hist-empty">아직 기록이 없습니다. 첫 사건을 해결해 보세요.</p>}
+      <div className="hist-grid">
         {list?.map((h) => (
           <ResultCard key={h.id} h={h} />
         ))}
       </div>
-      <div className="brief-actions">
-        <button onClick={onBack}>← 돌아가기</button>
+      <div className="actions hist-actions">
+        <button type="button" className="btn" onClick={onBack}>
+          <span className="btn-label"><Icon name="arrow-left" />돌아가기</span>
+        </button>
       </div>
     </div>
   )

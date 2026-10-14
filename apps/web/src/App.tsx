@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { ClearHistory, CreateOptions, ShareCard } from './api/types'
+import { PortraitPending } from './character/Portrait'
+import { Icon } from './components/Icon'
+import { About } from './screens/About'
 import { Briefing } from './screens/Briefing'
 import { Generating } from './screens/Generating'
 import { Finale } from './screens/Finale'
@@ -10,12 +13,16 @@ import { Start } from './screens/Start'
 import { useGame } from './state/useGame'
 import { getPref, setPref } from './util/saves'
 
-type Screen = 'start' | 'generating' | 'briefing' | 'main' | 'finale' | 'result' | 'history'
+type Screen = 'start' | 'generating' | 'briefing' | 'main' | 'finale' | 'result' | 'history' | 'about'
 type Theme = 'light' | 'dark'
+
+// 시작 화면에서 고른 분위기 → 도형 토큰(html[data-mood]). 색은 바뀌지 않는다(D15)
+const MOOD: Record<string, string> = { 코믹: 'comic', 보통: 'normal', 진지: 'serious' }
 
 export default function App() {
   const g = useGame()
   const [screen, setScreen] = useState<Screen>('start')
+  const [aboutFrom, setAboutFrom] = useState<Screen>('start') // 정보 화면에서 돌아갈 곳
   const [creating, setCreating] = useState(false)
   const [notice, setNotice] = useState<string | null>(null) // 시작 화면에 띄울 안내(거절 사유 등)
   const [job, setJob] = useState<{ text: string; options: CreateOptions; key: number } | null>(null)
@@ -28,6 +35,16 @@ export default function App() {
     document.documentElement.dataset.theme = theme
     setPref('theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    document.documentElement.dataset.mood = MOOD[getPref<string>('mood', '보통')] ?? 'normal'
+  }, [screen])
+
+  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
+  const openAbout = () => {
+    setAboutFrom(screen === 'about' ? 'start' : screen)
+    setScreen('about')
+  }
 
   // 델타가 어긋나면 GET 으로 화면을 다시 맞춘다
   const { needsResync, running } = g.state
@@ -82,15 +99,13 @@ export default function App() {
   }
 
   return (
-    <>
-      <button
-        className="theme-toggle"
-        onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-        aria-label={theme === 'dark' ? '밝은 테마로' : '어두운 테마로'}
-        title="테마 전환"
-      >
-        {theme === 'dark' ? '☀️' : '🌙'}
-      </button>
+    <PortraitPending.Provider value={g.portraitsPending}>
+      {screen !== 'main' && (
+        // 게임 화면은 메뉴 안에 같은 단추가 있다
+        <button type="button" className="btn btn-icon theme-toggle" onClick={toggleTheme} aria-label={theme === 'dark' ? '밝은 테마로' : '어두운 테마로'} title="테마 전환">
+          <span className="btn-label"><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></span>
+        </button>
+      )}
       {screen === 'start' && (
         <Start
           busy={creating}
@@ -100,8 +115,10 @@ export default function App() {
           onOpenGame={openGame}
           onLoadSlot={loadSlot}
           onHistory={() => setScreen('history')}
+          onAbout={openAbout}
         />
       )}
+      {screen === 'about' && <About onBack={() => setScreen(aboutFrom)} />}
       {screen === 'generating' && job && (
         <Generating
           key={job.key}
@@ -122,7 +139,7 @@ export default function App() {
       {screen === 'history' && <History onBack={home} />}
       {screen === 'briefing' && <Briefing view={creating ? null : g.state.view} onBegin={() => setScreen('main')} />}
       {screen === 'main' && g.state.view && (
-        <Main g={g} onFinale={() => setScreen('finale')} onHome={home} />
+        <Main g={g} theme={theme} onToggleTheme={toggleTheme} onFinale={() => setScreen('finale')} onHome={home} onAbout={openAbout} />
       )}
       {screen === 'finale' && g.state.view && (
         <Finale g={g} onBack={() => setScreen('main')} onResult={toResult} />
@@ -130,6 +147,6 @@ export default function App() {
       {screen === 'result' && result && (
         <Result h={result.history} card={result.card} onNew={home} onHistory={() => setScreen('history')} />
       )}
-    </>
+    </PortraitPending.Provider>
   )
 }

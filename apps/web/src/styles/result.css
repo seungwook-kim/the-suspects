@@ -1,0 +1,32 @@
+/* 결과: 사건 기록철의 종결 보고서. 읽는 면은 종이. 토큰만 사용(윗선 색은 사건 주제색 하나만 인라인). */
+.result { display: grid; gap: var(--space-4); max-width: 640px; }
+
+.res-card { padding: var(--space-5); padding-top: calc(var(--space-5) + 3px); display: grid; gap: var(--space-3); overflow: hidden; }
+.res-topline { position: absolute; left: 0; right: 0; top: 0; height: 3px; }
+.res-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
+.res-head h2 { font-size: var(--text-xl); min-width: 0; text-wrap: balance; }
+.res-grade { flex: none; margin-left: 0; font-size: 15px; }
+
+.res-stats { display: flex; flex-wrap: wrap; gap: var(--space-5); padding: var(--space-3) 0; border-block: 1px solid var(--line); }
+.res-stats dt { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--text-s); color: var(--muted); }
+.res-stats dd { margin: 0; font-size: var(--text-l); font-weight: 700; }
+
+.res-faces { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.res-faces figure { margin: 0; display: grid; justify-items: center; gap: var(--space-1); width: 64px; }
+.res-faces figcaption { font-size: 13px; color: var(--muted); text-align: center; line-height: 1.3; overflow-wrap: anywhere; }
+
+.res-verdict { display: grid; gap: var(--space-1); font-size: var(--text-m); }
+.res-verdict p { display: flex; align-items: baseline; gap: var(--space-2); }
+.res-verdict .icon { align-self: center; }
+.res-label { font-size: var(--text-s); color: var(--muted); }
+.res-quote { margin: 0; padding-left: var(--space-3); border-left: 3px solid var(--line-strong); font-size: var(--text-m); line-height: 1.6; text-wrap: pretty; }
+
+.res-actions .btn-cta { order: 0; }
+.res-saved { font-size: var(--text-s); }
+.res-note { font-size: var(--text-s); color: var(--muted); }
+
+@media (max-width: 720px) {
+  .res-card { padding: var(--space-4); padding-top: calc(var(--space-4) + 3px); }
+  .res-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .res-actions .btn-cta { grid-column: 1 / -1; order: -1; min-height: 48px; }
+}

@@ -18,6 +18,18 @@ export function dayPeriod(clock: number): string {
   return '밤'
 }
 
+/** 화면 제목용: 주제 이름 앞에 붙은 그림 문자(이모지)를 뗀다. 화면에는 이모지를 쓰지 않는다 */
+export function plainTitle(s: string): string {
+  return s.replace(/^(?:\p{Extended_Pictographic}|\uFE0F|\u200D|\s)+/u, '')
+}
+
+/** 추천 질문 글자에서 앞에 붙은 "이름:"을 뗀다(조서·칩에 이름이 이미 보이므로) */
+export function chipText(label: string, name: string): string {
+  if (!name) return label
+  const m = label.match(/^\s*([^:：]{1,20})\s*[:：]\s*(.+)$/)
+  return m && m[1].trim() === name ? m[2] : label
+}
+
 /** 메신저용 텍스트: `🔍🔍❌🔍✅ 23질문 만에 해결` */
 export function buildShareText(h: ClearHistory, card?: ShareCard | null): string {
   if (card?.share_text) return card.share_text

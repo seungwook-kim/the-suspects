@@ -1,0 +1,92 @@
+/* 시작 화면. 사건 카드는 누르는 것이라 바탕 면(선택되면 종이색으로 채움). 토큰만 사용. */
+.start { display: grid; gap: var(--space-4); align-content: start; padding-top: var(--space-5); }
+/* 오른쪽 위 테마 단추(44px)와 겹치지 않게 양옆 여백을 둔다 */
+.start-head { text-align: center; display: grid; gap: var(--space-2); justify-items: center; padding-inline: 52px; }
+.start-head h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.01em; }
+.start-head .lead { font-size: var(--text-l); }
+.ai-notice { display: flex; align-items: center; gap: var(--space-2); max-width: 62ch; font-size: var(--text-m); text-wrap: pretty; text-align: left; }
+.ai-notice .icon { width: 20px; height: 20px; }
+
+.start-cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.start-case {
+  position: relative; display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: var(--space-4); align-items: start; text-align: left;
+  min-height: 88px; padding: var(--space-3) var(--space-4); background: transparent; color: var(--ink);
+  border: 1.5px solid var(--line-strong); border-radius: var(--radius-m);
+  transition: background-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.start-case:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.start-case:active { transform: scale(0.98); }
+.start-case-icon { display: grid; place-items: center; width: 48px; height: 48px; }
+.start-case-icon .icon { width: 40px; height: 40px; }
+.start-case-text { display: grid; gap: 2px; min-width: 0; }
+.start-case-no { font-size: var(--text-s); color: var(--muted); }
+.start-case strong { font-size: var(--text-l); }
+.start-case-desc { font-size: 15px; color: var(--muted); text-wrap: pretty; }
+.start-case-on { display: none; position: absolute; top: var(--space-3); right: var(--space-3); align-items: center; gap: 6px; font-size: var(--text-s); font-weight: 700; }
+.start-case[aria-checked='true'] { border-width: 3px; padding: calc(var(--space-3) - 1.5px) calc(var(--space-4) - 1.5px); background: var(--surface); }
+.start-case[aria-checked='true'] .start-case-on { display: inline-flex; }
+.start-case[aria-checked='true'] .start-case-no, .start-case[aria-checked='true'] .start-case-desc { color: var(--ink); }
+
+.start-custom { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4); border: 1.5px dashed var(--line-strong); border-radius: var(--radius-m); margin-top: var(--space-3); }
+.start-custom-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.start-count { margin-left: auto; }
+.start-custom-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-3); align-items: start; }
+
+.start-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.start-seg-row { display: grid; gap: var(--space-2); min-width: 0; align-content: start; }
+.start-legend { font-weight: 700; }
+.start-options .seg { display: flex; width: 100%; }
+.start-options .seg button { flex: 1 1 0; min-height: 44px; }
+
+.start-go { display: flex; justify-content: center; align-items: flex-start; flex-wrap: wrap; gap: var(--space-3); }
+.start-go-side { display: flex; gap: var(--space-3); order: 2; }
+.start-go-main { order: 1; }
+.start-go-main .btn { min-width: 200px; }
+
+.start-saves { display: grid; gap: var(--space-3); padding: var(--space-4); }
+.start-save-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: stretch; }
+.start-slot { margin-top: var(--space-2); }
+.start-mock { text-align: center; }
+.start-foot { display: grid; gap: var(--space-1); justify-items: center; text-align: center; font-size: var(--text-s); color: var(--muted); }
+.start-about {
+  min-height: 44px; padding: 0 var(--space-3); background: none; border: 0; color: var(--focus); font-size: var(--text-s);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  html:has(.start) { scroll-padding-bottom: 96px; } /* 아래 고정 버튼에 가리지 않게 */
+  .start { padding-bottom: calc(var(--space-8) + var(--space-6)); padding-top: var(--space-4); }
+  .start-head { padding-inline: 48px; }
+  .start-head h1 { font-size: 26px; }
+  .start-cases { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+  .start-case { min-height: 0; grid-template-columns: 32px minmax(0, 1fr); gap: var(--space-3); padding: var(--space-3); }
+  .start-case-icon, .start-case-icon .icon { width: 32px; height: 32px; }
+  .start-case[aria-checked='true'] { padding: calc(var(--space-3) - 1.5px); }
+  .start-case[aria-checked='false'] .start-case-desc { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .start-custom-row { grid-template-columns: minmax(0, 1fr); }
+  .start-custom-row .btn { width: 100%; }
+  .start-options { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+  .start-go { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .start-go-side { order: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .start-go-side .btn { width: 100%; }
+  /* 주 버튼은 화면 아래에 고정 */
+  .start-go-main {
+    order: 2; position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-sticky); padding: var(--space-3) var(--space-4);
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); background: var(--bg); border-top: 1px solid var(--line-strong);
+  }
+  .start-go-main .btn { display: grid; width: 100%; min-height: 48px; }
+}
+
+/* ---- 사건 생성 화면(Generating) ---- */
+.gen { display: grid; gap: var(--space-4); align-content: start; }
+.gen-error { display: grid; justify-items: center; gap: var(--space-4); padding: var(--space-8) 0; text-align: center; }
+.gen-error-icon { width: 40px; height: 40px; }
+.gen .loading-file .cells { --cell-w: 28px; --cell-h: 14px; }
+.gen-summary { padding: var(--space-4) var(--space-5); max-width: 68ch; text-wrap: pretty; }
+.gen-status { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+
+/* ---- 클리어 이력(History) ---- */
+.hist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: var(--space-4); margin: var(--space-4) 0; }
+.hist-empty { padding: var(--space-5); margin-top: var(--space-4); }
+.hist-note { margin-top: var(--space-3); }
+.hist-actions { margin-top: var(--space-4); }

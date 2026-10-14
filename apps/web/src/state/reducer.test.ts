@@ -141,4 +141,36 @@ describe('AG-UI 리듀서', () => {
     expect(clientReducer(s, { kind: 'portraits', urls: {}, emotions: { a: { angry: '/a--angry.webp' } } })).toBe(s)
     expect(clientReducer(s, { kind: 'portraits', urls: {} })).toBe(s)
   })
+  it('NPC 대답이 끝나면 보낸 질문과 함께 문답 기록에 남고, 다른 사람의 대답에는 질문을 붙이지 않는다', () => {
+    const run = (s: ClientState, evs: AgEvent[]) => evs.reduce(applyEvent, s)
+    let s = clientReducer(initialClientState, { kind: 'asked', npcId: 'a', text: '어젯밤 어디 계셨어요?' })
+    s = run(s, [
+      { type: 'TEXT_MESSAGE_START', messageId: 'm1', role: 'npc', speakerId: 'a' },
+      { type: 'TEXT_MESSAGE_CONTENT', messageId: 'm1', delta: '집에 있었어요.' },
+      { type: 'TEXT_MESSAGE_END', messageId: 'm1' },
+    ])
+    expect(s.log).toEqual([{ id: 'm1', npcId: 'a', q: '어젯밤 어디 계셨어요?', a: '집에 있었어요.' }])
+    expect(s.asked).toBeNull()
+    s = clientReducer(s, { kind: 'asked', npcId: 'a', text: '정말요?' })
+    s = run(s, [
+      { type: 'TEXT_MESSAGE_START', messageId: 'm2', role: 'npc', speakerId: 'b' },
+      { type: 'TEXT_MESSAGE_CONTENT', messageId: 'm2', delta: '저는 봤는데요.' },
+      { type: 'TEXT_MESSAGE_END', messageId: 'm2' },
+      { type: 'TEXT_MESSAGE_START', messageId: 'm3', role: 'narrator' },
+      { type: 'TEXT_MESSAGE_CONTENT', messageId: 'm3', delta: '정적이 흘렀다.' },
+      { type: 'TEXT_MESSAGE_END', messageId: 'm3' },
+    ])
+    expect(s.log.map((e) => [e.npcId, e.q])).toEqual([['a', '어젯밤 어디 계셨어요?'], ['b', null]])
+    expect(applyEvent(clientReducer(s, { kind: 'asked', npcId: 'a', text: '?' }), { type: 'RUN_FINISHED' }).asked).toBeNull()
+    expect(clientReducer(s, { kind: 'reset' }).log).toEqual([])
+  })
+  it('델타로 먼저 들어온 모순도 새 모순으로 표시하고, 뒤따르는 notebook 이벤트로 두 번 넣지 않는다', () => {
+    let s = applyEvent(initialClientState, { type: 'STATE_SNAPSHOT', snapshot: view() })
+    const con = { id: 'c1', statement_id: 's1', evidence_id: 'e1', lie_id: 'l1', note: '' }
+    s = applyEvent(s, { type: 'STATE_DELTA', delta: [{ op: 'add', path: '/notebook/contradictions/-', value: con }] })
+    expect(s.newContradictions).toEqual(['c1'])
+    s = applyEvent(s, { type: 'CUSTOM', name: 'notebook', value: { added: { contradictions: [con] } } })
+    expect(s.newContradictions).toEqual(['c1'])
+    expect(s.view!.notebook.contradictions).toHaveLength(1)
+  })
 })

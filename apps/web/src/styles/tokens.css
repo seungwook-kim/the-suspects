@@ -1,0 +1,69 @@
+/* 디자인 토큰 — 방향 A "수사 기록철" (design/meeting/회의록.md D1~D18).
+ * 색은 여기서만 정한다. 화면 CSS 에 hex 를 직접 쓰지 않는다.
+ * 원칙: 읽는 것은 종이(--surface), 누르는 것은 바탕(--bg). 형광(--hl)은 모순 표시에만 쓴다.
+ * 분위기 html[data-mood=comic|serious] 는 도형 토큰만 바꾼다(색은 그대로). */
+:root {
+  color-scheme: light;
+  --bg: #E3E6E1;
+  --surface: #FAFAF7;
+  --ink: #1E2A31;
+  --muted: #4F5B62;
+  --line: #B3BAB5;
+  --line-strong: #1E2A31;
+  --hl: #F4D03F;
+  --hl-ink: #1E2A31;
+  --cta-fill: #1E2A31;
+  --cta-ink: #FAFAF7;
+  --cta-hover: #33444E;
+  --focus: #2F5D8A;
+  --grain: 0.05;
+  --shadow-1: 0 1px 0 var(--line), 0 4px 8px rgba(30, 42, 49, 0.10);
+  --scrim: rgba(20, 25, 28, 0.45);
+  --tape: rgba(255, 255, 255, 0.55);
+  --night: rgba(10, 13, 15, 0.94);
+  --night-ink: #E7ECE8;
+
+  --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', system-ui, sans-serif;
+  --font-mono: 'Nanum Gothic Coding', 'IBM Plex Sans KR', ui-monospace, 'Cascadia Mono', monospace;
+
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
+  --text-s: 14px; --text-m: 16px; --text-l: 18px; --text-xl: 24px; --text-2xl: 32px;
+
+  --radius-m: 6px;
+  --radius-s: 3px;
+  --tilt: 0deg;
+  --deco: 0;
+  --hl-size: 100%;
+
+  --dur-fast: 150ms;
+  --dur-base: 180ms;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  --z-sticky: 10; --z-scrim: 25; --z-drawer: 30; --z-modal: 60; --z-toast: 70; --z-overlay: 80; --z-cutin: 90; --z-alert: 99;
+  --actionbar-h: 0px; /* 휴대폰 하단 행동바 높이. 게임 화면이 실제 높이로 갱신한다 */
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #14191C;
+  --surface: #1F272B;
+  --ink: #E7ECE8;
+  --muted: #A3AEB0;
+  --line: #3C494F;
+  --line-strong: #E7ECE8;
+  --hl: #E8C547;
+  --hl-ink: #14191C;
+  --cta-fill: #E7ECE8;
+  --cta-ink: #14191C;
+  --cta-hover: #F4F7F4;
+  --focus: #8DB8E3;
+  --grain: 0.03;
+  --shadow-1: 0 1px 0 var(--line), 0 4px 8px rgba(0, 0, 0, 0.40);
+  --scrim: rgba(0, 0, 0, 0.6);
+  --tape: rgba(231, 236, 232, 0.28);
+}
+html[data-mood='comic'] { --radius-m: 12px; --radius-s: 6px; --tilt: 1.5deg; --deco: 1; }
+html[data-mood='serious'] { --radius-m: 2px; --radius-s: 1px; --hl-size: 70%; }
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur-base: 0ms; }
+}

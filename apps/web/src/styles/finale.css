@@ -1,0 +1,80 @@
+/* 최종 추리 화면 + 대사 줄(DialogueBox). 색은 토큰만. 접두어 fin- / dialogue */
+.fin-title { font-size: var(--text-2xl); line-height: 1.25; }
+.fin-lead { margin-top: var(--space-2); max-width: 60ch; }
+
+/* 하단 막대: 주 버튼이 화면 아래에 남는다 */
+.fin-bar {
+  position: sticky; bottom: 0; z-index: var(--z-sticky); margin: var(--space-4) calc(-1 * var(--space-4)) 0;
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  background: var(--bg); border-top: 1px solid var(--line-strong); display: flex; justify-content: flex-end;
+}
+.fin-bar .btn { min-height: 52px; }
+.fin-bar .btn-cta { min-width: 220px; }
+@media (max-width: 720px) {
+  .fin-bar .actions { width: 100%; flex-wrap: nowrap; }
+  .fin-bar .actions .btn-cta, .fin-bar > .btn-cta { flex: 1; min-width: 0; }
+  .fin-bar > .btn-cta { width: 100%; }
+}
+
+/* ---- 1단계: 지목 ---- */
+.fin-suspects { list-style: none; margin: var(--space-5) 0 0; padding: 0; display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+@media (max-width: 720px) { .fin-suspects { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); } }
+.fin-suspects .person.is-tile { cursor: pointer; min-height: 44px; transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out); }
+.fin-suspects .person.is-tile:hover { background: color-mix(in srgb, var(--ink) 5%, var(--surface)); }
+.fin-suspects .person.is-tile:active { transform: scale(0.98); }
+.fin-suspects .person-role { min-height: 2.7em; }
+.fin-hint { margin-top: var(--space-4); }
+
+/* ---- 2단계: 증거 제시 ---- */
+.fin-build { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 899px) { .fin-build { grid-template-columns: minmax(0, 1fr); } }
+.fin-dossier { padding: var(--space-5); display: grid; gap: var(--space-4); }
+@media (max-width: 720px) { .fin-dossier { padding: var(--space-4); } }
+.fin-who { display: grid; grid-template-columns: 136px minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+@media (max-width: 720px) { .fin-who { grid-template-columns: 112px minmax(0, 1fr); } }
+.fin-who .person-photo { width: 100%; margin: 0; }
+.fin-id { display: grid; gap: var(--space-1); align-content: start; }
+.fin-role { color: var(--muted); font-size: var(--text-s); }
+.fin-lives { display: inline-flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-3); }
+.fin-lives-text { font-size: var(--text-m); }
+.fin-lives-text b { font: 700 var(--text-l) var(--font-mono); }
+
+/* 단계 칸: 기회 · 수단 · 동기 */
+.fin-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
+.fin-steps li {
+  display: grid; gap: 2px; padding: var(--space-2) var(--space-3); border: 1.5px dashed var(--line-strong); border-radius: var(--radius-m); color: var(--muted);
+}
+.fin-step-label { font-weight: 700; font-size: var(--text-m); }
+.fin-step-state { font-size: var(--text-s); display: inline-flex; align-items: center; gap: 4px; }
+.fin-steps li.is-now { border-style: solid; border-width: 3px; color: var(--ink); }
+.fin-steps li.is-done { border-style: solid; border-width: 1.5px; color: var(--ink); background: var(--surface); }
+@media (max-width: 720px) { .fin-steps { grid-template-columns: minmax(0, 1fr); } .fin-steps li { grid-template-columns: 4em minmax(0, 1fr); align-items: center; min-height: 44px; } }
+
+.fin-speech { border-top: 1px solid var(--line); padding-top: var(--space-3); }
+.fin-note {
+  display: flex; gap: var(--space-2); align-items: flex-start; padding: var(--space-3); border: 1.5px solid var(--line-strong); border-radius: var(--radius-m);
+}
+.fin-note.is-wrong { border-style: dashed; border-width: 2px; }
+.fin-note .icon { margin-top: 3px; flex: none; }
+
+.fin-ev { overflow: hidden; }
+.fin-ev-head { padding: var(--space-3) var(--space-4) var(--space-2); border-bottom: 1px solid var(--line); }
+.fin-ev-head h2 { font-size: var(--text-l); }
+.fin-ev-head p { font-size: var(--text-s); color: var(--muted); margin-top: 2px; }
+.fin-ev .card-list { padding: var(--space-3) var(--space-4); }
+.fin-ev .fin-bar { margin: 0; }
+@media (min-width: 900px) { .fin-ev .fin-bar { position: static; } }
+
+/* ---- 3단계: 결론 페이지 ---- */
+.fin-conclusion { max-width: 640px; margin: calc(var(--tab-h) + var(--space-4)) auto 0; padding: var(--space-6); display: grid; gap: var(--space-4); }
+@media (max-width: 720px) { .fin-conclusion { padding: var(--space-4); } }
+.fin-conclusion-who span { color: var(--muted); font-size: var(--text-s); }
+.fin-conclusion-body { font-size: var(--text-l); line-height: 1.85; text-wrap: pretty; }
+
+/* ---- 대사 한 줄(DialogueBox): 이름 열 + 대사 ---- */
+.dialogue { display: grid; grid-template-columns: 4em minmax(0, 1fr); column-gap: var(--space-3); align-items: baseline; }
+.dialogue-who { font-size: var(--text-s); font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.dialogue-said, .dialogue p { margin: 0; font-size: var(--text-l); line-height: 1.85; text-wrap: pretty; }
+.dialogue .caret { margin-left: 1px; color: var(--muted); }
+.dialogue.role-narrator .dialogue-said { color: var(--muted); }
+@media (max-width: 720px) { .dialogue { grid-template-columns: minmax(0, 1fr); } .dialogue-said, .dialogue p { font-size: 17px; } }

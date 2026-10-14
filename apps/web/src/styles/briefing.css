@@ -1,0 +1,43 @@
+/* 브리핑: 사건 기록철 표지. 읽는 면은 종이. 토큰만 사용. (Generating 도 .briefing / .brief-actions / Cast 를 쓴다) */
+.briefing { display: grid; gap: var(--space-6); }
+.brief-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: stretch; margin-top: var(--space-4); }
+
+.brief-sheet { padding: var(--space-5); display: grid; gap: var(--space-3); width: 100%; }
+.brief-sheet h1 { font-size: 28px; }
+.brief-summary { max-width: 62ch; font-size: var(--text-m); line-height: 1.65; text-wrap: pretty; white-space: pre-line; }
+
+.brief-people { display: grid; gap: var(--space-3); }
+.brief-people h2 { font-size: var(--text-xl); }
+.brief-notice { max-width: 62ch; }
+
+.brief-cast { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); margin-top: var(--space-2); list-style: none; padding: 0; }
+.brief-card { --photo-w: 112px; padding: var(--space-4); opacity: 0; transform: translateY(6px); }
+.brief-card.in { opacity: 1; transform: none; transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+.brief-card .person-name { font-size: var(--text-l); }
+
+/* 등장인물이 많아도 첫 화면에서 바로 시작할 수 있게 아래에 붙여 둔다 */
+.brief-start {
+  position: sticky; bottom: 0; z-index: var(--z-sticky); display: flex; justify-content: center;
+  margin: 0 calc(-1 * var(--space-4)); padding: var(--space-3) var(--space-4); background: var(--bg); border-top: 1px solid var(--line);
+}
+.brief-start .btn { min-width: 240px; min-height: 52px; font-size: var(--text-l); }
+
+@media (prefers-reduced-motion: reduce) {
+  .brief-card, .brief-card.in { transform: none; transition: none; }
+}
+@media (max-width: 899px) {
+  .brief-cast { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .briefing { gap: var(--space-5); padding-bottom: calc(var(--space-8) + var(--space-5)); }
+  .brief-sheet { padding: var(--space-4); }
+  .brief-sheet h1 { font-size: 24px; }
+  .brief-card { padding: var(--space-3); }
+  .brief-card { --photo-w: 96px; }
+  .brief-card .person.is-row { column-gap: var(--space-3); }
+  .brief-start {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-sticky); padding: var(--space-3) var(--space-4);
+    background: var(--bg); border-top: 1px solid var(--line-strong);
+  }
+  .brief-start .btn { width: 100%; min-height: 48px; }
+}

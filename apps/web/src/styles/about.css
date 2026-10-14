@@ -1,0 +1,17 @@
+/* 정보 화면. 법적 표기라 14px 이상으로 숨기지 않는다. 읽는 면은 종이. */
+.about { display: grid; gap: var(--space-4); align-content: start; }
+.about-head { display: grid; gap: var(--space-3); justify-items: start; }
+.about-head h1 { font-size: 28px; }
+.about-block { padding: var(--space-5); display: grid; gap: var(--space-3); }
+.about-block h2 { font-size: var(--text-xl); }
+.about-block p { max-width: 68ch; text-wrap: pretty; }
+.about-list { display: grid; margin: 0; }
+.about-list > div { display: grid; grid-template-columns: 9em minmax(0, 1fr); gap: var(--space-1) var(--space-4); padding: var(--space-3) 0; }
+.about-list > div + div { border-top: 1px solid var(--line); }
+.about-list dt { font-weight: 700; }
+.about-list dd { margin: 0; grid-column: 2; text-wrap: pretty; overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .about-block { padding: var(--space-4); }
+  .about-list > div { grid-template-columns: minmax(0, 1fr); }
+  .about-list dd { grid-column: 1; }
+}

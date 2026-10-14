@@ -60,7 +60,7 @@ describe('Start 자유 주제', () => {
   it('빈 문자열/공백이면 사건 생성 버튼이 꺼져 있고, 글자가 있으면 켜진다', async () => {
     const onCreateCase = vi.fn()
     act(() => {
-      root.render(<Start busy={false} error={null} onStart={noop} onCreateCase={onCreateCase} onOpenGame={noop} onLoadSlot={noop} onHistory={noop} />)
+      root.render(<Start busy={false} error={null} onStart={noop} onCreateCase={onCreateCase} onOpenGame={noop} onLoadSlot={noop} onHistory={noop} onAbout={noop} />)
     })
     await flush()
     const input = host.querySelector('#custom-theme') as HTMLInputElement
@@ -81,7 +81,7 @@ describe('Start 자유 주제', () => {
 
   it('시작 화면에 인물 사진이 모두 AI 생성이라는 안내가 있다', async () => {
     act(() => {
-      root.render(<Start busy={false} error={null} onStart={noop} onCreateCase={noop} onOpenGame={noop} onLoadSlot={noop} onHistory={noop} />)
+      root.render(<Start busy={false} error={null} onStart={noop} onCreateCase={noop} onOpenGame={noop} onLoadSlot={noop} onHistory={noop} onAbout={noop} />)
     })
     await flush()
     const notice = host.querySelector('[data-testid="ai-notice"]')
@@ -90,7 +90,7 @@ describe('Start 자유 주제', () => {
 
   it('프리셋을 고르면 입력이 비워진다', async () => {
     act(() => {
-      root.render(<Start busy={false} error={null} onStart={noop} onCreateCase={noop} onOpenGame={noop} onLoadSlot={noop} onHistory={noop} />)
+      root.render(<Start busy={false} error={null} onStart={noop} onCreateCase={noop} onOpenGame={noop} onLoadSlot={noop} onHistory={noop} onAbout={noop} />)
     })
     await flush()
     const input = host.querySelector('#custom-theme') as HTMLInputElement

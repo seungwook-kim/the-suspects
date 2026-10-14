@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, USE_MOCK } from '../api/client'
 import type { CreateOptions, GameSummary, SaveSlotInfo, Theme } from '../api/types'
 import { AI_PORTRAIT_NOTICE } from '../character/Portrait'
+import { Icon, type IconName } from '../components/Icon'
 import { getPref, getSaves, setPref } from '../util/saves'
 
 type Mood = '코믹' | '보통' | '진지'
@@ -15,6 +16,7 @@ interface Props {
   onOpenGame: (gameId: string) => void
   onLoadSlot: (gameId: string, slotId: string) => void
   onHistory: () => void
+  onAbout: () => void
 }
 
 const TONE: Record<Mood, NonNullable<CreateOptions['tone']>> = { 코믹: 'comic', 보통: 'balanced', 진지: 'serious' }
@@ -22,7 +24,12 @@ const DIFF: Record<Difficulty, NonNullable<CreateOptions['difficulty']>> = { 쉬
 
 export const CUSTOM_MAX = 80
 
-export function Start({ busy, error, onStart, onCreateCase, onOpenGame, onLoadSlot, onHistory }: Props) {
+const MOOD_ATTR: Record<Mood, string> = { 코믹: 'comic', 보통: 'normal', 진지: 'serious' }
+// 사건 카드 아이콘은 순서대로 돌려 쓴다
+const CASE_ICONS: IconName[] = ['database', 'buildings', 'package', 'bed']
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+export function Start({ busy, error, onStart, onCreateCase, onOpenGame, onLoadSlot, onHistory, onAbout }: Props) {
   const [themes, setThemes] = useState<Theme[] | null>(null)
   const [loadErr, setLoadErr] = useState('')
   const [theme, setTheme] = useState<string | null>(null)
@@ -72,83 +79,128 @@ export function Start({ busy, error, onStart, onCreateCase, onOpenGame, onLoadSl
     setPref(key, v)
   }
 
+  // 분위기는 고르는 자리에서 바로 보이게 한다(저장은 pick 이 한다)
+  const pickMood = (v: Mood) => {
+    document.documentElement.dataset.mood = MOOD_ATTR[v]
+    pick(setMood, 'mood')(v)
+  }
+
   const opts: CreateOptions = { tone: TONE[mood], difficulty: DIFF[diff], play_minutes: minutes as 20 | 40 | 60 }
+  const customOk = custom.trim().length >= 2
 
   return (
     <div className="screen start">
-      <h1>The Suspects</h1>
-      <p className="lead">오늘은 어떤 사건을?</p>
-      <p className="ai-notice" role="note" data-testid="ai-notice">🤖 {AI_PORTRAIT_NOTICE}</p>
-      {USE_MOCK && <p className="mock-badge">목(mock) 모드 · 가짜 데이터로 실행 중</p>}
+      <header className="start-head">
+        <h1>The Suspects</h1>
+        <p className="lead">오늘은 어떤 사건을 맡을까요?</p>
+        <p className="ai-notice" role="note" data-testid="ai-notice">
+          <Icon name="info" />
+          <span>{AI_PORTRAIT_NOTICE}</span>
+        </p>
+        {USE_MOCK && <p className="start-mock muted small">목(mock) 모드 · 가짜 데이터로 실행 중</p>}
+      </header>
 
-      <div className="theme-grid">
+      <section aria-labelledby="start-cases-h">
+        <h2 id="start-cases-h" className="sr-only">사건 고르기</h2>
         {!themes && !loadErr && <p className="muted">주제를 불러오는 중…</p>}
-        {loadErr && <p className="warn">{loadErr}</p>}
-        {themes?.map((t) => (
-          <button key={t.id} className={`theme-card${theme === t.id ? ' on' : ''}`} onClick={() => { setTheme(t.id); setCustom('') }}>
-            <span className="emoji">{t.emoji}</span>
-            <strong>{t.title}</strong>
-            <span className="muted small">{t.description}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="custom-box">
-        <label htmlFor="custom-theme">
-          ✏️ 직접 만들기 <span className="lab">실험실</span>
-          <span className="muted small"> — 결과가 들쭉날쭉할 수 있어요</span>
-        </label>
-        <div className="custom-row">
-          <input
-            id="custom-theme"
-            value={custom}
-            maxLength={CUSTOM_MAX}
-            disabled={busy}
-            onChange={(e) => {
-              setCustom(e.target.value)
-              if (e.target.value) setTheme(null)
-            }}
-            placeholder="예: 고등학교 축제 날 사라진 상장"
-            aria-label="자유 주제"
-          />
-          <button className="primary" disabled={busy || custom.trim().length < 2} onClick={() => onCreateCase(custom.trim(), opts)}>
-            사건 생성 ▶
-          </button>
+        {loadErr && <p className="warn-text" role="alert">{loadErr}</p>}
+        <div className="start-cases" role="radiogroup" aria-label="사건">
+          {themes?.map((t, i) => (
+            <button
+              key={t.id}
+              type="button"
+              role="radio"
+              aria-checked={theme === t.id}
+              className={`theme-card start-case${theme === t.id ? ' on' : ''}`}
+              onClick={() => { setTheme(t.id); setCustom('') }}
+            >
+              <span className="start-case-icon"><Icon name={CASE_ICONS[i % CASE_ICONS.length]} /></span>
+              <span className="start-case-text">
+                <span className="start-case-no mono">사건 {pad2(i + 1)}</span>
+                <strong>{t.title}</strong>
+                <span className="start-case-desc">{t.description}</span>
+              </span>
+              <span className="start-case-on"><Icon name="check-circle" />선택됨</span>
+            </button>
+          ))}
         </div>
-        <span className="muted small char-count" aria-live="polite">{CUSTOM_MAX - custom.length}자 남음</span>
-      </div>
 
-      <div className="options">
-        <Seg label="분위기" values={['코믹', '보통', '진지']} value={mood} onChange={pick(setMood, 'mood')} />
+        <div className="start-custom">
+          <div className="start-custom-head">
+            <label htmlFor="custom-theme"><strong>직접 만들기</strong></label>
+            <span className="kind">실험실</span>
+            <span className="muted small">결과가 들쭉날쭉할 수 있어요.</span>
+            <span className="start-count mono muted small" aria-live="polite">{CUSTOM_MAX - custom.length}자 남음</span>
+          </div>
+          <div className="start-custom-row">
+            <input
+              id="custom-theme"
+              className="field"
+              value={custom}
+              maxLength={CUSTOM_MAX}
+              disabled={busy}
+              onChange={(e) => {
+                setCustom(e.target.value)
+                if (e.target.value) setTheme(null)
+              }}
+              placeholder="예: 고등학교 축제 날 사라진 상장"
+              aria-label="자유 주제"
+            />
+            <button
+              type="button"
+              className={`btn${customOk && !busy ? ' btn-cta' : ''}`}
+              disabled={busy || !customOk}
+              onClick={() => onCreateCase(custom.trim(), opts)}
+            >
+              <span className="btn-label"><Icon name="paper-plane-tilt" />사건 생성</span>
+              {!busy && !customOk && <small className="btn-reason">주제를 입력하세요</small>}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="start-options" aria-label="옵션">
+        <Seg label="분위기" values={['코믹', '보통', '진지']} value={mood} onChange={pickMood} />
         <Seg label="난이도" values={['쉬움', '보통', '어려움']} value={diff} onChange={pick(setDiff, 'diff')} />
         <Seg label="플레이 시간" values={[20, 40, 60]} fmt={(v) => (v === 60 ? '1시간' : `${v}분`)} value={minutes} onChange={pick(setMinutes, 'minutes')} />
-      </div>
+      </section>
 
-      {error && <p className="warn" role="alert">{error}</p>}
-      <div className="start-actions">
-        <button className="primary big" disabled={!theme || busy} onClick={() => theme && onStart(theme, opts)}>
-          {busy ? '사건 파일 작성 중…' : '사건 시작 ▶'}
-        </button>
-        <button disabled={busy} onClick={() => void toggleSaves()}>이어하기</button>
-        <button onClick={onHistory} disabled={busy}>클리어 이력</button>
+      {error && <p className="warn-text" role="alert">{error}</p>}
+      <div className="start-go">
+        <div className="start-go-side">
+          <button type="button" className="btn" disabled={busy} onClick={() => void toggleSaves()}>
+            <span className="btn-label"><Icon name="floppy-disk" />이어하기</span>
+          </button>
+          <button type="button" className="btn" onClick={onHistory} disabled={busy}>
+            <span className="btn-label"><Icon name="notebook" />클리어 이력</span>
+          </button>
+        </div>
+        <div className="start-go-main">
+          <button type="button" className="btn btn-cta btn-lg" disabled={!theme || busy} onClick={() => theme && onStart(theme, opts)}>
+            <span className="btn-label"><Icon name="chat-circle-text" />{busy ? '사건 파일 작성 중…' : '사건 시작'}</span>
+            {!theme && !busy && <small className="btn-reason">사건을 고르세요</small>}
+          </button>
+        </div>
       </div>
 
       {showSaves && (
-        <ul className="save-list">
+        <ul className="start-saves paper">
           {!offline && games === null && <li className="muted">불러오는 중…</li>}
           {!offline && games?.length === 0 && <li className="muted">이어할 게임이 없습니다.</li>}
           {!offline &&
             games?.map((gm) => (
               <li key={gm.game_id}>
-                <div className="save-row">
-                  <button onClick={() => onOpenGame(gm.game_id)}>
-                    <b>{gm.case_title}</b> · {gm.day}일차 · {new Date(gm.last_seen).toLocaleString('ko-KR')}
+                <div className="start-save-row">
+                  <button type="button" className="btn btn-quiet" onClick={() => onOpenGame(gm.game_id)}>
+                    <span className="btn-label"><b>{gm.case_title}</b> · {gm.day}일차 · {new Date(gm.last_seen).toLocaleString('ko-KR')}</span>
                   </button>
-                  <button onClick={() => void openSlots(gm.game_id)}>저장 슬롯</button>
+                  <button type="button" className="btn btn-sm" onClick={() => void openSlots(gm.game_id)}>
+                    <span className="btn-label">저장 슬롯</span>
+                  </button>
                 </div>
                 {slots[gm.game_id]?.map((sl) => (
-                  <button key={sl.slot_id} className="slot" onClick={() => onLoadSlot(gm.game_id, sl.slot_id)}>
-                    💾 {sl.name} · {new Date(sl.saved_at).toLocaleString('ko-KR')}
+                  <button key={sl.slot_id} type="button" className="btn btn-quiet start-slot" onClick={() => onLoadSlot(gm.game_id, sl.slot_id)}>
+                    <span className="btn-label"><Icon name="floppy-disk" />{sl.name} · {new Date(sl.saved_at).toLocaleString('ko-KR')}</span>
                   </button>
                 ))}
                 {slots[gm.game_id]?.length === 0 && <span className="muted small">저장 슬롯이 없습니다.</span>}
@@ -160,8 +212,8 @@ export function Start({ busy, error, onStart, onCreateCase, onOpenGame, onLoadSl
               {localSaves.length === 0 && <li className="muted">기억해 둔 저장본이 없습니다.</li>}
               {localSaves.map((sv) => (
                 <li key={sv.slot_id}>
-                  <button onClick={() => onLoadSlot(sv.game_id, sv.slot_id)}>
-                    <b>{sv.case_title}</b> · {sv.day}일차 · {new Date(sv.saved_at).toLocaleString('ko-KR')}
+                  <button type="button" className="btn btn-quiet" onClick={() => onLoadSlot(sv.game_id, sv.slot_id)}>
+                    <span className="btn-label"><b>{sv.case_title}</b> · {sv.day}일차 · {new Date(sv.saved_at).toLocaleString('ko-KR')}</span>
                   </button>
                 </li>
               ))}
@@ -169,7 +221,11 @@ export function Start({ busy, error, onStart, onCreateCase, onOpenGame, onLoadSl
           )}
         </ul>
       )}
-      <p className="muted small privacy">자유 입력에는 개인정보를 적지 마세요. 클리어하면 사건 데이터는 삭제됩니다.</p>
+
+      <footer className="start-foot">
+        <p>자유 입력에는 개인정보를 적지 마세요. 클리어하면 사건 데이터는 삭제됩니다.</p>
+        <button type="button" className="start-about" onClick={onAbout}>정보 · 라이선스</button>
+      </footer>
     </div>
   )
 }
@@ -184,11 +240,11 @@ function Seg<T extends string | number>({
   fmt?: (v: T) => string
 }) {
   return (
-    <div className="seg-row">
-      <span>{label}</span>
-      <div className="seg" role="radiogroup" aria-label={label}>
+    <div className="start-seg-row">
+      <span className="start-legend" id={`seg-${label}`}>{label}</span>
+      <div className="seg" role="radiogroup" aria-labelledby={`seg-${label}`}>
         {values.map((v) => (
-          <button key={String(v)} role="radio" aria-checked={v === value} className={v === value ? 'on' : ''} onClick={() => onChange(v)}>
+          <button key={String(v)} type="button" role="radio" aria-checked={v === value} className={v === value ? 'on' : ''} onClick={() => onChange(v)}>
             {fmt ? fmt(v) : String(v)}
           </button>
         ))}

@@ -1,7 +1,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Portrait, resetPortraitFailures } from './Portrait'
+import { Portrait, PortraitPending, resetPortraitFailures } from './Portrait'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -20,15 +20,13 @@ afterEach(() => {
 })
 
 const show = (el: React.ReactElement) => act(() => root.render(el))
-const stubMotion = (reduce: boolean) =>
-  vi.stubGlobal('matchMedia', (q: string) => ({ matches: reduce && q.includes('reduce'), addEventListener: () => {}, removeEventListener: () => {} }))
 
 describe('Portrait', () => {
   it('portrait_url 이 있으면 img 를 보여 준다', () => {
     show(<Portrait seed={1} portraitUrl="/api/portraits/k/a.png" name="오민재" />)
     const img = host.querySelector('img')!
     expect(img.getAttribute('src')).toBe('/api/portraits/k/a.png')
-    expect(img.alt).toBe('오민재')
+    expect(img.alt).toBe('오민재, AI로 생성한 가상의 인물 사진')
     expect(img.getAttribute('loading')).toBe('lazy')
     expect(img.getAttribute('decoding')).toBe('async')
   })
@@ -42,6 +40,18 @@ describe('Portrait', () => {
     show(<Portrait seed={1} portraitUrl={null} />)
     expect(host.querySelector('img')).toBeNull()
     expect(host.querySelector('svg')).not.toBeNull()
+  })
+
+  it('서버가 그리는 중이면 그림 얼굴 대신 "사진 준비 중" 칸을 보여 준다', () => {
+    show(
+      <PortraitPending.Provider value={true}>
+        <Portrait seed={1} portraitUrl={null} name="서도윤" />
+      </PortraitPending.Provider>,
+    )
+    expect(host.querySelector('svg')).toBeNull()
+    expect(host.querySelector('.avatar-pending')?.getAttribute('aria-label')).toBe('서도윤, 사진 준비 중')
+    expect(host.textContent).toContain('서')
+    expect(host.textContent).toContain('사진 준비 중')
   })
 
   it('이미지 로드가 실패하면 SVG 로 대체하고 다시 되돌아오지 않는다', () => {
@@ -59,36 +69,45 @@ describe('Portrait', () => {
     show(<Portrait seed={1} portraitUrl={null} />)
     show(<Portrait seed={1} portraitUrl="/late.png" />)
     const img = host.querySelector('img')!
-    expect(img.classList.contains('loaded')).toBe(false)
+    expect(img.classList.contains('is-front')).toBe(false)
     act(() => {
       img.dispatchEvent(new Event('load'))
     })
-    expect(host.querySelector('img')!.classList.contains('loaded')).toBe(true)
+    expect(host.querySelector('img')!.classList.contains('is-front')).toBe(true)
   })
 
   it('감정에 맞는 표정 사진이 있으면 그것을 보여 주고, 없으면 기본 사진으로', () => {
     show(<Portrait seed={1} portraitUrl="/base.png" portraitEmotions={{ angry: '/angry.png' }} emotion="angry" />)
     expect([...host.querySelectorAll('img')].map((i) => i.getAttribute('src'))).toEqual(['/angry.png'])
-    expect(host.querySelector('.portrait-tint')).toBeNull()
-    expect(host.textContent).toContain('💢')
     show(<Portrait seed={1} portraitUrl="/base.png" portraitEmotions={{ angry: '/angry.png' }} emotion="sad" />)
     expect(host.querySelector('img:last-of-type')!.getAttribute('src')).toBe('/base.png')
   })
 
-  it('사진을 바꾸는 동안 이전 사진을 남겨 두었다가 새 사진이 불러와지면 치운다', () => {
-    const emo = { angry: '/angry.png' }
-    show(<Portrait seed={1} portraitUrl="/base.png" portraitEmotions={emo} emotion="neutral" />)
-    act(() => {
-      host.querySelector('img')!.dispatchEvent(new Event('load'))
-    })
-    show(<Portrait seed={1} portraitUrl="/base.png" portraitEmotions={emo} emotion="angry" />)
-    const imgs = [...host.querySelectorAll('img')]
-    expect(imgs.map((i) => i.getAttribute('src'))).toEqual(['/base.png', '/angry.png'])
-    expect(imgs[0].classList.contains('loaded')).toBe(true)
-    act(() => {
-      imgs[1].dispatchEvent(new Event('load'))
-    })
-    expect([...host.querySelectorAll('img')].map((i) => i.getAttribute('src'))).toEqual(['/angry.png'])
+  it('표정이 바뀌면 이전 사진 위로 새 사진이 겹쳐 나타나고(크로스페이드), 끝나면 이전 사진을 치운다', () => {
+    vi.useFakeTimers()
+    try {
+      const emo = { angry: '/angry.png' }
+      show(<Portrait seed={1} portraitUrl="/base.png" portraitEmotions={emo} emotion="neutral" />)
+      act(() => {
+        host.querySelector('img')!.dispatchEvent(new Event('load'))
+      })
+      show(<Portrait seed={1} portraitUrl="/base.png" portraitEmotions={emo} emotion="angry" />)
+      let imgs = [...host.querySelectorAll('img')]
+      expect(imgs.map((i) => i.getAttribute('src'))).toEqual(['/base.png', '/angry.png'])
+      expect(imgs.map((i) => i.classList.contains('is-front'))).toEqual([true, false])
+      act(() => {
+        imgs[1].dispatchEvent(new Event('load'))
+      })
+      imgs = [...host.querySelectorAll('img')]
+      expect(imgs.map((i) => i.getAttribute('src'))).toEqual(['/base.png', '/angry.png'])
+      expect(imgs.every((i) => i.classList.contains('is-front'))).toBe(true)
+      act(() => {
+        vi.advanceTimersByTime(300)
+      })
+      expect([...host.querySelectorAll('img')].map((i) => i.getAttribute('src'))).toEqual(['/angry.png'])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('표정 사진 로드가 실패하면 기본 사진으로 돌아간다', () => {
@@ -99,30 +118,16 @@ describe('Portrait', () => {
     expect([...host.querySelectorAll('img')].map((i) => i.getAttribute('src'))).toEqual(['/base.png'])
   })
 
-  it('분노는 붉은 색조와 💢, 당황은 흔들림과 💦', () => {
-    stubMotion(false)
-    show(<Portrait seed={1} portraitUrl="/p.png" emotion="angry" />)
-    expect(host.querySelector('.portrait-tint')).not.toBeNull()
-    expect(host.textContent).toContain('💢')
-    show(<Portrait seed={1} portraitUrl="/p.png" emotion="flustered" />)
-    expect(host.querySelector('.fx-shake')).not.toBeNull()
-    expect(host.textContent).toContain('💦')
-    show(<Portrait seed={1} portraitUrl="/p.png" emotion="neutral" />)
-    expect(host.querySelector('.fx-shake, .fx-tremble, .portrait-tint, .portrait-badge')).toBeNull()
+  it('사진은 감정 효과로 변형하지 않는다(흔들림·색조·뱃지·반전 없음)', () => {
+    for (const emotion of ['angry', 'flustered', 'nervous', 'sad', 'happy'] as const) {
+      show(<Portrait seed={1} portraitUrl="/p.png" emotion={emotion} speaking />)
+      expect(host.querySelector('.fx-shake, .fx-tremble, .fx-bob, .portrait-tint, .portrait-badge')).toBeNull()
+      expect(host.textContent).not.toMatch(/💦|💢/)
+    }
   })
 
-  it('말하는 동안 들썩이고, 긴장은 떨린다', () => {
-    stubMotion(false)
-    show(<Portrait seed={1} portraitUrl="/p.png" emotion="nervous" speaking />)
-    expect(host.querySelector('.fx-bob')).not.toBeNull()
-    expect(host.querySelector('.fx-tremble')).not.toBeNull()
-  })
-
-  it('움직임 줄이기 설정이면 흔들림·떨림·들썩임이 없다', () => {
-    stubMotion(true)
-    show(<Portrait seed={1} portraitUrl="/p.png" emotion="flustered" speaking />)
-    expect(host.querySelector('.fx-shake, .fx-tremble, .fx-bob')).toBeNull()
-    expect(host.querySelector('.calm')).not.toBeNull()
-    expect(host.textContent).toContain('💦')
+  it('cover 글자를 사진 위 덮개로 보여 준다', () => {
+    show(<Portrait seed={1} portraitUrl="/p.png" cover="등을 돌렸다" />)
+    expect(host.querySelector('.away-cover')?.textContent).toBe('등을 돌렸다')
   })
 })

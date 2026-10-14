@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api/client'
 import type { CaseJob, CreateOptions, PlayerView } from '../api/types'
+import { PortraitPending } from '../character/Portrait'
+import { Icon } from '../components/Icon'
 import { Cast } from './Briefing'
 
 interface Props {
@@ -65,13 +67,13 @@ export function Generating({ themeText, options, onReady, onRejected, onFallback
 
   if (netError) {
     return (
-      <div className="screen briefing">
+      <div className="screen gen">
         <div className="gen-error">
-          <div className="folder">📡</div>
-          <p className="warn" role="alert">서버와 연결이 불안정해요. 사건 파일을 불러오지 못했습니다.</p>
-          <div className="brief-actions">
-            <button className="primary" onClick={retry}>다시 시도</button>
-            <button onClick={onHome}>처음으로</button>
+          <Icon name="warning-circle" className="gen-error-icon" />
+          <p className="warn-text" role="alert">서버와 연결이 불안정해요. 사건 파일을 불러오지 못했습니다.</p>
+          <div className="actions is-center">
+            <button type="button" className="btn btn-cta" onClick={retry}><span className="btn-label">다시 시도</span></button>
+            <button type="button" className="btn" onClick={onHome}><span className="btn-label">처음으로</span></button>
           </div>
         </div>
       </div>
@@ -80,15 +82,17 @@ export function Generating({ themeText, options, onReady, onRejected, onFallback
 
   if (job?.status === 'failed') {
     return (
-      <div className="screen briefing">
+      <div className="screen gen">
         <div className="gen-error">
-          <div className="folder">🗂️</div>
-          <p className="warn" role="alert">{job.message ?? '사건을 만들지 못했어요.'}</p>
-          <div className="brief-actions">
+          <Icon name="warning-circle" className="gen-error-icon" />
+          <p className="warn-text" role="alert">{job.message ?? '사건을 만들지 못했어요.'}</p>
+          <div className="actions is-center">
             {job.fallback_theme_id && (
-              <button className="primary" onClick={() => onFallback(job.fallback_theme_id!)}>기본 사건으로 시작</button>
+              <button type="button" className="btn btn-cta" onClick={() => onFallback(job.fallback_theme_id!)}>
+                <span className="btn-label">기본 사건으로 시작</span>
+              </button>
             )}
-            <button onClick={onHome}>처음으로</button>
+            <button type="button" className="btn" onClick={onHome}><span className="btn-label">처음으로</span></button>
           </div>
         </div>
       </div>
@@ -101,54 +105,55 @@ export function Generating({ themeText, options, onReady, onRejected, onFallback
   const stage = job?.stage ?? 1
   const total = job?.total ?? 5
 
-  const status = (
-    <div className="gen-status" role="status" aria-live="polite">
-      <span>{stageText}</span>
-      <span className="muted small"> ({stage}/{total})</span>
-      <div className="gen-steps" aria-hidden="true">
-        {Array.from({ length: total }, (_, i) => (
-          <span key={i} className={i < stage - (ready ? 0 : 1) ? 'done' : ''} />
-        ))}
-      </div>
-    </div>
+  // 단계 칸: 글자("단계 N / M")를 꼭 같이 둔다
+  const steps = (done: number) => (
+    <span className="cells" aria-hidden="true">
+      {Array.from({ length: total }, (_, i) => (
+        <i key={i} className={i < done ? 'on' : ''} />
+      ))}
+    </span>
   )
 
   if (!preview) {
     return (
-      <div className="screen briefing">
-        <div className="file-loading">
-          <div className="folder">📁</div>
+      <div className="screen gen">
+        <div className="loading-file" role="status" aria-live="polite">
+          <Icon name="notebook" />
           <p>{stageText.replace(/…$/, '')}<span className="dots" /></p>
+          {steps(stage)}
           <p className="muted small">단계 {stage} / {total} · 1~3분쯤 걸려요</p>
         </div>
-        <div className="gen-steps" aria-hidden="true">
-          {Array.from({ length: total }, (_, i) => (
-            <span key={i} className={i < stage ? 'done' : ''} />
-          ))}
-        </div>
-        <div className="brief-actions">
-          <button onClick={onHome}>취소</button>
+        <div className="actions is-center">
+          <button type="button" className="btn" onClick={onHome}><span className="btn-label">취소</span></button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="screen briefing">
-      <p className="eyebrow">사건 브리핑 <span className="lab">실험실</span></p>
+    <div className="screen gen gen-preview">
+      <p className="eyebrow">사건 브리핑 <span className="kind">실험실</span></p>
       <h1>{preview.title}</h1>
-      <p className="summary">{preview.incident_summary}</p>
+      <p className="gen-summary paper">{preview.incident_summary}</p>
 
-      <h2>등장인물</h2>
-      <Cast characters={preview.characters} />
+      <h2 className="section-title">등장인물</h2>
+      {/* 사진은 아직 그리는 중이라 "사진 준비 중"으로 보인다 */}
+      <PortraitPending.Provider value={true}>
+        <Cast characters={preview.characters} />
+      </PortraitPending.Provider>
 
-      <div className="brief-actions">
-        <button className="primary big" disabled={!ready} onClick={() => job?.game_id && job.view && onReady(job.game_id, job.view)}>
-          수사 시작 ▶
-        </button>
-        <button onClick={onHome}>취소</button>
+      <div className="gen-status" role="status" aria-live="polite">
+        <span>{stageText}</span>
+        {steps(stage - (ready ? 0 : 1))}
+        <span className="mono muted small">단계 {stage} / {total}</span>
       </div>
-      {status}
+      <div className="actions">
+        <button type="button" className="btn btn-cta btn-lg" disabled={!ready} onClick={() => job?.game_id && job.view && onReady(job.game_id, job.view)}>
+          <span className="btn-label"><Icon name="magnifying-glass" />수사 시작</span>
+          {!ready && <small className="btn-reason">사건 파일을 마무리하는 중</small>}
+        </button>
+        <button type="button" className="btn" onClick={onHome}><span className="btn-label">취소</span></button>
+      </div>
     </div>
   )
 }

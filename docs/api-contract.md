@@ -97,7 +97,7 @@ CaseJob = {
 ### CUSTOM 이벤트 이름
 | name | value | 화면 처리 |
 |:--|:--|:--|
-| `emotion` | `{npcId, emotion}` | 초상화 표정·효과(💦, 💢, 흔들림) |
+| `emotion` | `{npcId, emotion}` | 초상화 표정(표정 사진 교체 + 표정 글자 칩, 그림 얼굴은 표정 그림) |
 | `notebook` | `{added: {evidence_ids?, statements?, contradictions?}}` | 수첩에 추가, 모순이면 ⚠ 강조 |
 | `feed` | `FeedItem` | 단톡방·사내 메신저 피드에 추가 |
 | `chips` | `{chips: Chip[]}` | 질문 추천 칩 갱신 |
@@ -120,8 +120,8 @@ CaseJob = {
   (서버 재시작으로 끊김 등) 그 사람만 한 번 더 그린다(한 판에 최대 2번).
 - `PublicCharacter.portrait_emotions: {표정: 주소} | null` — 같은 얼굴의 표정 사진(그린 것만). 서버는 그 인물의 그 감정이 처음 나올 때 그린다(약 10초).
   화면은 감정에 맞는 표정 사진이 있으면 그것을, 없으면 기본 사진(`portrait_url`)을 쓴다. 행동이 끝날 때마다 사진 상태를 다시 묻는다.
-- 감정 효과는 사진 위에 그대로 얹는다(PRD §9.3; 표정 사진일 때는 색조만 뺀다): 당황 흔들림+💦, 분노 붉은 색조+💢, 긴장 살짝 확대·떨림,
-  슬픔 채도 낮춤·푸른 색조, 기쁨 밝게. 대사 중에는 미세하게 들썩인다.
+- 사진에는 감정 효과를 얹지 않는다(PRD §9.4, 2026-10-14 변경). 표정이 바뀌면 180ms 크로스페이드, 이름 옆에 표정 글자 칩.
+  `GET /portraits` 의 `pending` 이 true 인 동안 사진이 없는 인물은 "사진 준비 중" 칸으로 보여 준다.
 - `GET /api/portraits/{key}/{file}` → 이미지(`image/png`·`image/jpeg`·`image/webp`). 클리어하면 그 판의 초상화 파일은 삭제된다
   (서버의 사진 보관함에는 남지만 이 주소로는 다시 열 수 없다).
 

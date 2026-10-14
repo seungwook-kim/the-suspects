@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ClearHistory } from '../api/types'
-import { buildShareText, dayPeriod, formatDayTime } from './format'
-import { layoutGraph } from './layout'
+import { buildShareText, chipText, dayPeriod, formatDayTime, plainTitle } from './format'
+import { layoutGraph, separateBoxes } from './layout'
 
 describe('시간·공유 문구', () => {
   it('분 단위 clock 을 N일차 HH:MM 으로', () => {
@@ -40,5 +40,31 @@ describe('지도 자동 배치', () => {
   it('빈 그래프와 노드 1개', () => {
     expect(layoutGraph([], [], 100, 100, { x: 1, y: 1 })).toEqual([])
     expect(layoutGraph(['x'], [], 100, 100, { x: 1, y: 1 })).toHaveLength(1)
+  })
+  it('separateBoxes: 겹친 칸을 떼어 놓고 화면 안에 둔다', () => {
+    const nodes = [
+      { id: 'a', x: 100, y: 100 },
+      { id: 'b', x: 110, y: 105 },
+      { id: 'c', x: 100, y: 100 },
+    ]
+    const out = separateBoxes(nodes, 270, 400, 100, 50)
+    for (let i = 0; i < out.length; i++)
+      for (let j = i + 1; j < out.length; j++)
+        expect(Math.abs(out[i].x - out[j].x) >= 100 || Math.abs(out[i].y - out[j].y) >= 50).toBe(true)
+    for (const n of out) {
+      expect(n.x).toBeGreaterThanOrEqual(50)
+      expect(n.x).toBeLessThanOrEqual(220)
+    }
+    expect(separateBoxes(nodes, 270, 400, 100, 50)).toEqual(out)
+  })
+  it('chipText: 앞에 붙은 "이름:"은 그 사람 이름일 때만 뗀다', () => {
+    expect(chipText('정하늘: 어젯밤 어디 계셨어요?', '정하늘')).toBe('어젯밤 어디 계셨어요?')
+    expect(chipText('오민재: 백업은요?', '정하늘')).toBe('오민재: 백업은요?')
+    expect(chipText('감사 로그에 대해', '정하늘')).toBe('감사 로그에 대해')
+  })
+  it('plainTitle: 앞의 이모지만 뗀다', () => {
+    expect(plainTitle('💾 사라진 운영 DB')).toBe('사라진 운영 DB')
+    expect(plainTitle('🏨️ 호텔 밀실')).toBe('호텔 밀실')
+    expect(plainTitle('사건 01')).toBe('사건 01')
   })
 })

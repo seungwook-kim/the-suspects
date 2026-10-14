@@ -24,9 +24,19 @@ export interface DialogueLine {
   done: boolean
 }
 
+/** 심문 조서의 문답 한 쌍. 질문은 화면에서 보낸 것이고(칩·직접 질문·증거 제시), 답은 NPC 대사 원문이다. */
+export interface QaEntry {
+  id: string // 답 메시지 id
+  npcId: string
+  q: string | null
+  a: string
+}
+
 export interface ClientState {
   view: PlayerView | null
   dialogue: DialogueLine | null
+  log: QaEntry[] // 이번 접속에서 오간 문답(이전 문답 표시용). 불러온 게임은 비어 있고, 그때는 진술로 대신한다
+  asked: { npcId: string; text: string } | null // 답을 기다리는 질문
   emotions: Record<string, Emotion> // 이벤트로 덮어쓴 표정(스냅샷이 오면 비움)
   turnAway: Record<string, number> // npcId -> 풀리기까지 남은 행동 수
   cutin: (CutinValue & { key: number }) | null
@@ -45,6 +55,8 @@ export interface ClientState {
 export const initialClientState: ClientState = {
   view: null,
   dialogue: null,
+  log: [],
+  asked: null,
   emotions: {},
   turnAway: {},
   cutin: null,
@@ -86,9 +98,9 @@ export function applyEvent(s: ClientState, ev: AgEvent): ClientState {
     case 'RUN_STARTED':
       return { ...s, running: true, error: null }
     case 'RUN_FINISHED':
-      return { ...s, running: false, night: null }
+      return { ...s, running: false, night: null, asked: null }
     case 'RUN_ERROR':
-      return { ...s, running: false, night: null, error: ev.message || '알 수 없는 오류가 났습니다.' }
+      return { ...s, running: false, night: null, asked: null, error: ev.message || '알 수 없는 오류가 났습니다.' }
 
     case 'TEXT_MESSAGE_START':
       return {
@@ -104,16 +116,25 @@ export function applyEvent(s: ClientState, ev: AgEvent): ClientState {
     case 'TEXT_MESSAGE_CONTENT':
       if (!s.dialogue || s.dialogue.messageId !== ev.messageId) return s
       return { ...s, dialogue: { ...s.dialogue, text: s.dialogue.text + ev.delta } }
-    case 'TEXT_MESSAGE_END':
-      if (!s.dialogue || s.dialogue.messageId !== ev.messageId) return s
-      return { ...s, dialogue: { ...s.dialogue, done: true } }
+    case 'TEXT_MESSAGE_END': {
+      const d = s.dialogue
+      if (!d || d.messageId !== ev.messageId) return s
+      const done = { ...s, dialogue: { ...d, done: true } }
+      if (d.role !== 'npc' || !d.speakerId || !d.text) return done
+      const q = s.asked?.npcId === d.speakerId ? s.asked.text : null
+      return { ...done, asked: null, log: [...s.log, { id: d.messageId, npcId: d.speakerId, q, a: d.text }] }
+    }
 
     case 'STATE_SNAPSHOT':
       return { ...s, view: ev.snapshot, emotions: {}, needsResync: false, ending: s.ending }
     case 'STATE_DELTA': {
       if (!s.view) return { ...s, needsResync: true }
       try {
-        return { ...s, view: applyPatch(s.view, ev.delta) }
+        const view = applyPatch(s.view, ev.delta)
+        // 서버는 델타를 notebook 이벤트보다 먼저 보낸다. 델타로 새로 생긴 모순도 "새 모순"으로 표시한다
+        const before = new Set(s.view.notebook.contradictions.map((c) => c.id))
+        const fresh = view.notebook.contradictions.map((c) => c.id).filter((id) => !before.has(id) && !s.newContradictions.includes(id))
+        return { ...s, view, newContradictions: fresh.length ? [...s.newContradictions, ...fresh] : s.newContradictions }
       } catch {
         // 패치가 어긋나면 화면을 멈추지 않고 GET 으로 다시 맞춘다.
         return { ...s, needsResync: true }
@@ -138,7 +159,7 @@ function applyCustom(s: ClientState, name: string, value: unknown): ClientState 
       const added = (value as { added?: NotebookAdded }).added ?? {}
       if (!s.view) return s
       const have = new Set(s.view.notebook.contradictions.map((c) => c.id))
-      const fresh = (added.contradictions ?? []).filter((c) => !have.has(c.id)).map((c) => c.id)
+      const fresh = (added.contradictions ?? []).filter((c) => !have.has(c.id) && !s.newContradictions.includes(c.id)).map((c) => c.id)
       return {
         ...s,
         view: mergeNotebook(s.view, added),
@@ -183,6 +204,7 @@ export type UiAction =
   | { kind: 'clear_overheard' }
   | { kind: 'clear_new_contradictions' }
   | { kind: 'clear_dialogue' }
+  | { kind: 'asked'; npcId: string; text: string }
   | { kind: 'error'; message: string }
   | { kind: 'running'; value: boolean }
   | { kind: 'tick_turn_away' }
@@ -224,6 +246,8 @@ export function clientReducer(s: ClientState, a: UiAction): ClientState {
       return { ...s, newContradictions: [] }
     case 'clear_dialogue':
       return { ...s, dialogue: null }
+    case 'asked':
+      return { ...s, asked: { npcId: a.npcId, text: a.text } }
     case 'error':
       return { ...s, error: a.message, running: false, night: null }
     case 'running':

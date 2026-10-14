@@ -99,3 +99,39 @@ export function layoutGraph(
     y: margin.y + ((pos[i][1] - minY) / sy) * ih,
   }))
 }
+
+/** 배치된 칸(폭 nw, 높이 nh)이 겹치면 겹친 만큼 서로 밀어내고 화면 안에 가둔다. 결정적. gap 은 칸 사이 최소 여백. */
+export function separateBoxes(nodes: LayoutNode[], width: number, height: number, nw: number, nh: number, gap = 6): LayoutNode[] {
+  const p = nodes.map((n) => ({ ...n }))
+  const minX = nw / 2 + 2
+  const maxX = width - nw / 2 - 2
+  const minY = nh / 2 + 2
+  const maxY = height - nh / 2 - 2
+  for (let it = 0; it < 60; it++) {
+    let moved = false
+    for (let i = 0; i < p.length; i++) {
+      for (let j = i + 1; j < p.length; j++) {
+        const ox = nw + gap - Math.abs(p[i].x - p[j].x)
+        const oy = nh + gap - Math.abs(p[i].y - p[j].y)
+        if (ox <= 0 || oy <= 0) continue
+        moved = true
+        // 덜 겹친 방향으로 반씩 민다(같은 자리면 순서로 방향을 정한다)
+        if (ox < oy) {
+          const s = p[i].x < p[j].x || (p[i].x === p[j].x && i < j) ? -1 : 1
+          p[i].x += (s * ox) / 2
+          p[j].x -= (s * ox) / 2
+        } else {
+          const s = p[i].y < p[j].y || (p[i].y === p[j].y && i < j) ? -1 : 1
+          p[i].y += (s * oy) / 2
+          p[j].y -= (s * oy) / 2
+        }
+      }
+    }
+    for (const n of p) {
+      n.x = Math.min(maxX, Math.max(minX, n.x))
+      n.y = Math.min(maxY, Math.max(minY, n.y))
+    }
+    if (!moved) break
+  }
+  return p
+}
