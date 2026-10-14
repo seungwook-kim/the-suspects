@@ -6,7 +6,10 @@
   3. 재시도 상한: 기본 2회, 실패 사유를 다음 시도에 알려 줌
   4. 대체 동작: fallback 함수 결과를 쓰고 기록에 남김 (무한 재시도 없음)
 
-OPENROUTER_API_KEY가 없으면 가짜 LLM 모드: 호출자가 넘긴 fake 함수의 결과를 그대로 쓴다.
+API 키가 없으면 가짜 LLM 모드: 호출자가 넘긴 fake 함수의 결과를 그대로 쓴다.
+키는 기본으로 OPENROUTER_API_KEY에서 읽는다. 다른 OpenAI 호환 주소를 쓰는 프로필은 base_url과 함께
+api_key_env(키를 담은 환경 변수 이름)를 적는다. 그 주소가 OpenRouter식 추론 설정을 모르면 send_effort: false.
+주소마다 다른 추가 요청 값은 프로필·역할의 extra_body에 적으면 그대로 보낸다(역할 값이 우선).
 가짜 모드에서도 같은 검증·추적 경로를 통과하므로 키 없이 한 판을 끝까지 돌릴 수 있다.
 """
 
@@ -63,8 +66,9 @@ class LLMClient:
     ) -> None:
         self.tracer = tracer or Tracer()
         self.cfg = models_config or _load_models_config()
-        self.api_key = api_key if api_key is not None else os.getenv("OPENROUTER_API_KEY", "")
         self.profile = profile or os.getenv("THE_SUSPECTS_MODEL_PROFILE") or self.cfg.get("active_profile", "dev")
+        key_env = (self.cfg["profiles"].get(self.profile) or {}).get("api_key_env") or "OPENROUTER_API_KEY"
+        self.api_key = api_key if api_key is not None else os.getenv(key_env, "")
         self._models: dict[str, Any] = {}
 
     @property
@@ -98,8 +102,8 @@ class LLMClient:
 
         rc = self.role_config(role)
         prof = self.cfg["profiles"][rc["_profile"]]
-        extra_body: dict[str, Any] = {}
-        if rc.get("effort"):
+        extra_body: dict[str, Any] = {**(prof.get("extra_body") or {}), **(rc.get("extra_body") or {})}
+        if rc.get("effort") and prof.get("send_effort", True):
             extra_body["reasoning"] = {"effort": rc["effort"]}  # OpenRouter 통합 추론 설정
         model = ChatOpenAI(
             model=rc["model"],
@@ -107,7 +111,7 @@ class LLMClient:
             base_url=prof.get("base_url", "https://openrouter.ai/api/v1"),
             max_tokens=rc.get("max_tokens"),
             extra_body=extra_body or None,
-            timeout=30,
+            timeout=rc.get("timeout_s", 30),  # 사건 쓰기처럼 긴 출력은 역할 설정으로 늘린다
             max_retries=1,
         )
         self._models[role] = model
