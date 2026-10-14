@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { api, USE_MOCK } from '../api/client'
 import type { CreateOptions, GameSummary, SaveSlotInfo, Theme } from '../api/types'
 import { AI_PORTRAIT_NOTICE } from '../character/Portrait'
 import { Icon, type IconName } from '../components/Icon'
 import { getPref, getSaves, setPref } from '../util/saves'
+import suspect1 from '../assets/lineup/suspect-01.webp'
+import suspect2 from '../assets/lineup/suspect-02.webp'
+import suspect3 from '../assets/lineup/suspect-03.webp'
+import suspect4 from '../assets/lineup/suspect-04.webp'
 
 type Mood = '코믹' | '보통' | '진지'
 type Difficulty = '쉬움' | '보통' | '어려움'
@@ -28,6 +32,8 @@ const MOOD_ATTR: Record<Mood, string> = { 코믹: 'comic', 보통: 'normal', 진
 // 사건 카드 아이콘은 순서대로 돌려 쓴다
 const CASE_ICONS: IconName[] = ['database', 'buildings', 'package', 'bed']
 const pad2 = (n: number) => String(n).padStart(2, '0')
+// 첫 화면의 용의자 사진 카드(장식). 사진 보관함에서 고른 AI 생성 인물이며 사건 내용과 관계없다
+const LINEUP = [suspect1, suspect2, suspect3, suspect4]
 
 export function Start({ busy, error, onStart, onCreateCase, onOpenGame, onLoadSlot, onHistory, onAbout }: Props) {
   const [themes, setThemes] = useState<Theme[] | null>(null)
@@ -42,6 +48,8 @@ export function Start({ busy, error, onStart, onCreateCase, onOpenGame, onLoadSl
   const [slots, setSlots] = useState<Record<string, SaveSlotInfo[]>>({})
   const [offline, setOffline] = useState(false) // 서버 목록 실패 -> 브라우저에 기억해 둔 세이브
   const localSaves = getSaves()
+  const customRef = useRef('')
+  customRef.current = custom
 
   const toggleSaves = async () => {
     if (showSaves) return setShowSaves(false)
@@ -67,7 +75,12 @@ export function Start({ busy, error, onStart, onCreateCase, onOpenGame, onLoadSl
     let alive = true
     api
       .themes()
-      .then((t) => alive && setThemes(t))
+      .then((t) => {
+        if (!alive) return
+        setThemes(t)
+        // 직접 쓴 주제가 없으면 첫 사건을 골라 두어 바로 시작할 수 있게 한다
+        if (!customRef.current) setTheme((cur) => cur ?? t[0]?.id ?? null)
+      })
       .catch((e) => alive && setLoadErr(e instanceof Error ? e.message : '주제를 불러오지 못했습니다.'))
     return () => {
       alive = false
@@ -87,98 +100,126 @@ export function Start({ busy, error, onStart, onCreateCase, onOpenGame, onLoadSl
 
   const opts: CreateOptions = { tone: TONE[mood], difficulty: DIFF[diff], play_minutes: minutes as 20 | 40 | 60 }
   const customOk = custom.trim().length >= 2
+  const chosen = themes?.find((t) => t.id === theme) ?? null
+  const now = new Date()
+  const stamp = `${now.getFullYear()}. ${pad2(now.getMonth() + 1)}. ${pad2(now.getDate())}.`
 
   return (
     <div className="screen start">
-      <header className="start-head">
-        <h1>The Suspects</h1>
-        <p className="lead">오늘은 어떤 사건을 맡을까요?</p>
-        <p className="ai-notice" role="note" data-testid="ai-notice">
-          <Icon name="info" />
-          <span>{AI_PORTRAIT_NOTICE}</span>
-        </p>
-        {USE_MOCK && <p className="start-mock muted small">목(mock) 모드 · 가짜 데이터로 실행 중</p>}
+      <header className="start-hero">
+        <div className="hero-copy">
+          <p className="eyebrow">사건 접수 · {stamp}</p>
+          <h1 className="hero-title">
+            The Suspects
+            <span className="hero-ko">용의자들</span>
+          </h1>
+          <p className="hero-lead">모두가 무언가를 숨기고 있다. 증거를 모으고, 진술 속 모순을 찾아, 범인을 지목하세요.</p>
+          <ol className="hero-steps" aria-label="진행 순서">
+            <li><span className="mono">01</span><Icon name="magnifying-glass" />현장 조사</li>
+            <li><span className="mono">02</span><Icon name="chat-circle-text" />심문과 증거 제시</li>
+            <li><span className="mono">03</span><Icon name="seal-check" />범인 지목</li>
+          </ol>
+          <p className="ai-notice" role="note" data-testid="ai-notice">
+            <Icon name="info" />
+            <span>{AI_PORTRAIT_NOTICE}</span>
+          </p>
+          {USE_MOCK && <p className="start-mock muted small">목(mock) 모드 · 가짜 데이터로 실행 중</p>}
+        </div>
+        <figure className="mugshots" aria-hidden="true">
+          {LINEUP.map((src, i) => (
+            <div key={src} className="mugshot" style={{ '--i': i } as CSSProperties}>
+              <img src={src} alt="" width={300} height={400} />
+              <span className="mugshot-plate mono">용의자 {pad2(i + 1)}</span>
+            </div>
+          ))}
+          <span className="mugshots-clip"><Icon name="paperclip" /></span>
+          <span className="stamp mugshots-stamp">수사 중</span>
+        </figure>
       </header>
 
-      <section aria-labelledby="start-cases-h">
+      <section className="paper has-tab start-file" aria-labelledby="start-cases-h">
+        <span className="folder-tab">사건 고르기</span>
         <h2 id="start-cases-h" className="sr-only">사건 고르기</h2>
         {!themes && !loadErr && <p className="muted">주제를 불러오는 중…</p>}
         {loadErr && <p className="warn-text" role="alert">{loadErr}</p>}
-        <div className="start-cases" role="radiogroup" aria-label="사건">
-          {themes?.map((t, i) => (
-            <button
-              key={t.id}
-              type="button"
-              role="radio"
-              aria-checked={theme === t.id}
-              className={`theme-card start-case${theme === t.id ? ' on' : ''}`}
-              onClick={() => { setTheme(t.id); setCustom('') }}
-            >
-              <span className="start-case-icon"><Icon name={CASE_ICONS[i % CASE_ICONS.length]} /></span>
-              <span className="start-case-text">
-                <span className="start-case-no mono">사건 {pad2(i + 1)}</span>
-                <strong>{t.title}</strong>
-                <span className="start-case-desc">{t.description}</span>
-              </span>
-              <span className="start-case-on"><Icon name="check-circle" />선택됨</span>
-            </button>
-          ))}
+        <div className="start-cases">
+          <div className="start-presets" role="radiogroup" aria-label="사건">
+            {themes?.map((t, i) => (
+              <button
+                key={t.id}
+                type="button"
+                role="radio"
+                aria-checked={theme === t.id}
+                className={`theme-card start-case${theme === t.id ? ' on' : ''}`}
+                onClick={() => { setTheme(t.id); setCustom('') }}
+              >
+                <span className="start-case-icon"><Icon name={CASE_ICONS[i % CASE_ICONS.length]} /></span>
+                <span className="start-case-text">
+                  <span className="start-case-no mono">사건 {pad2(i + 1)}</span>
+                  <strong>{t.title}</strong>
+                  <span className="start-case-desc">{t.description}</span>
+                </span>
+                <span className="start-case-on"><Icon name="check-circle" />선택됨</span>
+              </button>
+            ))}
+          </div>
+
+          <div className={`start-custom${custom ? ' is-active' : ''}`}>
+            <div className="start-custom-head">
+              <Icon name="lightbulb" />
+              <label htmlFor="custom-theme"><strong>직접 만들기</strong></label>
+              <span className="kind">실험실</span>
+              <span className="start-count mono muted small" aria-live="polite">{CUSTOM_MAX - custom.length}자 남음</span>
+            </div>
+            <p className="muted small">원하는 주제를 한 줄로 적으면 사건을 새로 씁니다. 결과가 들쭉날쭉할 수 있어요.</p>
+            <div className="start-custom-row">
+              <input
+                id="custom-theme"
+                className="field"
+                value={custom}
+                maxLength={CUSTOM_MAX}
+                disabled={busy}
+                onChange={(e) => {
+                  setCustom(e.target.value)
+                  if (e.target.value) setTheme(null)
+                }}
+                placeholder="예: 고등학교 축제 날 사라진 상장"
+                aria-label="자유 주제"
+              />
+              <button
+                type="button"
+                className={`btn${customOk && !busy ? ' btn-cta' : ''}`}
+                disabled={busy || !customOk}
+                onClick={() => onCreateCase(custom.trim(), opts)}
+              >
+                <span className="btn-label"><Icon name="paper-plane-tilt" />사건 생성</span>
+                {!busy && !customOk && <small className="btn-reason">주제를 입력하세요</small>}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="start-custom">
-          <div className="start-custom-head">
-            <label htmlFor="custom-theme"><strong>직접 만들기</strong></label>
-            <span className="kind">실험실</span>
-            <span className="muted small">결과가 들쭉날쭉할 수 있어요.</span>
-            <span className="start-count mono muted small" aria-live="polite">{CUSTOM_MAX - custom.length}자 남음</span>
-          </div>
-          <div className="start-custom-row">
-            <input
-              id="custom-theme"
-              className="field"
-              value={custom}
-              maxLength={CUSTOM_MAX}
-              disabled={busy}
-              onChange={(e) => {
-                setCustom(e.target.value)
-                if (e.target.value) setTheme(null)
-              }}
-              placeholder="예: 고등학교 축제 날 사라진 상장"
-              aria-label="자유 주제"
-            />
-            <button
-              type="button"
-              className={`btn${customOk && !busy ? ' btn-cta' : ''}`}
-              disabled={busy || !customOk}
-              onClick={() => onCreateCase(custom.trim(), opts)}
-            >
-              <span className="btn-label"><Icon name="paper-plane-tilt" />사건 생성</span>
-              {!busy && !customOk && <small className="btn-reason">주제를 입력하세요</small>}
-            </button>
-          </div>
+        <div className="start-options" role="group" aria-label="수사 조건">
+          <Seg label="분위기" values={['코믹', '보통', '진지']} value={mood} onChange={pickMood} />
+          <Seg label="난이도" values={['쉬움', '보통', '어려움']} value={diff} onChange={pick(setDiff, 'diff')} />
+          <Seg label="플레이 시간" values={[20, 40, 60]} fmt={(v) => (v === 60 ? '1시간' : `${v}분`)} value={minutes} onChange={pick(setMinutes, 'minutes')} />
         </div>
-      </section>
-
-      <section className="start-options" aria-label="옵션">
-        <Seg label="분위기" values={['코믹', '보통', '진지']} value={mood} onChange={pickMood} />
-        <Seg label="난이도" values={['쉬움', '보통', '어려움']} value={diff} onChange={pick(setDiff, 'diff')} />
-        <Seg label="플레이 시간" values={[20, 40, 60]} fmt={(v) => (v === 60 ? '1시간' : `${v}분`)} value={minutes} onChange={pick(setMinutes, 'minutes')} />
       </section>
 
       {error && <p className="warn-text" role="alert">{error}</p>}
       <div className="start-go">
+        <div className="start-go-main">
+          <button type="button" className="btn btn-cta btn-lg" disabled={!theme || busy} onClick={() => theme && onStart(theme, opts)}>
+            <span className="btn-label"><Icon name="play" />{busy ? '사건 파일 작성 중…' : '사건 시작'}</span>
+            {!busy && <small className="btn-reason">{chosen ? chosen.title : custom ? '직접 만든 주제는 위의 "사건 생성"으로' : '사건을 고르세요'}</small>}
+          </button>
+        </div>
         <div className="start-go-side">
-          <button type="button" className="btn" disabled={busy} onClick={() => void toggleSaves()}>
+          <button type="button" className="btn" disabled={busy} onClick={() => void toggleSaves()} aria-expanded={showSaves}>
             <span className="btn-label"><Icon name="floppy-disk" />이어하기</span>
           </button>
           <button type="button" className="btn" onClick={onHistory} disabled={busy}>
             <span className="btn-label"><Icon name="notebook" />클리어 이력</span>
-          </button>
-        </div>
-        <div className="start-go-main">
-          <button type="button" className="btn btn-cta btn-lg" disabled={!theme || busy} onClick={() => theme && onStart(theme, opts)}>
-            <span className="btn-label"><Icon name="chat-circle-text" />{busy ? '사건 파일 작성 중…' : '사건 시작'}</span>
-            {!theme && !busy && <small className="btn-reason">사건을 고르세요</small>}
           </button>
         </div>
       </div>
