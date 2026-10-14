@@ -554,6 +554,7 @@ class GameService:
             on_small_talk=on_small_talk, after_answer=after_answer,
             lie_guidance=lambda case_, npc_id, q: C.relevant_lies(case_, npc_id, q),
             case_brief=lambda case_, game: self._brief(case_, game), gm_llm_check=gm_llm_check,
+            scene=lambda case_, game: self._scene(case_, game),
         )
 
     def _npc_search(self, case: CaseBible, game: GameState, npc_id: str, q: str) -> list[RetrievalHit]:
@@ -583,8 +584,13 @@ class GameService:
         return out[:k]
 
     def _brief(self, case: CaseBible, game: GameState) -> str:
+        """한 판 동안 그대로인 사건 공통 정보 (인물 지시문 쪽, 캐시됨)."""
+        return f"사건: {case.incident.summary}"
+
+    def _scene(self, case: CaseBible, game: GameState) -> str:
+        """지금 날짜·시각·장소. 행동마다 바뀌므로 사용자 글 쪽에 넣는다(PRD §12.8)."""
         loc = next((l.name for l in case.locations if l.id == game.player_location), "")
-        return f"수사 {game.day}일차 {C.hhmm(game.clock)}, 장소: {loc}. 사건: {case.incident.summary}"
+        return f"수사 {game.day}일차 {C.hhmm(game.clock)}, 장소: {loc}"
 
     def _require_npc_here(self, state: GameState, npc_id: str | None) -> str:
         ns = state.npc_states.get(npc_id or "")
@@ -623,6 +629,7 @@ class GameService:
         ctx = npc_agent.NPCContext(
             character=ch, state=state.npc_states[npc_id], question=prompt_text, hits=hits,
             case_brief=self._brief(case, state), lie_guidance=C.relevant_lies(case, npc_id, prompt_text),
+            scene=self._scene(case, state),
             conversation_summary=state.conversation_summary, forced_emotion=forced_emotion, forced_reaction=forced_reaction,
         )
         reply, _, _ = await npc_agent.answer(

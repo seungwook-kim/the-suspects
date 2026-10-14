@@ -4,7 +4,10 @@
   검색(권한 필터, 호출자가 넘김) → 프롬프트(캐싱 순서) → LLM 구조화 출력 → 검증(게임 마스터 코드 검사 포함) → 재시도/기본 대사
 
 프롬프트 순서 (PRD §12.8, 바뀌지 않는 것부터):
-  1. 공통 규칙  2. NPC 고정 설정  3. 사건 공통 정보  4. 검색 결과  5. 대화 요약  6. 이번 질문
+  지시문: 1. 공통 규칙  2. NPC 고정 설정  3. 사건 공통 정보(한 판 동안 그대로)
+  사용자 글: 4. 지금(날짜·시각·장소)  5. 검색 결과  6. 대화 요약  7. 이번 질문
+  지금 시각·장소는 행동마다 바뀌므로 지시문에 넣지 않는다. 넣으면 그 뒤가 모두 캐시에서 빠진다
+  (2026-10-15 실측: 시각만 1시간 바꿔도 캐시 2,588토큰 중 589토큰만 남음).
 """
 
 from __future__ import annotations
@@ -32,11 +35,12 @@ class NPCContext:
     state: NPCState
     question: str
     hits: list[RetrievalHit]
-    case_brief: str  # 장소, 현재 날짜·시각 등 사건 공통 정보 (비밀 없음)
+    case_brief: str  # 사건 개요 등 한 판 동안 바뀌지 않는 공통 정보 (비밀 없음)
     lie_guidance: list[str] = field(default_factory=list)  # 이 NPC의 거짓말 장부 항목만 (범인·공범)
     conversation_summary: str = ""
     forced_emotion: Emotion | None = None  # 블러핑 판정 등 코드가 정한 반응
     forced_reaction: str | None = None  # 예: "흔들림: 반박 단서를 하나 흘린다"
+    scene: str = ""  # 지금 날짜·시각·장소 (행동마다 바뀜 → 사용자 글 맨 앞)
 
 
 def build_prompt(ctx: NPCContext) -> tuple[str, str]:
@@ -50,7 +54,8 @@ def build_prompt(ctx: NPCContext) -> tuple[str, str]:
         f"- ({h.id}) {h.content}" + (f" [확신도 {h.meta.get('confidence'):.1f}]" if h.meta.get("confidence") is not None else "")
         for h in ctx.hits
     ) or "- (관련된 기억 없음)"
-    parts = [f"[네가 아는 것]\n{known}"]
+    parts = [f"[지금]\n{ctx.scene}"] if ctx.scene else []
+    parts.append(f"[네가 아는 것]\n{known}")
     if ctx.lie_guidance:
         parts.append("[거짓말 지침]\n" + "\n".join(f"- {g}" for g in ctx.lie_guidance))
     if ctx.conversation_summary:
@@ -154,7 +159,7 @@ async def answer(
 
 
 _SECTION_WORDS = {"[네가 아는 것]": "제 기억", "[거짓말 지침]": "", "[지금까지의 대화 요약]": "", "[이번 반응]": "",
-                  "[형사의 질문]": "", "[인물]": ""}
+                  "[형사의 질문]": "", "[인물]": "", "[지금]": ""}
 
 
 def scrub_prompt_terms(text: str, ids: set[str]) -> str:
