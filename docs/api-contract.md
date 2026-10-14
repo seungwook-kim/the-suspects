@@ -89,6 +89,8 @@ CaseJob = {
 | `TEXT_MESSAGE_START` | `messageId`, `role`(`"npc"`\|`"narrator"`\|`"partner"`\|`"chief"`), `speakerId` | 대사 시작 (초상화 표시, 글자 찍기 준비) |
 | `TEXT_MESSAGE_CONTENT` | `messageId`, `delta` | 대사 조각 (글자 찍힘 효과) |
 | `TEXT_MESSAGE_END` | `messageId` | 대사 끝 |
+
+인물 답은 모델이 쓰는 동안 문장 단위로 온다(PRD §14.1, D-61): `emotion` → `TEXT_MESSAGE_START` → 검사를 통과한 문장마다 `TEXT_MESSAGE_CONTENT` → (수첩·기억 처리 뒤) `emotion` · `TEXT_MESSAGE_END`. 문장 사이에 몇 초가 걸릴 수 있으므로 화면은 `TEXT_MESSAGE_END`가 올 때까지 대사를 진행 중으로 둔다. 행동 이벤트는 만들어지는 즉시 온다(전: 행동이 끝난 뒤 한꺼번에).
 | `STATE_SNAPSHOT` | `snapshot: PlayerView` | 전체 뷰 교체 (처음, 불러오기, 아침) |
 | `STATE_DELTA` | `delta: JSONPatch[]` (RFC 6902) | 바뀐 부분만 (행동 수, 위치, 수첩 등) |
 | `CUSTOM` | `name`, `value` | 게임 전용 이벤트 (아래) |

@@ -191,11 +191,101 @@ class LLMClient:
         )
         return result, used_fallback
 
-    async def _call(self, role: str, schema: type[T], system: str, user: str, prev_errors: list[str]):
+    @staticmethod
+    def _with_schema(system: str, schema: type[BaseModel]) -> str:
         schema_hint = json.dumps(schema.model_json_schema(), ensure_ascii=False)
-        sys = (
-            f"{system}\n\n반드시 아래 JSON 스키마를 따르는 JSON 객체 하나만 출력한다. 설명 문장, 코드 블록 표시 금지.\n{schema_hint}"
-        )
+        return f"{system}\n\n반드시 아래 JSON 스키마를 따르는 JSON 객체 하나만 출력한다. 설명 문장, 코드 블록 표시 금지.\n{schema_hint}"
+
+    # ------------------------------------------------------------------ 실시간 출력 (첫 문장부터 보여 주기, PRD §14.1)
+    @property
+    def can_stream(self) -> bool:
+        """답을 조각으로 받을 수 있는지. 가짜 LLM은 아니고, 명령줄 연결은 cli.stream_command가 있어야 한다."""
+        if self.fake_mode:
+            return False
+        if self.provider == "cli":
+            return bool((self.cfg["profiles"][self.profile].get("cli") or {}).get("stream_command"))
+        return True
+
+    async def _stream_raw(self, role: str, system: str, user: str):
+        """(지금까지의 원문, 사용량 또는 None)을 조각마다 낸다."""
+        rc = self.role_config(role)
+        if self.provider == "cli":
+            from server.llm.cli_provider import stream_cli
+
+            async for item in stream_cli(self.cfg["profiles"][self.profile]["cli"], model=rc["model"],
+                                         effort=rc.get("effort"), system=system, user=user,
+                                         timeout_s=rc.get("timeout_s"), env=self._thinking_off(rc).get("env")):
+                yield item
+            return
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        raw = ""
+        async for chunk in self._chat_model(role).astream([SystemMessage(content=system), HumanMessage(content=user)],
+                                                          stream_usage=True):
+            raw += chunk.content if isinstance(chunk.content, str) else ""
+            u = getattr(chunk, "usage_metadata", None)
+            yield raw, ({"input_tokens": int(u.get("input_tokens", 0)), "output_tokens": int(u.get("output_tokens", 0))}
+                        if u else None)
+
+    async def structured_stream(
+        self,
+        *,
+        role: str,
+        bucket: Bucket,
+        schema: type[T],
+        system: str,
+        user: str,
+        on_partial: Callable[[str], Any],
+        game_id: str | None = None,
+        node: str | None = None,
+        meta: dict | None = None,
+    ) -> tuple[T | None, str]:
+        """한 번만 시도하는 실시간 구조화 출력. 조각이 올 때마다 await on_partial(지금까지의 원문).
+        on_partial이 False를 돌려주면 그만 받는다(남은 생성은 버림). 끝나면 (스키마에 맞는 결과 또는 None, 원문).
+        재시도·대체 동작은 부르는 쪽이 정한다(이미 화면에 보여 준 글이 있을 수 있어서).
+        meta: 호출 기록 extra에 더할 값(부르는 쪽이 첫 문장을 보여 준 시각 등을 채운다)."""
+        t0 = time.perf_counter()
+        first: float | None = None
+        raw, it, ot, err, stopped = "", 0, 0, "", False
+        gen = self._stream_raw(role, self._with_schema(system, schema), user)
+        try:
+            async for raw, usage in gen:
+                if first is None and raw:
+                    first = time.perf_counter() - t0
+                if usage:
+                    it, ot = usage["input_tokens"], usage["output_tokens"]
+                if raw and (await on_partial(raw)) is False:
+                    stopped = True
+                    break
+        except Exception as e:  # 네트워크·도구 오류
+            err = f"호출 오류: {type(e).__name__}: {str(e)[:200]}"
+        finally:
+            await gen.aclose()
+        result: T | None = None
+        if not err and not stopped:
+            m = _JSON_RE.search(raw)
+            try:
+                result = schema.model_validate_json(m.group(0)) if m else None
+            except (ValidationError, ValueError) as e:
+                err = f"형식 오류: {str(e)[:200]}"
+            if result is None and not err:
+                err = "JSON 객체가 없습니다"
+        extra: dict[str, Any] = {"stream": True, "first_token_s": round(first, 3) if first is not None else None,
+                                 **(meta or {})}
+        if stopped:
+            extra["stopped"] = True
+        if err:
+            extra["errors"] = [err]
+        self.tracer.record(CallRecord(
+            ts=time.time(), role=role, bucket=bucket, model=self.role_config(role)["model"],
+            latency_s=time.perf_counter() - t0, input_tokens=it, output_tokens=ot, attempts=1,
+            ok=result is not None or stopped, fallback_used=False, game_id=game_id, node=node or role,
+            prompt=f"[system]\n{system}\n[user]\n{user}", output=raw, extra=extra,
+        ))
+        return result, raw
+
+    async def _call(self, role: str, schema: type[T], system: str, user: str, prev_errors: list[str]):
+        sys = self._with_schema(system, schema)
         msg = user
         if prev_errors:
             msg += "\n\n[이전 출력의 문제 — 고쳐서 다시 출력]\n- " + "\n- ".join(prev_errors)

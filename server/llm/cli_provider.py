@@ -84,3 +84,76 @@ def _parse(out: str) -> tuple[str, int, int]:
     if isinstance(data.get("result"), str):
         return data["result"], in_tok, out_tok
     return out, in_tok, out_tok
+
+
+# ---------------------------------------------------------------------------- 실시간 출력 (첫 문장부터 보여 주기)
+# cli.stream_command: 같은 도구를 "실시간 출력(한 줄에 JSON 하나)"으로 부르는 인자. 출력 형식 강제 인자는 빼고
+# 지시문의 JSON 안내만으로 받는다(글자 조각이 그대로 흘러나오게). 한 줄의 모양:
+#   {"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "…"}}}
+#   {"type": "result", "usage": {...}, "is_error": false}
+# 없으면 실시간으로 받지 않는다(client.can_stream이 False).
+
+async def stream_cli(cli_cfg: dict, *, model: str, effort: str | None, system: str, user: str,
+                     timeout_s: float | None = None, env: dict[str, str] | None = None):
+    """(지금까지의 출력 글, 사용량 또는 None)을 조각이 올 때마다 낸다. 마지막에 사용량이 붙은 한 번을 더 낸다.
+    받는 쪽이 중간에 그만두면(aclose) 프로그램을 끝낸다."""
+    cwd = Path(cli_cfg.get("cwd") or "var/cli_workdir")
+    if not cwd.is_absolute():
+        cwd = _ROOT / cwd
+    cwd.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".txt", dir=cwd, delete=False) as f:
+        f.write(system)
+        system_file = f.name
+    values = {"model": model, "effort": effort or "low", "system": system, "system_file": system_file, "schema": "{}"}
+    args = [str(a).format(**values) for a in cli_cfg["stream_command"]]
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+    proc = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd,
+                            env={**os.environ, **{str(k): str(v) for k, v in (env or {}).items()}} if env else None)
+
+    def pump() -> None:  # 스레드: 한 줄씩 읽어 이벤트 루프로 넘긴다
+        try:
+            proc.stdin.write(user.encode("utf-8"))
+            proc.stdin.close()
+            for line in proc.stdout:
+                loop.call_soon_threadsafe(queue.put_nowait, line)
+        except Exception as e:  # 프로그램이 먼저 끝난 경우 등
+            loop.call_soon_threadsafe(queue.put_nowait, e)
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    reader = loop.run_in_executor(None, pump)
+    text, usage, deadline = "", None, loop.time() + float(timeout_s or cli_cfg.get("timeout_s", 90))
+    try:
+        while True:
+            item = await asyncio.wait_for(queue.get(), timeout=max(0.1, deadline - loop.time()))
+            if item is None:
+                break
+            if isinstance(item, Exception):
+                raise CLIError(f"실시간 출력 읽기 실패: {item}")
+            try:
+                d = json.loads(item)
+            except json.JSONDecodeError:
+                continue
+            if d.get("type") == "stream_event":
+                delta = (d.get("event") or {}).get("delta") or {}
+                if delta.get("type") == "text_delta" and delta.get("text"):
+                    text += delta["text"]
+                    yield text, None
+            elif d.get("type") == "result":
+                if d.get("is_error"):
+                    raise CLIError(f"도구 오류: {str(d.get('result') or d.get('subtype'))[:300]}")
+                u = d.get("usage") or {}
+                usage = {"input_tokens": sum(int(u.get(k) or 0) for k in
+                                             ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")),
+                         "output_tokens": int(u.get("output_tokens") or 0)}
+                if not text and isinstance(d.get("result"), str):
+                    text = d["result"]
+        if usage is None and proc.wait(timeout=5) != 0:
+            raise CLIError(f"종료 코드 {proc.returncode}: {proc.stderr.read().decode('utf-8', 'replace')[:300]}")
+        yield text, usage or {"input_tokens": 0, "output_tokens": 0}
+    finally:
+        if proc.poll() is None:
+            proc.kill()  # 받는 쪽이 그만뒀거나 시간 초과: 남은 생성은 버린다(읽는 스레드는 출력이 닫히면 끝난다)
+        del reader
+        Path(system_file).unlink(missing_ok=True)

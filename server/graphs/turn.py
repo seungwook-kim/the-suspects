@@ -60,6 +60,8 @@ class TurnDeps:
     scene: Callable[[CaseBible, GameState], str] | None = None
     # 게임 마스터 LLM 검사: 코드 검사가 트리거만 남겼을 때(확정 위반 없음) 실행. True면 통과
     gm_llm_check: Callable[[CaseBible, GameState, str, NPCReply, GMVerdict], Awaitable[bool]] | None = None
+    # 인물 답을 첫 문장부터 보여 준다(문장마다 게임 마스터 코드 검사 통과분만, PRD §14.1·§7.2)
+    stream: bool = False
 
 
 @dataclass
@@ -81,6 +83,7 @@ class TurnState(TypedDict, total=False):
     text: str
     chip_route: RouterOutput | None
     prepared: PreparedAnswer | None
+    streamed_mid: str | None  # 첫 문장부터 내보낸 대사의 메시지 id (끝 이벤트만 남음)
     route: RouterOutput
     hits: list[RetrievalHit]
     reply: NPCReply
@@ -189,17 +192,40 @@ async def node_npc_answer(s: TurnState) -> TurnState:
         conversation_summary=game.conversation_summary,
     )
     role = _answer_role(ch, s["route"])
-    reply, verdict, fb = await npc_agent.answer(
-        deps.llm, ctx, role=role,
-        gm_code_check=lambda r: deps.gm_code_check(case, game, npc_id, r),
-        fallback_line=lambda: deps.fallback_line(ch), game_id=game.game_id,
-    )
+    if deps.stream:
+        eb, mid = s["eb"], None
+
+        def on_text(piece: str) -> None:
+            nonlocal mid
+            if mid is None:
+                mid, start = eb.text_start("npc", npc_id)
+                s["events"].append(start)
+            s["events"].append(eb.text_delta(mid, piece))
+
+        llm_check = None
+        if deps.gm_llm_check is not None:
+            async def llm_check(r: NPCReply, v: GMVerdict) -> bool:
+                return await deps.gm_llm_check(case, game, npc_id, r, v)  # type: ignore[misc]
+
+        hooks = npc_agent.StreamHooks(
+            on_emotion=lambda e: s["events"].append(eb.custom("emotion", {"npcId": npc_id, "emotion": e})),
+            on_text=on_text, llm_check=llm_check)
+        reply, verdict, fb, streamed = await npc_agent.answer_stream(
+            deps.llm, ctx, role=role, gm_code_check=lambda r: deps.gm_code_check(case, game, npc_id, r),
+            fallback_line=lambda: deps.fallback_line(ch), hooks=hooks, game_id=game.game_id)
+        s["streamed_mid"] = mid if streamed else None
+    else:
+        reply, verdict, fb = await npc_agent.answer(
+            deps.llm, ctx, role=role,
+            gm_code_check=lambda r: deps.gm_code_check(case, game, npc_id, r),
+            fallback_line=lambda: deps.fallback_line(ch), game_id=game.game_id,
+        )
     s["reply"], s["verdict"], s["fallback_used"] = reply, verdict, fb
     return s
 
 
 def gm_branch(s: TurnState) -> str:
-    if s.get("prepared"):  # 미리 만들 때 게임 마스터 LLM 검사까지 마쳤다
+    if s.get("prepared") or s.get("streamed_mid"):  # 미리 만들 때·문장마다 내보낼 때 게임 마스터 검사까지 마쳤다
         return "after_answer"
     v = s.get("verdict")
     if s.get("fallback_used") or v is None or not v.needs_llm_check or v.violations:
@@ -223,7 +249,10 @@ def node_after_answer(s: TurnState) -> TurnState:
     game, npc_id, reply = s["game"], s["npc_id"], s["reply"]
     game.npc_states[npc_id].emotion = reply.emotion
     s["events"].append(s["eb"].custom("emotion", {"npcId": npc_id, "emotion": reply.emotion}))
-    _say(s, npc_id, reply.text)
+    if s.get("streamed_mid"):  # 대사는 이미 문장마다 내보냈다
+        s["events"].append(s["eb"].text_end(s["streamed_mid"]))
+    else:
+        _say(s, npc_id, reply.text)
     stmt = NotebookStatement(id=f"t_{uuid.uuid4().hex[:8]}", npc_id=npc_id, content=reply.text,
                              game_time=game.clock, source_ids=list(reply.used_ids))
     game.notebook.statements.append(stmt)
@@ -302,13 +331,14 @@ TURN_GRAPH = build_turn_graph()
 
 
 async def run_turn(case: CaseBible, game: GameState, npc_id: str, text: str, deps: TurnDeps,
-                   chip_route: RouterOutput | None = None,
-                   prepared: PreparedAnswer | None = None) -> tuple[GameState, list[dict], TurnState]:
+                   chip_route: RouterOutput | None = None, prepared: PreparedAnswer | None = None,
+                   events: list[dict] | None = None) -> tuple[GameState, list[dict], TurnState]:
+    """events: 이벤트를 붙일 목록. 붙이는 즉시 화면으로 내보내는 목록을 넘기면 첫 문장부터 보인다."""
     eb = EventBuilder()
     if prepared is not None and (prepared.npc_id != npc_id or prepared.text != text or chip_route is None):
         prepared = None  # 다른 질문용으로 만든 답은 쓰지 않는다
     init: TurnState = {"case": case, "game": game, "npc_id": npc_id, "text": text, "chip_route": chip_route,
-                       "prepared": prepared, "events": [], "eb": eb, "deps": deps}
+                       "prepared": prepared, "events": events if events is not None else [], "eb": eb, "deps": deps}
     out: TurnState = await TURN_GRAPH.ainvoke(init)
     return out["game"], out["events"], out
 

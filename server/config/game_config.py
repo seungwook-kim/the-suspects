@@ -267,6 +267,7 @@ class SpeedCfg(_Base):
     speculative_chip_count: int
     speculative_auto_off: SpeculativeAutoOff
     prefetch_retrieval_on_enter: bool
+    stream_npc_answers: bool = True  # 인물 답을 첫 문장부터 보여 준다(PRD §14.1)
     latency_budget_ms: dict[str, int]
 
 

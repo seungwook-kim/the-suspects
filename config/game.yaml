@@ -56,6 +56,7 @@ speed:
   speculative_auto_off: { window: 20, min_hit_rate: 0.5 }
   prefetch_retrieval_on_enter: false   # 보류(2026-10-15): 지금 검색은 질문당 0.0초라 미리 해도 줄어드는 시간이 없다.
                                        # 외부 임베딩 모델로 바꾸면 다시 잰 뒤 켠다(evals/reports/2026-10-15-speculative-chips.md)
+  stream_npc_answers: true   # 인물 답을 첫 문장부터 보여 준다. 문장마다 게임 마스터 코드 검사를 통과한 것만(PRD §14.1·§7.2)
   latency_budget_ms: { router: 500, retrieval: 200, npc_first_token: 1500, gm_code: 50, gm_llm: 1000 }
 modes: { role_reversal: true, broadcast: false }
 rag:

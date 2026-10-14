@@ -36,12 +36,26 @@ class EventBuilder:
 
     def text(self, role: str, speaker_id: str | None, text: str, chunk: int = 6) -> list[dict]:
         """대사 하나를 START / CONTENT 조각 / END 이벤트로 나눈다(글자 찍힘 효과)."""
-        mid = f"msg_{uuid.uuid4().hex[:10]}"
-        events = [{"type": "TEXT_MESSAGE_START", "messageId": mid, "role": role, "speakerId": speaker_id}]
+        mid, start = self.text_start(role, speaker_id)
+        events = [start]
         for i in range(0, len(text), chunk):
-            events.append({"type": "TEXT_MESSAGE_CONTENT", "messageId": mid, "delta": text[i:i + chunk]})
-        events.append({"type": "TEXT_MESSAGE_END", "messageId": mid})
+            events.append(self.text_delta(mid, text[i:i + chunk]))
+        events.append(self.text_end(mid))
         return events
+
+    # 모델이 쓰는 대로 내보낼 때(첫 문장부터 보여 주기): 시작 → 조각들 → 끝을 따로 만든다
+    @staticmethod
+    def text_start(role: str, speaker_id: str | None) -> tuple[str, dict]:
+        mid = f"msg_{uuid.uuid4().hex[:10]}"
+        return mid, {"type": "TEXT_MESSAGE_START", "messageId": mid, "role": role, "speakerId": speaker_id}
+
+    @staticmethod
+    def text_delta(mid: str, delta: str) -> dict:
+        return {"type": "TEXT_MESSAGE_CONTENT", "messageId": mid, "delta": delta}
+
+    @staticmethod
+    def text_end(mid: str) -> dict:
+        return {"type": "TEXT_MESSAGE_END", "messageId": mid}
 
     def snapshot(self, view: BaseModel) -> dict:
         return {"type": "STATE_SNAPSHOT", "snapshot": _dump(view)}

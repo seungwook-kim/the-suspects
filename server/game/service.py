@@ -84,6 +84,34 @@ def _absorb(target: GameState, new: GameState) -> None:
         setattr(target, k, getattr(new, k))
 
 
+class _NoStream:
+    """실시간 출력을 쓰지 않게 감싼 모델 연결(설정 speed.stream_npc_answers: false)."""
+
+    can_stream = False
+
+    def __init__(self, llm) -> None:
+        self._llm = llm
+
+    def __getattr__(self, name: str):
+        return getattr(self._llm, name)
+
+
+class _LiveEvents(list):
+    """붙이는 즉시 화면으로 내보내는 이벤트 목록(인물 답을 첫 문장부터 보여 주기)."""
+
+    def __init__(self, push) -> None:
+        super().__init__()
+        self._push = push
+
+    def append(self, ev: dict) -> None:  # type: ignore[override]
+        super().append(ev)
+        self._push(ev)
+
+    def extend(self, evs) -> None:  # type: ignore[override]
+        for ev in list(evs):
+            self.append(ev)
+
+
 class GMCheck(BaseModel):
     ok: bool
     reason: str = ""
@@ -311,16 +339,33 @@ class GameService:
 
     # ================================================================= 행동
     async def act(self, game_id: str, action: dict) -> AsyncIterator[dict]:
+        """행동 하나. 이벤트는 만들어지는 즉시 내보낸다(인물 답은 첫 문장부터). 화면 연결이 끊겨도 행동은 끝까지
+        처리하고 저장한다."""
+        queue: asyncio.Queue = asyncio.Queue()
+        task = asyncio.ensure_future(self._act(game_id, action, queue.put_nowait))
+        while True:
+            getter = asyncio.ensure_future(queue.get())
+            done, _ = await asyncio.wait({getter, task}, return_when=asyncio.FIRST_COMPLETED)
+            if getter in done:
+                yield getter.result()
+                continue
+            getter.cancel()
+            while not queue.empty():
+                yield queue.get_nowait()
+            task.result()  # 처리 중 오류는 그대로 올린다(API 계층이 오류 이벤트로 바꿈)
+            return
+
+    async def _act(self, game_id: str, action: dict, push) -> None:
         case, state, masker = self._load(game_id)
         key = state_key(state)  # 행동 전 상태 (미리 만든 칩 답이 이 상태용인지 가른다)
         eb = EventBuilder()
-        yield eb.run_started()
+        push(eb.run_started())
         before = self._view(case, state, masker)
-        events: list[dict] = []
+        events = _LiveEvents(push)  # 붙이는 즉시 내보낸다
         kind = action.get("type")
         if state.phase in ("ended", "finale"):
-            yield eb.run_error("지금은 할 수 없는 행동이에요.", code="phase")
-            yield eb.run_finished()
+            push(eb.run_error("지금은 할 수 없는 행동이에요.", code="phase"))
+            push(eb.run_finished())
             return
         if state.phase == "briefing":
             state.phase = "day"
@@ -330,14 +375,14 @@ class GameService:
         if kind == "move":
             cost_kind = act_rules.move_kind(state, action.get("location_id"))
         if cost_kind is None:
-            yield eb.run_error(f"모르는 행동입니다: {kind}", code="bad_action")
-            yield eb.run_finished()
+            push(eb.run_error(f"모르는 행동입니다: {kind}", code="bad_action"))
+            push(eb.run_finished())
             return
         ok, reason = act_rules.can_perform(self.cfg, state, cost_kind)
         if not ok:
             msg = "오늘은 더 움직일 수 없어요. 하루를 끝내세요." if reason == "no_actions_left" else "지금은 할 수 없어요."
-            yield eb.run_error(msg, code=reason)
-            yield eb.run_finished()
+            push(eb.run_error(msg, code=reason))
+            push(eb.run_finished())
             return
         prepared = await self._take_prepared(game_id, key, state, action) if kind == "chip" else None
         self._spend(state, cost_kind)
@@ -372,13 +417,11 @@ class GameService:
         self.spec.close(game_id)  # 행동을 했으니 이전 상태용 준비분은 끝. 화면이 새 상태로 다시 부른다
         self._record_speculation(state)
         self.store.save_live(state)
-        for ev in events:
-            yield ev
         delta = eb.delta(before, after)
         if delta:
-            yield delta
-        yield eb.custom("chips", {"chips": [c.model_dump() for c in after.chips]})
-        yield eb.run_finished()
+            push(delta)
+        push(eb.custom("chips", {"chips": [c.model_dump() for c in after.chips]}))
+        push(eb.run_finished())
 
     def _spend(self, state: GameState, cost_kind: str) -> None:
         """행동 소모와 게임 속 시간 흐름 (실제 행동과 칩 답 미리 만들기가 같은 계산을 쓴다)."""
@@ -408,7 +451,8 @@ class GameService:
         if st.phase == "briefing":
             st.phase = "day"
         self._spend(st, "ask")
-        return await prepare_answer(case, st, npc_id, text, self._turn_deps(case, st, llm=TaggedLLM(self.llm)))
+        return await prepare_answer(case, st, npc_id, text,
+                                    self._turn_deps(case, st, llm=TaggedLLM(self.llm), stream=False))
 
     async def _take_prepared(self, game_id: str, key: tuple, state: GameState, action: dict) -> PreparedAnswer | None:
         """누른 칩의 미리 만든 답. 아직 만드는 중이면 끝날 때까지 기다린다. 기다린 시간을 호출 기록에 남긴다."""
@@ -468,7 +512,8 @@ class GameService:
         events.append(eb.custom("notebook", {"added": {"evidence_ids": [masker.out("evidence", e) for e in new]}}))
 
     # ----------------------------------------------------------------- 대화
-    def _turn_deps(self, case: CaseBible, state: GameState, llm=None) -> TurnDeps:
+    def _turn_deps(self, case: CaseBible, state: GameState, llm=None, stream: bool = True) -> TurnDeps:
+        """stream: 인물 답을 첫 문장부터 내보낼지(설정 speed.stream_npc_answers, 미리 만들기는 False)."""
         cfg, hold, llm = self.cfg, {}, llm or self.llm
 
         def retrieve(game: GameState, npc_id: str, q: str) -> list[RetrievalHit]:
@@ -555,6 +600,7 @@ class GameService:
             lie_guidance=lambda case_, npc_id, q: C.relevant_lies(case_, npc_id, q),
             case_brief=lambda case_, game: self._brief(case_, game), gm_llm_check=gm_llm_check,
             scene=lambda case_, game: self._scene(case_, game),
+            stream=stream and cfg.speed.stream_npc_answers and bool(getattr(llm, "can_stream", False)),
         )
 
     def _npc_search(self, case: CaseBible, game: GameState, npc_id: str, q: str) -> list[RetrievalHit]:
@@ -615,9 +661,10 @@ class GameService:
             npc_id, text = action.get("npc_id"), (action.get("text") or "").strip()[:300]
         npc_id = self._require_npc_here(state, npc_id)
         game, evs, _ = await run_turn(case, state, npc_id, text, self._turn_deps(case, state), chip_route=chip_route,
-                                      prepared=prepared)
+                                      prepared=prepared, events=events)
         _absorb(state, game)
-        events.extend(evs)
+        if evs is not events:  # 그래프가 같은 목록을 썼으면 이미 붙어 있다
+            events.extend(evs)
 
     async def _npc_react(self, case, state, npc_id, prompt_text, events, eb, *, forced_emotion=None, forced_reaction=None,
                          presented: str | None = None) -> NPCReply:
@@ -632,17 +679,33 @@ class GameService:
             scene=self._scene(case, state),
             conversation_summary=state.conversation_summary, forced_emotion=forced_emotion, forced_reaction=forced_reaction,
         )
-        reply, _, _ = await npc_agent.answer(
-            self.llm, ctx, role="npc_minor" if ch.tier == "minor" else "npc",
+        mid = None
+
+        def on_text(piece: str) -> None:  # 첫 문장부터 내보낼 때
+            nonlocal mid
+            if mid is None:
+                mid, start = eb.text_start("npc", npc_id)
+                events.append(start)
+            events.append(eb.text_delta(mid, piece))
+
+        hooks = npc_agent.StreamHooks(
+            on_emotion=lambda e: events.append(eb.custom("emotion", {"npcId": npc_id, "emotion": forced_emotion or e})),
+            on_text=on_text)
+        llm = self.llm if self.cfg.speed.stream_npc_answers else _NoStream(self.llm)
+        reply, _, _, streamed = await npc_agent.answer_stream(
+            llm, ctx, role="npc_minor" if ch.tier == "minor" else "npc",
             gm_code_check=lambda r: ground_verdict(self.cfg, case, gm_rules.check_reply(self.cfg, case, npc_id, r.text),
                                                    r.text, " ".join(h.content for h in hits), presented),
-            fallback_line=lambda: gm_rules.fallback_line(self.cfg, ch), game_id=state.game_id,
+            fallback_line=lambda: gm_rules.fallback_line(self.cfg, ch), hooks=hooks, game_id=state.game_id,
         )
         if forced_emotion:
             reply.emotion = forced_emotion
         state.npc_states[npc_id].emotion = reply.emotion
         events.append(eb.custom("emotion", {"npcId": npc_id, "emotion": reply.emotion}))
-        self._say(events, eb, "npc", npc_id, reply.text)
+        if streamed:
+            events.append(eb.text_end(mid))  # type: ignore[arg-type]
+        else:
+            self._say(events, eb, "npc", npc_id, reply.text)
         stmt = NotebookStatement(id=f"t_{uuid.uuid4().hex[:8]}", npc_id=npc_id, content=reply.text,
                                  game_time=state.clock, source_ids=list(reply.used_ids))
         state.notebook.statements.append(stmt)

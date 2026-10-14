@@ -13,11 +13,15 @@
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Awaitable, Callable, get_args
 
 from server.llm.client import LLMClient
+from server.llm.partial_json import complete_sentences, partial_string_field
 from server.schemas import Character, Emotion, GMVerdict, NPCReply, NPCState, RetrievalHit
+
+_EMOTIONS = set(get_args(Emotion))
 
 COMMON_RULES = """너는 추리 게임 속 인물이다. 아래 규칙을 지킨다.
 - 형사의 질문에 너의 인물로서 1~3문장으로 답한다. 말투 규칙을 반드시 지킨다.
@@ -156,6 +160,112 @@ async def answer(
     )
     reply.text = scrub_prompt_terms(reply.text, allowed)
     return reply, last_verdict, used_fallback
+
+
+# ---------------------------------------------------------------------------
+# 첫 문장부터 보여 주기 (PRD §14.1 스트리밍 + §7.2 게임 마스터 검사)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class StreamHooks:
+    """실시간으로 내보낼 곳. 부르는 쪽(턴 그래프·서비스)이 이벤트로 바꾼다."""
+    on_emotion: Callable[[Emotion], None]  # 표정이 정해지면 (첫 글자보다 먼저 올 수 있음)
+    on_text: Callable[[str], None]  # 검사를 통과한 새 문장들 (처음 부르면 대사 시작)
+    # 게임 마스터 LLM 검사(조건부). 이 검사가 필요한 문장이 나오면 거기서 멈추고, 다 쓴 뒤 검사가 통과하면 나머지를 낸다
+    llm_check: Callable[[NPCReply, GMVerdict], Awaitable[bool]] | None = None
+
+
+async def answer_stream(
+    llm: LLMClient,
+    ctx: NPCContext,
+    *,
+    role: str,
+    gm_code_check: Callable[[NPCReply], GMVerdict],
+    fallback_line: Callable[[], str],
+    hooks: StreamHooks,
+    game_id: str | None = None,
+) -> tuple[NPCReply, GMVerdict, bool, bool]:
+    """첫 문장부터 보여 주는 NPC 답변. (답변, 판정, 대체 대사 사용 여부, 실시간으로 내보냈는지).
+
+    문장이 끝날 때마다 지금까지의 글 전체를 코드 검사(게임 마스터 1단계)에 넣고, 통과한 문장만 내보낸다.
+    - 걸리는 문장이 나오면 거기서 끊는다(이미 보여 준 문장까지가 답). 하나도 못 보여 줬으면 평소처럼 다시 만든다.
+    - LLM 검사가 필요한 문장이 나오면 거기서 멈췄다가, 다 쓴 뒤 그 검사가 통과하면 나머지를 낸다.
+    - 세 문장을 넘으면 거기서 끊는다. 화면에 낸 글과 답(reply.text)은 항상 같다.
+    실시간으로 받을 수 없는 연결(가짜 LLM 등)은 answer()와 똑같이 동작한다."""
+    if not getattr(llm, "can_stream", False):
+        reply, verdict, fb = await answer(llm, ctx, role=role, gm_code_check=gm_code_check,
+                                          fallback_line=fallback_line, game_id=game_id)
+        return reply, verdict, fb, False
+
+    system, user = build_prompt(ctx)
+    allowed = {h.id for h in ctx.hits}
+    shown, emotion, held, cut = "", None, False, False
+    verdict = GMVerdict(ok=True)
+    meta: dict = {}
+    t0 = time.perf_counter()
+
+    def release(upto: str) -> None:
+        nonlocal shown
+        if len(upto) > len(shown):
+            if not shown:
+                meta["first_text_s"] = round(time.perf_counter() - t0, 3)
+            hooks.on_text(upto[len(shown):])
+            shown = upto
+
+    def judge(text: str) -> str:
+        """이 글까지 내보내도 되는지: ok / hold(LLM 검사 필요) / cut."""
+        nonlocal verdict
+        if text != shown and not text.startswith(shown):
+            return "cut"
+        if len([s for s in _SENT.findall(text) if s.strip()]) > 3:
+            return "cut"
+        v = gm_code_check(NPCReply(text=text, emotion=emotion or ctx.state.emotion, used_ids=[]))
+        if not v.ok:
+            return "cut"
+        verdict = v
+        return "hold" if v.needs_llm_check else "ok"
+
+    async def on_partial(raw: str) -> bool:
+        nonlocal emotion, held, cut
+        if emotion is None:
+            emo = partial_string_field(raw, "emotion")
+            if emo and emo[1] and emo[0] in _EMOTIONS:
+                emotion = emo[0]  # type: ignore[assignment]
+                hooks.on_emotion(emotion)
+        got = partial_string_field(raw, "text")
+        if not got or held or cut:
+            return not cut
+        candidate = scrub_prompt_terms(complete_sentences(*got), allowed)
+        if len(candidate) <= len(shown):
+            return True
+        state = judge(candidate)
+        if state == "ok":
+            release(candidate)
+        elif state == "hold":
+            held = True
+        else:
+            cut = True
+        return not cut  # 끊었으면 남은 생성은 받지 않는다
+
+    result, _ = await llm.structured_stream(role=role, bucket="npc", schema=NPCReply, system=system, user=user,
+                                            on_partial=on_partial, game_id=game_id, node="npc", meta=meta)
+    if result is not None and not cut:
+        final = scrub_prompt_terms(trim_sentences(result.text, 3), allowed)
+        state = judge(final)
+        if state == "hold" and hooks.llm_check is not None:
+            probe = NPCReply(text=final, emotion=result.emotion, used_ids=[i for i in result.used_ids if i in allowed])
+            state = "ok" if await hooks.llm_check(probe, verdict) else "cut"
+        elif state == "hold":
+            state = "ok"  # LLM 검사 연결이 없으면 코드 검사만으로 판단(평소 경로와 같음)
+        if state == "ok":
+            release(final)
+    if not shown:  # 한 문장도 못 보여 줬다 → 평소처럼 (재시도·대체 대사 포함)
+        reply, verdict, fb = await answer(llm, ctx, role=role, gm_code_check=gm_code_check,
+                                          fallback_line=fallback_line, game_id=game_id)
+        return reply, verdict, fb, False
+    used = [i for i in (result.used_ids if result else []) if i in allowed]
+    final_emotion = emotion or (result.emotion if result else ctx.state.emotion)
+    return NPCReply(text=shown, emotion=final_emotion, used_ids=used), verdict, False, True
 
 
 _SECTION_WORDS = {"[네가 아는 것]": "제 기억", "[거짓말 지침]": "", "[지금까지의 대화 요약]": "", "[이번 반응]": "",

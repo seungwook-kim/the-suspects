@@ -88,3 +88,24 @@ async def test_measure_speculative_with_fake_llm(tmp_path):
     assert sum(1 for r in svc.llm.tracer.records if r.model == "prepared") == 2  # B·C는 미리 만든 답을 쓴다
     assert "| C. 0초 읽고 누름 | 1 |" in render_speculative(rows, 0.0)
 
+
+
+def test_first_text_time_for_streamed_and_plain_answers():
+    recs = [_rec("router", 1.0), _rec("npc", 5.0, extra={"first_text_s": 1.5}),
+            _rec("npc", 4.0), _rec("gm_check", 1.0, bucket="gm")]
+    qs = questions(recs)
+    assert [q["first"] for q in qs] == [2.5, 5.0] and qs[0]["streamed"] and not qs[1]["streamed"]
+    s = summarize(recs)
+    assert s["questions"]["first_p50"] == 2.5 and s["questions"]["streamed"] == 1
+    assert "첫 문장까지 p50 2.5초" in render_markdown(s)
+
+
+async def test_measure_stream_with_fake_llm(tmp_path):
+    from server.game.service import GameService
+    from server.llm.latency import measure_stream, render_stream
+
+    svc = GameService(tmp_path, in_memory=True)
+    rows = await measure_stream(svc, rounds=1, settle_s=0.0)
+    assert [r["stream"] for r in rows] == [False, True] and not any(r["error"] for r in rows)
+    assert all(r["text"] for r in rows) and svc.cfg.speed.stream_npc_answers  # 설정은 원래대로 돌려놓는다
+    assert "| 첫 문장부터 보여 줌(후) | 1 |" in render_stream(rows)

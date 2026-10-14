@@ -364,10 +364,10 @@ class RouterOutput(BaseModel):
 
 
 class NPCReply(BaseModel):
-    """NPC 답변 LLM 구조화 출력."""
+    """NPC 답변 LLM 구조화 출력. 표정을 대사보다 먼저 쓰게 한다(첫 문장부터 보여 줄 때 표정이 먼저 바뀌도록)."""
 
-    text: str  # 1~3문장
     emotion: Emotion = "neutral"
+    text: str  # 1~3문장
     used_ids: list[str] = Field(default_factory=list)  # 근거로 쓴 기억/청크 id
 
 

@@ -17,6 +17,10 @@
   uv run python -m server.llm.latency --replay 4 --roles npc     # 최근 인물 답 요청 4개 다시 보내기
   uv run python -m server.llm.latency --replay 4 --roles npc --thinking off   # 같은 요청을 생각 끄고
   uv run python -m server.llm.latency --speculative 2            # 칩 답 미리 만들기 효과 (A·B·C 방식 2번씩)
+  uv run python -m server.llm.latency --stream-check 3           # 직접 쓴 질문의 첫 문장·전체 시간 (첫 문장부터 보여 주기 끔/켬)
+
+첫 문장부터 보여 주기(server/agents/npc.py answer_stream): 인물 답 호출 기록의 extra.first_text_s = 그 호출을 시작해
+첫 문장을 내보내기까지 걸린 시간. 질문 단위 "첫 문장" = 앞선 라우터·검색 + first_text_s (없으면 답이 다 끝난 시각).
 """
 
 from __future__ import annotations
@@ -66,7 +70,7 @@ def percentile(values: Iterable[float], p: float) -> float:
 
 
 def questions(records: list[dict]) -> list[dict]:
-    """기록 순서대로 질문 단위로 묶는다: {total, answer, before, after, role, routed}.
+    """기록 순서대로 질문 단위로 묶는다: {total, first, answer, before, after, role, routed}.
     판(game_id)이 바뀌면 앞서 쌓인 라우터·검색 시간은 버린다."""
     out: list[dict] = []
     pending, pending_game, routed = 0.0, None, False
@@ -80,13 +84,18 @@ def questions(records: list[dict]) -> list[dict]:
             pending += r["latency_s"]
             routed = routed or role == "router"
         elif role in ANSWER_ROLES:
+            first = (r.get("extra") or {}).get("first_text_s")
             out.append({"role": role, "answer": r["latency_s"], "before": pending, "after": 0.0, "routed": routed,
                         "total": pending + r["latency_s"], "output_tokens": r.get("output_tokens", 0),
+                        "first": pending + (first if first is not None else r["latency_s"]),
+                        "streamed": first is not None,
                         "game_id": game, "prepared": r.get("model") == "prepared"})
             pending, routed = 0.0, False
         elif role in AFTER_ANSWER and out and out[-1]["game_id"] == game:
             out[-1]["after"] += r["latency_s"]
             out[-1]["total"] += r["latency_s"]
+            if not out[-1]["streamed"]:  # 실시간이면 검사는 문장을 내보내는 중에 끝났다
+                out[-1]["first"] += r["latency_s"]
     return out
 
 
@@ -127,7 +136,10 @@ def summarize(records: list[dict]) -> dict:
     return {
         "roles": roles,
         "questions": {**_stats(totals), "over_target": sum(1 for t in totals if t > TARGET_P95_S),
-                      "routed": sum(1 for q in qs if q["routed"]), "prepared": sum(1 for q in qs if q["prepared"])},
+                      "routed": sum(1 for q in qs if q["routed"]), "prepared": sum(1 for q in qs if q["prepared"]),
+                      "first_p50": percentile([q["first"] for q in qs], 50),
+                      "first_p95": percentile([q["first"] for q in qs], 95),
+                      "streamed": sum(1 for q in qs if q["streamed"])},
         "speculative": {"shows": len(shows), "prepared": prepared, "used": used,
                         "hit_rate": sum(1 for u in made if u > 0) / len(made) if made else None,  # F.15 (D-60)
                         "discard_rate": 1 - used / prepared if prepared else None},
@@ -139,7 +151,8 @@ def render_markdown(s: dict, title: str = "응답 지연") -> str:
     lines = [f"### {title}", "",
              f"질문→답 {q['n']}개: p50 {q['p50']:.1f}초 · p95 {q['p95']:.1f}초 · 최대 {q['max']:.1f}초 "
              f"(목표 {TARGET_P50_S:.0f}초/{TARGET_P95_S:.0f}초) · {TARGET_P95_S:.0f}초 넘음 {q['over_target']}개 · "
-             f"LLM 라우터 {q['routed']}번 · 미리 만든 답 사용 {q['prepared']}개", "",
+             f"LLM 라우터 {q['routed']}번 · 미리 만든 답 사용 {q['prepared']}개",
+             f"첫 문장까지 p50 {q['first_p50']:.1f}초 · p95 {q['first_p95']:.1f}초 (첫 문장부터 보여 준 답 {q['streamed']}개)", "",
              "| 역할 | 호출 | p50 | p95 | 최대 | 출력 토큰 p50 | 대체 동작 |", "|:--|--:|--:|--:|--:|--:|--:|"]
     for role, r in s["roles"].items():
         lines.append(f"| {role} | {r['n']} | {r['p50']:.1f} | {r['p95']:.1f} | {r['max']:.1f} | "
@@ -264,7 +277,12 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--speculative", type=int, default=0,
                     help="칩 답 미리 만들기 효과를 N번씩 잰다(임시 폴더의 새 판, 그림 끔). 진짜 모델 사용량이 든다")
     ap.add_argument("--read", type=float, default=8.0, help="--speculative C 방식의 읽는 시간(초)")
+    ap.add_argument("--stream-check", type=int, default=0,
+                    help="직접 쓴 질문의 첫 대사 조각·끝 시간을 N번씩 잰다(첫 문장부터 보여 주기 끔/켬). 진짜 모델 사용량이 든다")
     args = ap.parse_args(argv)
+    if args.stream_check:
+        _run_stream(args.stream_check)
+        return
     if args.speculative:
         _run_speculative(args.speculative, args.read)
         return
@@ -286,6 +304,69 @@ def main(argv: list[str] | None = None) -> None:
         print(f"다시 보내기: 프로필 {client.profile}, 방식 {client.provider}" + (" (가짜 LLM)" if client.fake_mode else ""))
         rows = asyncio.run(replay(client, records, roles=args.roles.split(","), limit=args.replay))
         print(render_replay(rows))
+
+
+async def measure_stream(svc: Any, *, rounds: int = 3, question: str = "어젯밤 사건 시각쯤 어디 계셨어요?",
+                         theme: str = "demo_db_deleted", settle_s: float = 1.0) -> list[dict]:
+    """직접 쓴 질문 하나를 보내 첫 대사 조각과 행동 끝까지의 시간을 잰다. 첫 문장부터 보여 주기를 끔/켬 번갈아.
+    매번 새 판의 같은 인물(처음 장소에 있는 첫 사람)에게 같은 질문."""
+    rows = []
+    base = svc.cfg
+    for _ in range(rounds):
+        for stream in (False, True):
+            svc.cfg = base.model_copy(update={"speed": base.speed.model_copy(update={"stream_npc_answers": stream})})
+            game_id, view = svc.new_game(theme, {"difficulty": "normal"})
+            npc = next(c for c in view.characters if c.location_id == view.player_location)
+            t0, first = time.perf_counter(), None
+            evs = []
+            async for e in svc.act(game_id, {"type": "ask", "npc_id": npc.id, "text": question}):
+                evs.append(e)
+                if first is None and e["type"] == "TEXT_MESSAGE_CONTENT":
+                    first = time.perf_counter() - t0
+            total = time.perf_counter() - t0
+            rows.append({"stream": stream, "first_s": first if first is not None else total, "total_s": total,
+                         "error": any(e["type"] == "RUN_ERROR" for e in evs),
+                         "text": "".join(e.get("delta", "") for e in evs if e["type"] == "TEXT_MESSAGE_CONTENT")})
+            await asyncio.sleep(settle_s)
+    svc.cfg = base
+    return rows
+
+
+def render_stream(rows: list[dict]) -> str:
+    lines = ["| 방식 | 횟수 | 첫 대사 조각 p50 | 최대 | 행동 끝 p50 | 오류 |", "|:--|--:|--:|--:|--:|--:|"]
+    for stream, name in ((False, "다 만든 뒤 보여 줌(전)"), (True, "첫 문장부터 보여 줌(후)")):
+        rs = [r for r in rows if r["stream"] == stream]
+        if rs:
+            f, t = [r["first_s"] for r in rs], [r["total_s"] for r in rs]
+            lines.append(f"| {name} | {len(rs)} | {percentile(f, 50):.1f}초 | {max(f):.1f}초 | "
+                         f"{percentile(t, 50):.1f}초 | {sum(r['error'] for r in rs)} |")
+    return "\n".join(lines) + "\n"
+
+
+def _temp_service():
+    import os
+    import tempfile
+
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    os.environ["CLOUDFLARE_API_TOKEN"] = os.environ["CLOUDFLARE_ACCOUNT_ID"] = ""  # 그림은 그리지 않는다
+    from server.game.service import GameService
+
+    svc = GameService(Path(tempfile.mkdtemp(prefix="latency_")), in_memory=True)
+    print(f"모델 연결: 프로필 {svc.llm.profile}, 방식 {svc.llm.provider}" + (" (가짜 LLM)" if svc.llm.fake_mode else "")
+          + (", 실시간 출력 가능" if svc.llm.can_stream else ""))
+    return svc
+
+
+def _run_stream(rounds: int) -> None:
+    svc = _temp_service()
+    rows = asyncio.run(measure_stream(svc, rounds=rounds))
+    print(render_stream(rows))
+    for r in rows:
+        print(f"- {'후' if r['stream'] else '전'} 첫 {r['first_s']:.1f}초 / 끝 {r['total_s']:.1f}초: {r['text'][:60]}")
+    print()
+    print(render_markdown(summarize([r.__dict__ for r in svc.llm.tracer.records]), title="이번 측정 호출 기록"))
 
 
 def _run_speculative(rounds: int, read_s: float) -> None:
