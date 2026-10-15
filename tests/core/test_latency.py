@@ -16,21 +16,31 @@ def test_percentile_nearest_rank():
     assert percentile([], 50) == 0.0
 
 
+def _seq(*specs):
+    """차례로 돈 호출 기록: (역할, 지연, 추가 인자) → 끝 시각(ts)이 이어지게."""
+    out, t = [], 100.0
+    for role, lat, *kw in specs:
+        t += lat
+        out.append(_rec(role, lat, ts=t, **(kw[0] if kw else {})))
+    return out
+
+
 def test_questions_group_router_retrieval_answer_and_gm_check():
-    recs = [_rec("router", 9.1), _rec("retrieval", 0.1, bucket="retrieval"), _rec("npc", 5.2),
-            _rec("gm_check", 1.0, bucket="gm"), _rec("retrieval", 0.0, bucket="retrieval"), _rec("npc_minor", 7.3)]
+    recs = _seq(("router", 9.1), ("retrieval", 0.1, {"bucket": "retrieval"}), ("npc", 5.2),
+                ("gm_check", 1.0, {"bucket": "gm"}), ("retrieval", 0.0, {"bucket": "retrieval"}), ("npc_minor", 7.3))
     qs = questions(recs)
     assert [round(q["total"], 1) for q in qs] == [15.4, 7.3]
     assert qs[0]["routed"] and not qs[1]["routed"]
 
 
 def test_questions_drop_pending_steps_from_another_game():
-    qs = questions([_rec("router", 9.0, game="old"), _rec("npc", 2.0, game="new")])
+    qs = questions([_rec("router", 9.0, game="old", ts=109.0), _rec("npc", 2.0, game="new", ts=111.0)])
     assert qs[0]["total"] == 2.0 and not qs[0]["routed"]
 
 
 def test_summarize_and_markdown_against_target():
-    recs = [_rec("npc", t, out=200) for t in (2.0, 4.0, 7.0)] + [_rec("night", 6.0, bucket="night")]
+    recs = _seq(("npc", 2.0, {"out": 200}), ("npc", 4.0, {"out": 200}), ("npc", 7.0, {"out": 200}),
+                ("night", 6.0, {"bucket": "night"}))
     s = summarize(recs)
     assert s["questions"]["n"] == 3 and s["questions"]["over_target"] == 1
     assert s["roles"]["npc"]["p50"] == 4.0 and s["roles"]["night"]["n"] == 1
@@ -65,10 +75,10 @@ async def test_replay_resends_recorded_prompts_with_current_client():
 
 
 def test_speculative_calls_are_not_waited_questions_and_hit_rate_is_reported():
-    recs = [_rec("npc", 4.0, node="npc:speculative"), _rec("npc", 4.2, node="npc:speculative"),
-            _rec("npc", 0.3, model="prepared", node="npc_prepared"),
-            _rec("speculative", 0.0, model="code", node="speculative", extra={"prepared": 2, "used": 1}),
-            _rec("npc", 5.0)]
+    recs = _seq(("npc", 4.0, {"node": "npc:speculative"}), ("npc", 4.2, {"node": "npc:speculative"}),
+                ("npc", 0.3, {"model": "prepared", "node": "npc_prepared"}),
+                ("speculative", 0.0, {"model": "code", "node": "speculative", "extra": {"prepared": 2, "used": 1}}),
+                ("npc", 5.0))
     qs = questions(recs)
     assert [q["total"] for q in qs] == [0.3, 5.0] and qs[0]["prepared"] and not qs[1]["prepared"]
     s = summarize(recs)
@@ -91,8 +101,8 @@ async def test_measure_speculative_with_fake_llm(tmp_path):
 
 
 def test_first_text_time_for_streamed_and_plain_answers():
-    recs = [_rec("router", 1.0), _rec("npc", 5.0, extra={"first_text_s": 1.5}),
-            _rec("npc", 4.0), _rec("gm_check", 1.0, bucket="gm")]
+    recs = _seq(("router", 1.0), ("npc", 5.0, {"extra": {"first_text_s": 1.5}}),
+                ("npc", 4.0), ("gm_check", 1.0, {"bucket": "gm"}))
     qs = questions(recs)
     assert [q["first"] for q in qs] == [2.5, 5.0] and qs[0]["streamed"] and not qs[1]["streamed"]
     s = summarize(recs)
@@ -109,3 +119,18 @@ async def test_measure_stream_with_fake_llm(tmp_path):
     assert [r["stream"] for r in rows] == [False, True] and not any(r["error"] for r in rows)
     assert all(r["text"] for r in rows) and svc.cfg.speed.stream_npc_answers  # 설정은 원래대로 돌려놓는다
     assert "| 첫 문장부터 보여 줌(후) | 1 |" in render_stream(rows)
+
+
+def test_router_running_alongside_answer_counts_overlap_once():
+    """애매한 질문: 라우터(4초)와 인물 답(5초, 첫 문장 1.5초)을 동시에 시작. 라우터가 먼저 끝나는 경우와 늦게 끝나는 경우."""
+    a = [_rec("retrieval", 0.0, ts=100.0, bucket="retrieval"), _rec("router", 4.0, ts=104.0),
+         _rec("npc", 5.0, ts=105.0, extra={"first_text_s": 1.5})]
+    q = questions(a)[0]
+    assert q["total"] == 5.0 and q["first"] == 4.0 and q["routed"]  # 첫 문장은 판정(4초) 뒤에 보인다
+    b = [_rec("npc", 3.0, ts=103.0, extra={"first_text_s": 1.0}), _rec("router", 4.0, ts=104.0)]  # 답이 먼저 끝남
+    qb = questions(b)
+    assert len(qb) == 1 and qb[0]["total"] == 4.0 and qb[0]["first"] == 4.0 and qb[0]["routed"]
+    c = [_rec("npc", 3.0, ts=103.2, extra={"first_text_s": 1.0}), _rec("router", 4.0, ts=104.0)]  # 라우터가 조금 먼저 시작
+    qc = questions(c)
+    assert len(qc) == 1 and qc[0]["routed"] and qc[0]["total"] == 4.0
+

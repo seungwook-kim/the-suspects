@@ -9,11 +9,15 @@
 규칙 엔진·RAG·저장소는 TurnDeps로 주입받는다(테스트에서 가짜로 바꿔 끼울 수 있게).
 추천 질문 칩은 답을 미리 만들어 둘 수 있다(prepare_answer, PRD §14.1 추측 생성). 미리 만든 답(prepared)이 오면
 검색·인물 답·게임 마스터 LLM 검사를 건너뛰고 그 결과로 뒤처리(수첩·기억·증거)만 한다.
+시맨틱 분류가 애매해 LLM 라우터를 부를 때는, 수사 질문이라고 보고 인물 답을 동시에 시작한다(PRD §14.1 병렬로 하기).
+라우터가 수사 질문(또는 증거 제시·블러핑 시도)으로 판정하면 붙잡아 둔 답을 이어서 내보내고, 아니면 취소한다.
+판정 규칙은 그대로이고 기다리는 시간만 "라우터 + 답"에서 "둘 중 긴 쪽"으로 준다.
 그래프는 이벤트(AG-UI 형식 dict) 목록과 바뀐 게임 상태를 만든다. 전송은 API 계층이 한다.
 """
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, TypedDict
@@ -77,6 +81,33 @@ class PreparedAnswer:
     hits: list[RetrievalHit] = field(default_factory=list)
 
 
+class _Gate(list):
+    """먼저 시작한 인물 답의 이벤트를 붙잡아 두는 목록. open(대상)하면 붙잡은 것을 내보내고 이후는 바로 넘긴다."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._target: list | None = None
+
+    def append(self, ev: dict) -> None:  # type: ignore[override]
+        if self._target is not None:
+            self._target.append(ev)
+        else:
+            super().append(ev)
+
+    def extend(self, evs) -> None:  # type: ignore[override]
+        for ev in list(evs):
+            self.append(ev)
+
+    def open(self, target: list) -> None:
+        self._target = target
+        for ev in list(self):
+            target.append(ev)
+        self.clear()
+
+
+_EARLY_KINDS = ("investigate", "present_evidence", "bluff_attempt")  # 결국 인물 답(수사)으로 가는 판정
+
+
 class TurnState(TypedDict, total=False):
     case: CaseBible
     game: GameState
@@ -85,6 +116,7 @@ class TurnState(TypedDict, total=False):
     chip_route: RouterOutput | None
     prepared: PreparedAnswer | None
     streamed_mid: str | None  # 첫 문장부터 내보낸 대사의 메시지 id (끝 이벤트만 남음)
+    early: tuple | None  # (작업, 붙잡는 목록): 라우터와 동시에 먼저 시작한 인물 답
     route: RouterOutput
     hits: list[RetrievalHit]
     reply: NPCReply
@@ -125,6 +157,11 @@ async def node_route(s: TurnState) -> TurnState:
         return s
     out = deps.router.classify(s["text"], target_npc=s["npc_id"])
     if out.via == "llm":
+        guess = out.model_copy(update={"kind": "investigate"})
+        early = None
+        if deps.stream:  # 실시간 경로만: 버릴 때 취소하면 생성도 멈춘다
+            gate = _Gate()
+            early = (asyncio.ensure_future(_early_answer({**s, "route": guess}, gate)), gate, guess)
         out, _ = await deps.llm.structured(
             role="router", bucket="npc", schema=RouterOutput,
             system="형사가 추리 게임 속 인물에게 한 말의 의도를 분류한다.",
@@ -135,8 +172,24 @@ async def node_route(s: TurnState) -> TurnState:
         )
         out.via = "llm"
         out.target_npc = s["npc_id"]
+        if early is not None:
+            task, gate, guess = early
+            ch = _char(s["case"], s["npc_id"])
+            if out.kind in _EARLY_KINDS and _answer_role(ch, out) == _answer_role(ch, guess):
+                s["early"] = (task, gate)
+            else:  # 다른 판정(잡담·메타 등)이거나 어려운 질문용 모델로 바뀌었다 → 먼저 만든 답은 버린다
+                task.cancel()
     s["route"] = out
     return s
+
+
+async def _early_answer(state: dict, gate: _Gate) -> dict:
+    """라우터를 기다리는 동안 수사 질문이라고 보고 검색 + 인물 답을 먼저 만든다. 이벤트는 gate에 붙잡아 둔다."""
+    ss: dict = dict(state)
+    ss["events"] = gate
+    node_retrieve(ss)  # type: ignore[arg-type]
+    await _answer_core(ss)  # type: ignore[arg-type]
+    return {k: ss.get(k) for k in ("hits", "reply", "verdict", "fallback_used", "streamed_mid")}
 
 
 def route_branch(s: TurnState) -> str:
@@ -167,6 +220,8 @@ def node_warrant_hint(s: TurnState) -> TurnState:
 
 def node_retrieve(s: TurnState) -> TurnState:
     deps: TurnDeps = s["deps"]
+    if s.get("early"):  # 먼저 시작한 답이 검색까지 했다
+        return s
     if s.get("prepared"):
         s["hits"] = list(s["prepared"].hits)
         return s
@@ -180,11 +235,22 @@ def _answer_role(ch: Character, route: RouterOutput) -> str:
 
 
 async def node_npc_answer(s: TurnState) -> TurnState:
-    deps: TurnDeps = s["deps"]
-    case, game, npc_id = s["case"], s["game"], s["npc_id"]
     if p := s.get("prepared"):
         s["reply"], s["verdict"], s["fallback_used"] = p.reply.model_copy(deep=True), p.verdict, p.fallback_used
         return s
+    if early := s.get("early"):  # 라우터와 동시에 먼저 시작한 답: 붙잡아 둔 이벤트를 내보내고 이어서 받는다
+        task, gate = early
+        gate.open(s["events"])
+        s.update(await task)  # type: ignore[typeddict-item]
+        return s
+    await _answer_core(s)
+    return s
+
+
+async def _answer_core(s: TurnState) -> None:
+    """검색 결과(s["hits"])로 인물 답을 만든다. 이벤트는 s["events"]로(실시간이면 문장마다)."""
+    deps: TurnDeps = s["deps"]
+    case, game, npc_id = s["case"], s["game"], s["npc_id"]
     ch = _char(case, npc_id)
     ctx = npc_agent.NPCContext(
         character=ch, state=game.npc_states[npc_id], question=s["text"], hits=s.get("hits", []),
@@ -222,7 +288,6 @@ async def node_npc_answer(s: TurnState) -> TurnState:
             fallback_line=lambda: deps.fallback_line(ch), game_id=game.game_id,
         )
     s["reply"], s["verdict"], s["fallback_used"] = reply, verdict, fb
-    return s
 
 
 def gm_branch(s: TurnState) -> str:

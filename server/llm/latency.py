@@ -70,33 +70,64 @@ def percentile(values: Iterable[float], p: float) -> float:
 
 
 def questions(records: list[dict]) -> list[dict]:
-    """기록 순서대로 질문 단위로 묶는다: {total, first, answer, before, after, role, routed}.
-    판(game_id)이 바뀌면 앞서 쌓인 라우터·검색 시간은 버린다."""
+    """기록 순서대로 질문 단위로 묶는다: {total, first, answer, before, after, role, routed, streamed, prepared}.
+    시각은 호출 기록의 끝 시각(ts)과 지연으로 구간을 만들어 계산한다(동시에 돈 단계는 겹친 만큼 뺀다).
+    - 라우터와 인물 답을 동시에 돌린 경우(애매한 질문): 답이 라우터보다 먼저 끝나 라우터 기록이 뒤에 오면
+      그 라우터는 앞 질문에 붙인다. 첫 문장은 라우터 판정이 끝나야 보이므로 둘 중 늦은 쪽.
+    - 판(game_id)이 바뀌면 앞서 쌓인 라우터·검색은 버린다."""
     out: list[dict] = []
-    pending, pending_game, routed = 0.0, None, False
+    pend: list[dict] = []  # 답 앞에 쌓인 라우터·검색 기록
     for r in records:
         role, game = r.get("role"), r.get("game_id")
         if _speculative(r):  # 미리 만든 호출은 플레이어가 기다리지 않았다
             continue
-        if game != pending_game:
-            pending, routed, pending_game = 0.0, False, game
+        if pend and pend[-1].get("game_id") != game:
+            pend = []
+        r_start, r_end = r["ts"] - r["latency_s"], r["ts"]
         if role in BEFORE_ANSWER:
-            pending += r["latency_s"]
-            routed = routed or role == "router"
+            last = out[-1] if out else None
+            if last and last["game_id"] == game and r_start < last["_end"]:
+                _merge_before(last, r)  # 답과 겹쳐 돈 라우터·검색(답보다 늦게 끝남): 앞 질문의 것
+            else:
+                pend.append(r)
         elif role in ANSWER_ROLES:
             first = (r.get("extra") or {}).get("first_text_s")
-            out.append({"role": role, "answer": r["latency_s"], "before": pending, "after": 0.0, "routed": routed,
-                        "total": pending + r["latency_s"], "output_tokens": r.get("output_tokens", 0),
-                        "first": pending + (first if first is not None else r["latency_s"]),
-                        "streamed": first is not None,
-                        "game_id": game, "prepared": r.get("model") == "prepared"})
-            pending, routed = 0.0, False
+            q = {"role": role, "answer": r["latency_s"], "after": 0.0, "routed": False,
+                 "output_tokens": r.get("output_tokens", 0), "streamed": first is not None,
+                 "game_id": game, "prepared": r.get("model") == "prepared",
+                 "_start": r_start, "_end": r_end, "_shown": r_start + first if first is not None else r_end}
+            for b in pend:
+                _merge_before(q, b)
+            pend = []
+            _finish(q)
+            out.append(q)
         elif role in AFTER_ANSWER and out and out[-1]["game_id"] == game:
-            out[-1]["after"] += r["latency_s"]
-            out[-1]["total"] += r["latency_s"]
-            if not out[-1]["streamed"]:  # 실시간이면 검사는 문장을 내보내는 중에 끝났다
-                out[-1]["first"] += r["latency_s"]
+            q = out[-1]
+            q["after"] += r["latency_s"]
+            q["_end"] = max(q["_end"], r_end)
+            if not q["streamed"]:  # 실시간이면 검사는 문장을 내보내는 중에 끝났다
+                q["_shown"] = max(q["_shown"], r_end)
+            _finish(q)
+    for q in out:
+        for k in ("_start", "_end", "_shown"):
+            q.pop(k, None)
     return out
+
+
+def _merge_before(q: dict, b: dict) -> None:
+    b_start, b_end = b["ts"] - b["latency_s"], b["ts"]
+    q["_start"] = min(q["_start"], b_start)
+    q["_end"] = max(q["_end"], b_end)
+    if b.get("role") == "router":
+        q["routed"] = True
+        q["_shown"] = max(q["_shown"], b_end)  # 판정이 끝나야 답이 화면에 나간다
+    _finish(q)
+
+
+def _finish(q: dict) -> None:
+    q["total"] = round(q["_end"] - q["_start"], 3)
+    q["first"] = round(q["_shown"] - q["_start"], 3)
+    q["before"] = round(max(0.0, q["total"] - q["answer"] - q["after"]), 3)
 
 
 def _stats(values: list[float]) -> dict:
@@ -279,9 +310,10 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--read", type=float, default=8.0, help="--speculative C 방식의 읽는 시간(초)")
     ap.add_argument("--stream-check", type=int, default=0,
                     help="직접 쓴 질문의 첫 대사 조각·끝 시간을 N번씩 잰다(첫 문장부터 보여 주기 끔/켬). 진짜 모델 사용량이 든다")
+    ap.add_argument("--question", help="--stream-check에 쓸 질문 (기본: 어젯밤 사건 시각쯤 어디 계셨어요?)")
     args = ap.parse_args(argv)
     if args.stream_check:
-        _run_stream(args.stream_check)
+        _run_stream(args.stream_check, args.question)
         return
     if args.speculative:
         _run_speculative(args.speculative, args.read)
@@ -359,9 +391,11 @@ def _temp_service():
     return svc
 
 
-def _run_stream(rounds: int) -> None:
+def _run_stream(rounds: int, question: str | None = None) -> None:
     svc = _temp_service()
-    rows = asyncio.run(measure_stream(svc, rounds=rounds))
+    q = question or "어젯밤 사건 시각쯤 어디 계셨어요?"
+    print(f"질문: {q} (시맨틱 분류: {svc.router.classify(q).via})")
+    rows = asyncio.run(measure_stream(svc, rounds=rounds, question=q))
     print(render_stream(rows))
     for r in rows:
         print(f"- {'후' if r['stream'] else '전'} 첫 {r['first_s']:.1f}초 / 끝 {r['total_s']:.1f}초: {r['text'][:60]}")

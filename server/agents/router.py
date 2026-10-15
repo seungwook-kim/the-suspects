@@ -28,7 +28,10 @@ Vector = dict[str, float]
 EmbedFn = Callable[[str], Vector]
 
 _JAMO_ONLY = re.compile(r"^[\sㄱ-ㅎㅏ-ㅣ!?.~ㅋㅎ]+$")
-_PROFANITY = ["씨발", "시발", "ㅅㅂ", "개새", "병신", "ㅂㅅ", "좆", "닥쳐", "꺼져", "미친놈", "미친년", "fuck"]
+_PROFANITY = ["씨발", "시발", "ㅅㅂ", "개새", "병신", "ㅂㅅ", "좆", "닥쳐", "미친놈", "미친년", "fuck"]
+# "꺼져"는 "불이 꺼져 있다"처럼 평범한 말에도 들어 있어서 낱말 포함으로 잡으면 수사 질문이 욕설로 처리된다
+# (2026-10-15 검증 문장 "백업이 꺼져 있던 거 알고 있었어요?"). 명령으로 쓰인 경우(문장 끝·"꺼져라"·"꺼지라고")만 잡는다.
+_PROFANITY_RE = re.compile(r"(^|[\s,.!?~])(꺼져(라)?|꺼지라고)\s*[!.~?]*\s*$|꺼져라|꺼지라고")
 _META = ["프롬프트", "시스템", "지시를 무시", "지시사항", "개발자 모드", "너 ai", "ai지", "챗봇", "gpt", "정답 알려",
          "범인 알려", "범인 누군지", "범인 이름", "설정을 출력", "사건 원본", "규칙을 무시"]
 
@@ -71,7 +74,7 @@ class SemanticRouter:
         low = t.lower()
         if not t or _JAMO_ONLY.match(t) or len(re.sub(r"[^가-힣a-zA-Z0-9]", "", t)) < 2:
             return RouterOutput(kind="gibberish", via="rule")
-        if any(p in low for p in _PROFANITY):
+        if any(p in low for p in _PROFANITY) or _PROFANITY_RE.search(t):
             return RouterOutput(kind="inappropriate", via="rule")
         if any(m in low for m in _META):
             return RouterOutput(kind="meta", via="rule")
