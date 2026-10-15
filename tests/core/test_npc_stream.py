@@ -105,3 +105,46 @@ async def test_without_streaming_it_is_the_normal_answer(mini_case):
                                                  gm_code_check=lambda r: GMVerdict(ok=True),
                                                  fallback_line=lambda: "모르겠어요.", hooks=hooks)
     assert not streamed and shown == [] and reply.text and not fb
+
+
+async def test_signal_sentence_waits_for_real_sources_like_normal_path(mini_case):
+    """근거 목록을 모르는 동안은 근거 면제 없이 검사(잡아 둠), 다 쓴 뒤 실제 근거로 평소와 같은 판정."""
+    from server.agents.npc import _PENDING_ID
+
+    seen_ids = []
+
+    def check(r):  # 실제 검사처럼: 근거로 댄 기억(m1)에 있는 시각이면 LLM 검사 면제
+        seen_ids.append(list(r.used_ids))
+        return GMVerdict(ok=True, needs_llm_check="11시" in r.text and "m1" not in r.used_ids, triggers=["시각"])
+
+    calls = []
+
+    async def llm_check(r, v):
+        calls.append(r.text)
+        return True
+
+    chunks = ['{"emotion": "neutral", "text": "퇴근했어요. ', "11시쯤이요. ", '집에 갔죠."', ', "used_ids": ["m1"]}']
+    _, shown, _, run = _run(mini_case, chunks, check=check, llm_check=llm_check)
+    reply, _, _, _ = await run
+    assert [_PENDING_ID] in seen_ids  # 쓰는 동안은 자리표시 근거로(면제 없음) → 시각 문장은 잡아 둠
+    assert shown == ["퇴근했어요.", " 11시쯤이요. 집에 갔죠."] and calls == []  # 근거(m1)가 확인돼 LLM 검사 없이 냄
+    assert reply.text == "퇴근했어요. 11시쯤이요. 집에 갔죠."
+
+    chunks_no_src = chunks[:-1] + [', "used_ids": []}']
+    calls.clear()
+    _, shown2, _, run2 = _run(mini_case, chunks_no_src, check=check, llm_check=llm_check)
+    await run2
+    assert calls and shown2[-1].endswith("집에 갔죠.")  # 근거가 없으면 평소처럼 LLM 검사를 거친다
+
+
+async def test_sentence_limit_comes_from_context(mini_case):
+    from server.agents.npc import build_prompt
+
+    ctx = _ctx(mini_case)
+    ctx.sentences = (1, 2)
+    assert "1~2문장" in build_prompt(ctx)[0]
+    stub = StreamStub(['{"emotion": "neutral", "text": "하나. ', "둘. ", "셋. ", '넷."}'])
+    hooks = StreamHooks(on_emotion=lambda e: None, on_text=lambda t: None)
+    reply, _, _, _ = await answer_stream(stub, ctx, role="npc", gm_code_check=lambda r: GMVerdict(ok=True),
+                                         fallback_line=lambda: "모르겠어요.", hooks=hooks)
+    assert reply.text == "하나. 둘."

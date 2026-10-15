@@ -37,6 +37,10 @@ class TaggedLLM:
         kw["node"] = f"{kw.get('node') or kw['role']}:{self._tag}"
         return await self._llm.structured(**kw)
 
+    async def structured_stream(self, **kw: Any) -> Any:
+        kw["node"] = f"{kw.get('node') or kw['role']}:{self._tag}"
+        return await self._llm.structured_stream(**kw)
+
     def __getattr__(self, name: str) -> Any:
         return getattr(self._llm, name)
 

@@ -68,8 +68,11 @@ class LLMClient:
         models_config: dict | None = None,
         api_key: str | None = None,
         profile: str | None = None,
+        http_async_client: Any = None,
     ) -> None:
+        """http_async_client: API 호출에 쓸 httpx.AsyncClient(테스트에서 가짜 서버를 끼울 때). 없으면 기본."""
         self.tracer = tracer or Tracer()
+        self._http = http_async_client
         self.cfg = models_config or _load_models_config()
         self.profile = profile or os.getenv("THE_SUSPECTS_MODEL_PROFILE") or self.cfg.get("active_profile", "dev")
         key_env = (self.cfg["profiles"].get(self.profile) or {}).get("api_key_env") or "OPENROUTER_API_KEY"
@@ -119,6 +122,7 @@ class LLMClient:
             extra_body=extra_body or None,
             timeout=rc.get("timeout_s", 30),  # 사건 쓰기처럼 긴 출력은 역할 설정으로 늘린다
             max_retries=1,
+            **({"http_async_client": self._http} if self._http is not None else {}),
         )
         self._models[role] = model
         return model
@@ -246,7 +250,7 @@ class LLMClient:
         meta: 호출 기록 extra에 더할 값(부르는 쪽이 첫 문장을 보여 준 시각 등을 채운다)."""
         t0 = time.perf_counter()
         first: float | None = None
-        raw, it, ot, err, stopped = "", 0, 0, "", False
+        raw, it, ot, err, stopped, last = "", 0, 0, "", False, ""
         gen = self._stream_raw(role, self._with_schema(system, schema), user)
         try:
             async for raw, usage in gen:
@@ -254,7 +258,10 @@ class LLMClient:
                     first = time.perf_counter() - t0
                 if usage:
                     it, ot = usage["input_tokens"], usage["output_tokens"]
-                if raw and (await on_partial(raw)) is False:
+                if raw == last:  # 사용량만 붙은 마지막 알림 등: 글이 그대로면 부르지 않는다
+                    continue
+                last = raw
+                if (await on_partial(raw)) is False:
                     stopped = True
                     break
         except Exception as e:  # 네트워크·도구 오류

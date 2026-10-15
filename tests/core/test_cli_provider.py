@@ -94,3 +94,59 @@ async def test_thinking_off_env_reaches_the_tool(tmp_path):
     cfg["profiles"]["dev"]["roles"]["npc"]["thinking"] = "off"
     off, _ = await _ask(LLMClient(tracer=Tracer(), models_config=cfg, api_key=""))
     assert off.text == "0"
+
+
+async def test_stream_output_and_kill_on_cancel(tmp_path):
+    """명령줄 실시간 출력: 조각마다 받고, 받는 쪽이 취소하면 프로그램을 끝낸다(남은 생성을 버림)."""
+    import asyncio
+    import time
+
+    done_flag = tmp_path / "finished.txt"
+    script = tmp_path / "stream_tool.py"
+    script.write_text(textwrap.dedent(f"""
+        import json, sys, time
+        sys.stdin.buffer.read()
+        def ev(t):
+            print(json.dumps({{"type": "stream_event", "event": {{"type": "content_block_delta",
+                  "delta": {{"type": "text_delta", "text": t}}}}}}), flush=True)
+        ev('{{"emotion": "neutral", "text": "집에')
+        ev(' 있었어요."}}')
+        if "--slow" in sys.argv:
+            time.sleep(20)
+            open(r"{done_flag}", "w").write("끝까지 돎")
+        print(json.dumps({{"type": "result", "usage": {{"input_tokens": 3, "output_tokens": 4}}}}), flush=True)
+    """), encoding="utf-8")
+    cli = {"command": [sys.executable, str(script)], "stream_command": [sys.executable, str(script)],
+           "cwd": str(tmp_path / "work"), "timeout_s": 30}
+    cfg = {"active_profile": "dev", "profiles": {"dev": {"provider": "cli", "cli": cli,
+                                                         "roles": {"npc": {"model": "m"}}}}}
+    client = LLMClient(tracer=Tracer(), models_config=cfg, api_key="")
+    assert client.can_stream
+    seen = []
+
+    async def on_partial(raw):
+        seen.append(raw)
+
+    result, _ = await client.structured_stream(role="npc", bucket="npc", schema=_Emo, system="s", user="u",
+                                               on_partial=on_partial)
+    assert result.text == "집에 있었어요." and len(seen) == 2
+    assert client.tracer.records[-1].output_tokens == 4
+
+    cli["stream_command"] = [sys.executable, str(script), "--slow"]
+    t0 = time.perf_counter()
+    task = asyncio.ensure_future(client.structured_stream(role="npc", bucket="npc", schema=_Emo, system="s", user="u",
+                                                          on_partial=on_partial))
+    while len(seen) < 4:
+        await asyncio.sleep(0.05)
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    await asyncio.sleep(0.5)
+    assert time.perf_counter() - t0 < 15 and not done_flag.exists()  # 20초 생성을 기다리지 않고 끊었다
+
+
+class _Emo(BaseModel):
+    emotion: str
+    text: str

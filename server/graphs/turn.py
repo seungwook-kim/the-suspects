@@ -62,6 +62,7 @@ class TurnDeps:
     gm_llm_check: Callable[[CaseBible, GameState, str, NPCReply, GMVerdict], Awaitable[bool]] | None = None
     # 인물 답을 첫 문장부터 보여 준다(문장마다 게임 마스터 코드 검사 통과분만, PRD §14.1·§7.2)
     stream: bool = False
+    reply_sentences: tuple[int, int] = (1, 3)  # 답 문장 수 (설정 npc_reply_sentences)
 
 
 @dataclass
@@ -188,7 +189,7 @@ async def node_npc_answer(s: TurnState) -> TurnState:
     ctx = npc_agent.NPCContext(
         character=ch, state=game.npc_states[npc_id], question=s["text"], hits=s.get("hits", []),
         case_brief=deps.case_brief(case, game), lie_guidance=deps.lie_guidance(case, npc_id, s["text"]),
-        scene=deps.scene(case, game) if deps.scene else "",
+        scene=deps.scene(case, game) if deps.scene else "", sentences=deps.reply_sentences,
         conversation_summary=game.conversation_summary,
     )
     role = _answer_role(ch, s["route"])
@@ -276,7 +277,7 @@ async def node_small_talk(s: TurnState) -> TurnState:
                   "blunt": "…그런 걸 왜 물어요.", "normal": "아, 네… 그냥 그렇죠 뭐."}[ch.small_talk_style]
     reply, _ = await deps.llm.structured(
         role="small_talk", bucket="npc", schema=NPCReply,
-        system=f"{npc_agent.COMMON_RULES}\n이름: {ch.name}, 역할: {ch.role}, 성격: {ch.personality}, 말투: {ch.speech_style}\n"
+        system=f"{npc_agent.common_rules(*deps.reply_sentences)}\n이름: {ch.name}, 역할: {ch.role}, 성격: {ch.personality}, 말투: {ch.speech_style}\n"
                "사건과 무관한 잡담이다. 사건 정보를 꺼내지 말고 성격대로 짧게 답한다.",
         user=s["text"], fake=lambda: NPCReply(text=style_line),
         fallback=lambda: NPCReply(text=style_line), game_id=game.game_id, node="small_talk",

@@ -451,8 +451,8 @@ class GameService:
         if st.phase == "briefing":
             st.phase = "day"
         self._spend(st, "ask")
-        return await prepare_answer(case, st, npc_id, text,
-                                    self._turn_deps(case, st, llm=TaggedLLM(self.llm), stream=False))
+        # 실시간 경로로 만든다: 화면에는 안 내보내지만, 버릴 때(다른 행동) 취소하면 모델 생성도 바로 멈춘다
+        return await prepare_answer(case, st, npc_id, text, self._turn_deps(case, st, llm=TaggedLLM(self.llm)))
 
     async def _take_prepared(self, game_id: str, key: tuple, state: GameState, action: dict) -> PreparedAnswer | None:
         """누른 칩의 미리 만든 답. 아직 만드는 중이면 끝날 때까지 기다린다. 기다린 시간을 호출 기록에 남긴다."""
@@ -601,6 +601,7 @@ class GameService:
             case_brief=lambda case_, game: self._brief(case_, game), gm_llm_check=gm_llm_check,
             scene=lambda case_, game: self._scene(case_, game),
             stream=stream and cfg.speed.stream_npc_answers and bool(getattr(llm, "can_stream", False)),
+            reply_sentences=(cfg.npc_reply_sentences[0], cfg.npc_reply_sentences[1]),
         )
 
     def _npc_search(self, case: CaseBible, game: GameState, npc_id: str, q: str) -> list[RetrievalHit]:
@@ -678,6 +679,7 @@ class GameService:
             case_brief=self._brief(case, state), lie_guidance=C.relevant_lies(case, npc_id, prompt_text),
             scene=self._scene(case, state),
             conversation_summary=state.conversation_summary, forced_emotion=forced_emotion, forced_reaction=forced_reaction,
+            sentences=(self.cfg.npc_reply_sentences[0], self.cfg.npc_reply_sentences[1]),
         )
         mid = None
 

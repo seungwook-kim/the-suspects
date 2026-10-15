@@ -95,3 +95,35 @@ async def test_present_evidence_reaction_streams_too(svc):
 
 async def _collect(gen):
     return [e async for e in gen]
+
+
+async def test_discarded_preparation_stops_the_model_call(tmp_path):
+    """다른 행동을 하면 미리 만들던 답은 버리고, 실시간 호출을 취소해 모델 생성도 멈춘다(사용량 절약)."""
+    svc = GameService(tmp_path, in_memory=True)
+
+    class Hang:
+        can_stream = True
+
+        def __init__(self, inner):
+            self.inner, self.started, self.cancelled = inner, 0, 0
+
+        def __getattr__(self, name):
+            return getattr(self.inner, name)
+
+        async def structured_stream(self, **_):
+            self.started += 1
+            try:
+                await asyncio.Event().wait()  # 끝나지 않는 생성
+            except asyncio.CancelledError:
+                self.cancelled += 1
+                raise
+
+    svc.llm = Hang(svc.llm)
+    game_id, _ = svc.new_game("demo_db_deleted", {"difficulty": "easy"})
+    chip = ask_chip(svc, game_id)
+    assert (await svc.prepare(game_id, chip.target_npc))["prepared"] >= 1
+    await asyncio.sleep(0.05)
+    assert svc.llm.started >= 1
+    await asyncio.wait_for(_collect(svc.act(game_id, {"type": "investigate"})), timeout=5)
+    await asyncio.sleep(0.05)
+    assert svc.llm.cancelled == svc.llm.started  # 버린 준비분은 모두 취소됐다
