@@ -141,6 +141,7 @@ class GameService:
             self._index_template(case)
         self.jobs: dict[str, dict] = {}  # 사건 생성 작업 (메모리, 서버 재시작 시 사라짐)
         self.spec = Speculator()  # 추천 질문 답 미리 만들기 (메모리, 서버 재시작 시 사라짐)
+        self.history_photos = data / "history_photos"  # 클리어 기록용 인물 사진 사본(결과 카드)
         self.portraits = PortraitStore(data / "portraits", ImageClient(tracer=self.llm.tracer),
                                        library=None if in_memory else PortraitLibrary(data / "portrait_library"))
 
@@ -1038,18 +1039,25 @@ class GameService:
         if bluffs:
             highlight = f"블러핑으로 {C.char(case, bluffs[-1]['npc']).name}의 자백을 받아냈다"
         elif success:
-            highlight = f"증거 {len(state.notebook.evidence_ids)}개와 모순 {len(state.notebook.contradictions)}개로 진실을 밝혀냈다"
+            n_ev, n_con = len(state.notebook.evidence_ids), len(state.notebook.contradictions)
+            highlight = (f"증거 {n_ev}개와 모순 {n_con}개로 진실을 밝혀냈다" if n_con
+                         else f"증거 {n_ev}개로 진실을 밝혀냈다")
         else:
             highlight = "끝내 진실에 닿지 못했다"
+        hid = f"h_{uuid.uuid4().hex[:10]}"
+        shown = [c for c in case.characters if state.npc_states.get(c.id) and state.npc_states[c.id].visible]
+        # 판 사진은 아래에서 지우므로, 결과 카드에 쓸 작은 사본을 먼저 남긴다
+        photos = self.portraits.keep_for_history(self._portrait_key(state), self._public_people(shown), self.history_photos / hid)
         history = ClearHistory(
-            id=f"h_{uuid.uuid4().hex[:10]}", player_id="player", case_title=case.title, theme=case.theme,
+            id=hid, player_id="player", case_title=case.title, theme=case.theme,
             cleared_at=datetime.now(), success=success,
             real_minutes=max(1, int((datetime.now() - state.started_at).total_seconds() // 60)),
             game_days=state.day, question_count=state.question_count, grade=grade if success else None,
             titles=[title] if title else [], reputation=state.reputation,
             culprit={"name": culprit.name, "role": culprit.role},
-            characters=[{"name": c.name, "role": c.role, "face_seed": c.face_seed, "appearance": c.appearance}
-                        for c in case.characters if state.npc_states.get(c.id) and state.npc_states[c.id].visible],
+            characters=[{"name": c.name, "role": c.role, "face_seed": c.face_seed, "appearance": c.appearance,
+                         "portrait_url": f"/api/history/{hid}/photos/{photos[c.id]}" if c.id in photos else None}
+                        for c in shown],
             highlight=highlight, fingerprint=case.fingerprint,
         )
         self.store.add_history(history)
@@ -1065,6 +1073,15 @@ class GameService:
         self.portraits.delete(self._portrait_key(state))
         self._forget_generated(case)
         return {"history": history.model_dump(mode="json"), "card": card.model_dump() if card else None}
+
+    def history_photo(self, hid: str, filename: str) -> Path | None:
+        """클리어 기록 사진 파일(경로 조작 방지: h_<영숫자>/<숫자>.webp 만)."""
+        import re
+
+        if not re.fullmatch(r"h_[0-9a-f]{10}", hid) or not re.fullmatch(r"\d{1,3}\.webp", filename):
+            return None
+        p = self.history_photos / hid / filename
+        return p if p.is_file() else None
 
     def history(self) -> list[ClearHistory]:
         return self.store.list_history()

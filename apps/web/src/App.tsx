@@ -70,7 +70,8 @@ export default function App() {
   }
 
   const enter = (view: { phase: string } | null) => {
-    if (view) setScreen(view.phase === 'finale' ? 'finale' : view.phase === 'briefing' ? 'briefing' : 'main')
+    // 끝난 판(ended)은 결말 화면으로: 결과 카드를 보기 전에 나갔다가 이어하기로 돌아온 경우
+    if (view) setScreen(view.phase === 'finale' || view.phase === 'ended' ? 'finale' : view.phase === 'briefing' ? 'briefing' : 'main')
   }
   const openGame = async (gameId: string) => {
     setCreating(true)

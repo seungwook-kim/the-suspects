@@ -23,7 +23,8 @@
 | GET | `/api/games/{game_id}/sources/{statement_id}` | — | 진술 출처 원문 `[{kind, title, content}]` (플레이어 권한 안의 것만) |
 | POST | `/api/games/{game_id}/finale` | `FinaleStep` | SSE 이벤트 스트림 |
 | POST | `/api/games/{game_id}/clear` | — | `{history: ClearHistory, card: ShareCard}` |
-| GET | `/api/history` | — | `ClearHistory[]` |
+| GET | `/api/history` | — | `ClearHistory[]` (`characters[].portrait_url`: 결과 카드용 인물 사진 썸네일, 없으면 `null` → 코드로 그린 얼굴) |
+| GET | `/api/history/{history_id}/photos/{n}.webp` | — | 결과 카드용 인물 사진 썸네일(180×240 WebP). 클리어할 때 남긴다 |
 
 ### 사건 직접 만들기 (자유 주제, PRD §4.1·§4.2·§5.2)
 | 메서드 | 경로 | 요청 | 응답 |
@@ -126,7 +127,7 @@ CaseJob = {
   화면은 감정에 맞는 표정 사진이 있으면 그것을, 없으면 기본 사진(`portrait_url`)을 쓴다. 행동이 끝날 때마다 사진 상태를 다시 묻는다.
 - 사진에는 감정 효과를 얹지 않는다(PRD §9.4, 2026-10-14 변경). 표정이 바뀌면 180ms 크로스페이드, 이름 옆에 표정 글자 칩.
   `GET /portraits` 의 `pending` 이 true 인 동안 사진이 없는 인물은 "사진 준비 중" 칸으로 보여 준다.
-- `GET /api/portraits/{key}/{file}` → 이미지(`image/png`·`image/jpeg`·`image/webp`). 클리어하면 그 판의 초상화 파일은 삭제된다
+- `GET /api/portraits/{key}/{file}` → 이미지(`image/png`·`image/jpeg`·`image/webp`). 클리어하면 그 판의 초상화 파일은 삭제된다(결과 카드용 썸네일만 클리어 기록과 함께 남음)
   (서버의 사진 보관함에는 남지만 이 주소로는 다시 열 수 없다).
 
 ### 절차적 SVG (대체 그림)

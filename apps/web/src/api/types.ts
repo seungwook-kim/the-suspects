@@ -130,7 +130,8 @@ export interface ClearHistory {
   titles: string[]
   reputation: number
   culprit: { name?: string; role?: string }
-  characters: { name: string; role: string; face_seed: number; appearance: Record<string, string> }[]
+  /** portrait_url: 클리어할 때 남긴 인물 사진 사본(없으면 코드로 그린 얼굴) */
+  characters: { name: string; role: string; face_seed: number; appearance: Record<string, string>; portrait_url?: string | null }[]
   highlight: string
   fingerprint: Record<string, unknown>
 }

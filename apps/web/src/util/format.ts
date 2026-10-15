@@ -23,6 +23,11 @@ export function plainTitle(s: string): string {
   return s.replace(/^(?:\p{Extended_Pictographic}|\uFE0F|\u200D|\s)+/u, '')
 }
 
+/** 직업에서 괄호 설명을 뗀 짧은 이름: "야간 청소원(시설관리 용역업체 소속, 근무 2년째)" → "야간 청소원" (결과 카드처럼 좁은 자리용) */
+export function shortRole(role: string): string {
+  return role.replace(/\s*[(（][^)）]*[)）]/g, '').trim() || role
+}
+
 /** 추천 질문 글자에서 앞에 붙은 "이름:"을 뗀다(조서·칩에 이름이 이미 보이므로) */
 export function chipText(label: string, name: string): string {
   if (!name) return label

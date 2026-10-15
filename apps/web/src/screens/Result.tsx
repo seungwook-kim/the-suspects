@@ -3,7 +3,7 @@ import type { ClearHistory, ShareCard } from '../api/types'
 import { Icon } from '../components/Icon'
 import { Portrait } from '../character/Portrait'
 import { downloadBlob, renderCardPng } from '../util/cardImage'
-import { buildShareText, plainTitle } from '../util/format'
+import { buildShareText, plainTitle, shortRole } from '../util/format'
 
 export function ResultCard({ h, card }: { h: ClearHistory; card?: ShareCard | null }) {
   const color = card?.theme_color ?? '#3b6ea5'
@@ -26,14 +26,14 @@ export function ResultCard({ h, card }: { h: ClearHistory; card?: ShareCard | nu
       <div className="res-faces">
         {h.characters.map((c, i) => (
           <figure key={i}>
-            <Portrait seed={c.face_seed} appearance={c.appearance} width={64} still title={c.role} />
-            <figcaption>{c.role}</figcaption>
+            <Portrait seed={c.face_seed} appearance={c.appearance} width={64} still title={c.role} portraitUrl={c.portrait_url} name={c.name} />
+            <figcaption><strong>{c.name}</strong><span>{shortRole(c.role)}</span></figcaption>
           </figure>
         ))}
       </div>
       {h.success ? (
         <div className="res-verdict">
-          <p><Icon name="magnifying-glass" /><span className="res-label">범인</span> {h.culprit.role} {h.culprit.name}</p>
+          <p><Icon name="magnifying-glass" /><span className="res-label">범인</span> {shortRole(h.culprit.role ?? '')} {h.culprit.name}</p>
           {h.titles[0] && <p><Icon name="seal-check" /><span className="res-label">칭호</span> {h.titles[0]}</p>}
         </div>
       ) : (

@@ -50,5 +50,5 @@ npm run lint       # oxlint
 ## 참고
 
 - 서버의 이어하기 목록(`GET /api/games`)을 받지 못하면 이 브라우저에 기억해 둔 저장본을 대신 보여 줍니다.
-- 결과 카드 PNG는 브라우저 캔버스에서 만들며 서버에 저장하지 않습니다.
+- 결과 카드 PNG는 브라우저 캔버스에서 만들며 서버에 저장하지 않습니다. 인물 사진은 클리어할 때 남긴 썸네일(`ClearHistory.characters[].portrait_url`)을 쓰고, 없으면 코드로 그린 얼굴을 씁니다.
 - 아이콘(Phosphor, MIT)과 글꼴(IBM Plex Sans KR, 나눔고딕코딩, OFL)의 라이선스 원문은 `public/licenses/`에 있습니다.

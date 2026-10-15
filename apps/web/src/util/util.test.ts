@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ClearHistory } from '../api/types'
-import { buildShareText, chipText, dayPeriod, formatDayTime, plainTitle } from './format'
+import { buildShareText, chipText, dayPeriod, formatDayTime, plainTitle, shortRole } from './format'
 import { fitLabel, layoutGraph, separateBoxes } from './layout'
 
 describe('시간·공유 문구', () => {
@@ -84,6 +84,15 @@ describe('fitLabel (지도 칸 이름)', () => {
         expect(em * size).toBeLessThanOrEqual(72.01)
       }
     }
+  })
+})
+
+describe('shortRole', () => {
+  it('괄호 설명을 떼고, 남는 게 없으면 원래 글자', () => {
+    expect(shortRole('야간 청소원(시설관리 용역업체 소속, 근무 2년째)')).toBe('야간 청소원')
+    expect(shortRole('DBA(데이터베이스 관리자, 2021년 입사)')).toBe('DBA')
+    expect(shortRole('야간 경비원')).toBe('야간 경비원')
+    expect(shortRole('(미상)')).toBe('(미상)')
   })
 })
 

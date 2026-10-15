@@ -433,7 +433,7 @@ class ClearHistory(BaseModel):
     titles: list[str] = Field(default_factory=list)
     reputation: int = 0
     culprit: dict = Field(default_factory=dict)  # {name, role}
-    characters: list[dict] = Field(default_factory=list)  # [{name, role, face_seed, appearance}]
+    characters: list[dict] = Field(default_factory=list)  # [{name, role, face_seed, appearance, portrait_url}]
     highlight: str = ""  # 게임 기록 기반 한 줄 (플레이어 문장 금지)
     fingerprint: dict = Field(default_factory=dict)
 

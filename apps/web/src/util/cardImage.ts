@@ -4,6 +4,7 @@
 import type { ClearHistory } from '../api/types'
 import paperUrl from '../assets/paper-beige.webp'
 import { renderPortraitSvg } from '../character/faceRender'
+import { shortRole } from './format'
 
 const C = {
   bg: '#E3E6E1',
@@ -71,13 +72,17 @@ export async function renderCardPng(h: ClearHistory, themeColor = '#3b6ea5'): Pr
 
   const title = h.theme || h.case_title
   const stats = `⏱ ${h.real_minutes}분 · 질문 ${h.question_count}개 · 게임 속 ${h.game_days}일째`
-  const lead = h.success ? `🔍 범인: ${h.culprit.role ?? ''} ${h.culprit.name ?? ''}` : '범인을 잡지 못했다…'
+  const lead = h.success ? `🔍 범인: ${shortRole(h.culprit.role ?? '')} ${h.culprit.name ?? ''}` : '범인을 잡지 못했다…'
   const titleLine = h.success && h.titles.length ? `🏅 칭호: ${h.titles[0]}` : null
   const grade = h.success ? `해결 등급 ${h.grade ?? '-'}` : '미해결'
-  await loadFonts([title, stats, lead, titleLine, grade, h.highlight, ...h.characters.map((c) => c.role), '사건 종결 미해결 등장인물'].join(''))
+  await loadFonts([title, stats, lead, titleLine, grade, h.highlight, ...h.characters.map((c) => c.name + shortRole(c.role)), '사건 종결 미해결 등장인물'].join(''))
 
   const [faces, paper] = await Promise.all([
-    Promise.all(h.characters.map((c) => loadSvg(renderPortraitSvg(c.face_seed, c.appearance, { emotion: 'neutral' })))),
+    // 클리어할 때 남긴 실제 사진이 있으면 그것을, 없거나 못 불러오면 코드로 그린 얼굴
+    Promise.all(h.characters.map((c) => {
+      const svg = () => loadSvg(renderPortraitSvg(c.face_seed, c.appearance, { emotion: 'neutral' }))
+      return c.portrait_url ? loadImage(c.portrait_url).catch(svg) : svg()
+    })),
     loadImage(paperUrl).catch(() => null),
   ])
 
@@ -91,7 +96,7 @@ export async function renderCardPng(h: ClearHistory, themeColor = '#3b6ea5'): Pr
   const yRule2 = yStats + 20
   const yCastLabel = yRule2 + 32
   const yFaces = yCastLabel + 12
-  const yLead = yFaces + faceH + 60
+  const yLead = yFaces + faceH + 78 // 얼굴 아래 이름·직업 두 줄
   const yTitleLine = yLead + 32
   const yQuote = (titleLine ? yTitleLine : yLead) + 42
   const bottom = quote.length ? yQuote + (quote.length - 1) * 26 + 8 : (titleLine ? yTitleLine : yLead) + 6
@@ -200,10 +205,13 @@ export async function renderCardPng(h: ClearHistory, themeColor = '#3b6ea5'): Pr
     ctx.beginPath()
     ctx.roundRect(x + 0.5, yFaces + 0.5, faceW - 1, faceH - 1, 3)
     ctx.stroke()
+    ctx.textAlign = 'center'
+    ctx.fillStyle = C.ink
+    ctx.font = `700 13px ${BODY}`
+    ctx.fillText(fit(ctx, h.characters[i].name, faceW + gap - 2), x + faceW / 2, yFaces + faceH + 18)
     ctx.fillStyle = C.muted
     ctx.font = `400 12px ${BODY}`
-    ctx.textAlign = 'center'
-    ctx.fillText(fit(ctx, h.characters[i].role, faceW + gap - 2), x + faceW / 2, yFaces + faceH + 18)
+    ctx.fillText(fit(ctx, shortRole(h.characters[i].role), faceW + gap - 2), x + faceW / 2, yFaces + faceH + 35)
     ctx.textAlign = 'left'
   })
 

@@ -110,6 +110,15 @@ def portrait(key: str, filename: str) -> FileResponse:
     return FileResponse(path, media_type=media, headers={"Cache-Control": "private, max-age=86400"})
 
 
+@app.get("/api/history/{hid}/photos/{filename}")
+def history_photo(hid: str, filename: str) -> FileResponse:
+    """클리어 기록(결과 카드)의 인물 사진 사본."""
+    path = _service().history_photo(hid, filename)
+    if path is None:
+        raise HTTPException(404, "사진이 없습니다")
+    return FileResponse(path, media_type="image/webp", headers={"Cache-Control": "private, max-age=604800"})
+
+
 @app.get("/api/games")
 def list_games() -> list[dict]:
     return _service().list_games()

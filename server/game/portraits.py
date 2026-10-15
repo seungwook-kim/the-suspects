@@ -309,6 +309,36 @@ class PortraitStore:
                              model=self.images.model, seed=seed, kind="emotion", emotion=emo,
                              base_file=self._base_files.get((key, pid)))
 
+    def keep_for_history(self, key: str, people: list[dict], dest: Path,
+                         size: tuple[int, int] = (180, 240), quality: int = 80) -> dict[str, str]:
+        """클리어 기록(결과 카드)용으로 그 판 인물의 기본 사진을 작은 썸네일로 남긴다: 인물 id → 파일 이름.
+        판 사진 폴더는 클리어하면 지우지만, 결과 카드·공유 이미지는 그 뒤에도 실제 사진을 보여 준다(사용자 결정 2026-10-15).
+        그 판 사진이 없는 인물은 보관함의 비슷한 사람 사진(이 판에서 안 쓴 것)으로 채운다. 그래도 없으면 빠진다(코드로 그린 얼굴).
+        people: [{id, role, age, gender, appearance}] — 공개 정보만. 파일 이름은 순번만 쓴다(인물 id 같은 사건 내부 값을 남기지 않음)."""
+        if not _SAFE.match(key):
+            return {}
+        d = self.root / key
+        used = {f for (k, _), f in self._base_files.items() if k == key}  # 이 판이 이미 쓴 보관함 사진(같은 얼굴 두 번 금지)
+        out: dict[str, str] = {}
+        for i, p in enumerate(people):
+            pid = p["id"]
+            src = self._base_path(d, pid) if _SAFE.match(pid) else None
+            if src is None and self.library is not None:
+                hit = self.library.pick(p, exclude=used)
+                if hit:
+                    used.add(hit[0]["file"])
+                    src = self.library.root / hit[0]["file"]
+            if src is None:
+                continue
+            img = compact(src.read_bytes(), max_size=size, quality=quality)
+            if not img:
+                continue
+            dest.mkdir(parents=True, exist_ok=True)
+            name = f"{i}.webp"
+            (dest / name).write_bytes(img)
+            out[pid] = name
+        return out
+
     def delete(self, key: str) -> None:
         """판 그림만 지운다. 보관함 사진은 남는다."""
         t = self._tasks.pop(key, None)
