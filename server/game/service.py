@@ -527,11 +527,16 @@ class GameService:
             return ground_verdict(cfg, case_, v, reply.text, grounded)
 
         async def gm_llm_check(case_, game, npc_id, reply, verdict) -> bool:
+            hidden = ""
+            if "hidden_truth" in verdict.triggers:  # 숨길 진실을 털어놓았는지도 본다
+                truths = [lie.truth for lie in case_.lie_ledger if lie.liar_id == npc_id]
+                hidden = f"\n이 인물이 증거 없이는 숨겨야 하는 사실: {truths}\n대답이 이 사실을 털어놓았으면 ok=false."
             out, _ = await llm.structured(
                 role="gm_check", bucket="gm", schema=GMCheck,
-                system="추리 게임의 게임 마스터다. 인물의 대답이 그 인물이 알 수 있는 정보만 말했는지 판정한다.",
+                system="추리 게임의 게임 마스터다. 인물의 대답이 그 인물이 알 수 있는 정보만 말했는지, "
+                       "숨겨야 할 사실을 털어놓지 않았는지 판정한다.",
                 user=f"인물: {C.char(case_, npc_id).name}\n인물이 아는 것: {[h.content for h in hold.get('hits', [])]}\n"
-                     f"대답: {reply.text}\n문제 신호: {verdict.triggers}",
+                     f"대답: {reply.text}\n문제 신호: {verdict.triggers}{hidden}",
                 fake=lambda: GMCheck(ok=True), fallback=lambda: GMCheck(ok=False, reason="판정 실패"),
                 game_id=game.game_id, node="gm_llm",
             )
@@ -598,6 +603,7 @@ class GameService:
             fallback_line=lambda ch: gm_rules.fallback_line(cfg, ch), handle_offtopic=handle_offtopic,
             on_small_talk=on_small_talk, after_answer=after_answer,
             lie_guidance=lambda case_, npc_id, q: C.relevant_lies(case_, npc_id, q),
+            hidden=lambda case_, npc_id: C.hidden_topics(case_, npc_id),
             case_brief=lambda case_, game: self._brief(case_, game), gm_llm_check=gm_llm_check,
             scene=lambda case_, game: self._scene(case_, game),
             stream=stream and cfg.speed.stream_npc_answers and bool(getattr(llm, "can_stream", False)),
@@ -668,7 +674,8 @@ class GameService:
             events.extend(evs)
 
     async def _npc_react(self, case, state, npc_id, prompt_text, events, eb, *, forced_emotion=None, forced_reaction=None,
-                         presented: str | None = None) -> NPCReply:
+                         presented: str | None = None, revealed_lies: frozenset[str] = frozenset()) -> NPCReply:
+        """revealed_lies: 이번에 깨진 거짓말(반박 증거 제시) 또는 블러핑이 먹힌 경우 전부 → 그 진실은 말해도 된다."""
         """증거 제시·블러핑에 대한 NPC 반응 (핫 패스 LLM 1회)."""
         from server.agents import npc as npc_agent
 
@@ -680,6 +687,7 @@ class GameService:
             scene=self._scene(case, state),
             conversation_summary=state.conversation_summary, forced_emotion=forced_emotion, forced_reaction=forced_reaction,
             sentences=(self.cfg.npc_reply_sentences[0], self.cfg.npc_reply_sentences[1]),
+            hidden=C.hidden_topics(case, npc_id, revealed_lies),
         )
         mid = None
 
@@ -696,8 +704,8 @@ class GameService:
         llm = self.llm if self.cfg.speed.stream_npc_answers else _NoStream(self.llm)
         reply, _, _, streamed = await npc_agent.answer_stream(
             llm, ctx, role="npc_minor" if ch.tier == "minor" else "npc",
-            gm_code_check=lambda r: ground_verdict(self.cfg, case, gm_rules.check_reply(self.cfg, case, npc_id, r.text),
-                                                   r.text, " ".join(h.content for h in hits), presented),
+            gm_code_check=lambda r: ground_verdict(self.cfg, case, gm_rules.check_reply(
+                self.cfg, case, npc_id, r.text, revealed_lies=revealed_lies), r.text, " ".join(h.content for h in hits), presented),
             fallback_line=lambda: gm_rules.fallback_line(self.cfg, ch), hooks=hooks, game_id=state.game_id,
         )
         if forced_emotion:
@@ -726,7 +734,7 @@ class GameService:
             reply = await self._npc_react(case, state, npc_id, f"형사가 '{ev.name}'을(를) 내밀었다: {ev.content}", events, eb,
                                           forced_emotion="flustered",
                                           forced_reaction="증거 앞에서 당황한다. 앞서 한 말과 어긋난다는 걸 들킨 반응을 보인다.",
-                                          presented=ev.name)
+                                          presented=ev.name, revealed_lies=frozenset(l.id for l in lies))
             stmt_id = state.notebook.statements[-1].id
             new_c = []
             for lie in lies:
@@ -765,8 +773,10 @@ class GameService:
             "rebutted": ("angry", "블러핑이 통하지 않는다. 근거가 없다며 반박한다."),
             "instant_fail": ("angry", "거짓말인 걸 바로 알아챈다. 형사를 비웃는다."),
         }[result.outcome]
+        broken = frozenset(l.id for l in case.lie_ledger if l.liar_id == npc_id) \
+            if result.outcome in ("shaken", "confession") else frozenset()  # 블러핑이 먹히면 흘리거나 자백한다
         await self._npc_react(case, state, npc_id, f"형사가 블러핑한다: '{claim.label}'", events, eb,
-                              forced_emotion=reaction[0], forced_reaction=reaction[1])
+                              forced_emotion=reaction[0], forced_reaction=reaction[1], revealed_lies=broken)
         if result.outcome == "shaken" and result.leaked_hint_id:
             new = self._obtain(case, state, [result.leaked_hint_id])
             if new:

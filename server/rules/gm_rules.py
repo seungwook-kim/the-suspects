@@ -154,13 +154,39 @@ def count_sentences(text: str) -> int:
 # ---------------------------------------------------------------------------
 
 
+_STEM = re.compile(r"[가-힣A-Za-z0-9]{2,}")
+
+
+def _stems(text: str) -> set[str]:
+    """낱말의 앞 두 글자(조사·어미를 대충 떼는 용도)."""
+    return {w[:2] for w in _STEM.findall(text)}
+
+
+def hidden_truth_hit(case: CaseBible, npc_id: str, text: str,
+                     exempt: set[str] | frozenset[str] = frozenset()) -> list[str]:
+    """그 인물이 숨겨야 할 진실(거짓말 장부 truth)을 대답이 건드렸는지: 걸린 거짓말 id 목록.
+    진실에만 있고 거짓말에는 없는 낱말(앞 두 글자, 인물은 이름 두 글자도)이 2개 이상 나오면 신호로 본다.
+    신호일 뿐이고 판정은 LLM 검사가 한다(PRD §7.2 두 단계 검사)."""
+    said = _stems(text) | {c.name[-2:] for c in case.characters if len(c.name) >= 3 and c.name[-2:] in text}
+    hits = []
+    for lie in case.lie_ledger:
+        if lie.liar_id != npc_id or lie.id in exempt:
+            continue
+        truth = _stems(lie.truth) | {c.name[-2:] for c in case.characters if len(c.name) >= 3 and c.name in lie.truth}
+        if len((truth - _stems(lie.lie)) & said) >= 2:
+            hits.append(lie.id)
+    return hits
+
+
 def check_reply(
     cfg: GameConfig,
     case: CaseBible,
     npc_id: str,
     text: str,
     knowledge: NPCKnowledge | None = None,
+    revealed_lies: set[str] | frozenset[str] = frozenset(),
 ) -> GMVerdict:
+    """revealed_lies: 형사가 반박 증거를 내밀어 이미 깨진 거짓말 id(그 진실은 말해도 된다)."""
     kn = knowledge or knowledge_for(case, npc_id)
     triggers: list[str] = []
     violations: list[str] = []
@@ -203,6 +229,10 @@ def check_reply(
             out_of_scope = True
     if out_of_scope:
         triggers.append("out_of_scope_entity")
+
+    # 6. 숨길 진실(거짓말 장부): 범인·공범이 증거 없이 진실을 털어놓는 것
+    if hidden_truth_hit(case, npc_id, text, revealed_lies):
+        triggers.append("hidden_truth")
 
     mode = cfg.gm.llm_check
     needs = bool(triggers)

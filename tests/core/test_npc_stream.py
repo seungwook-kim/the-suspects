@@ -57,7 +57,7 @@ async def test_sentences_are_released_one_by_one(mini_case):
 
 
 async def test_violation_cuts_at_last_passing_sentence(mini_case):
-    bad = lambda r: GMVerdict(ok="박정수" not in r.text, violations=["범인 이름"])  # noqa: E731
+    bad = lambda r: GMVerdict(ok="박정수" not in r.text, violations=["범인 이름"] if "박정수" in r.text else [])  # noqa: E731
     stub, shown, _, run = _run(mini_case, ['{"emotion": "nervous", "text": "집에 있었어요. ', "범인은 박정수예요. ",
                                            '더 할 말 없어요."}'], check=bad)
     reply, _, _, streamed = await run
@@ -66,14 +66,15 @@ async def test_violation_cuts_at_last_passing_sentence(mini_case):
 
 
 async def test_first_sentence_violation_falls_back_to_normal_answer(mini_case):
-    bad = lambda r: GMVerdict(ok="박정수" not in r.text, violations=["범인 이름"])  # noqa: E731
+    bad = lambda r: GMVerdict(ok="박정수" not in r.text, violations=["범인 이름"] if "박정수" in r.text else [])  # noqa: E731
     stub, shown, _, run = _run(mini_case, ['{"emotion": "nervous", "text": "범인은 박정수예요. ', '그렇죠."}'], check=bad)
     reply, _, _, streamed = await run
     assert shown == [] and not streamed and stub.redo == 1 and reply.text == "다시 만든 답이에요."
 
 
 async def test_llm_check_sentence_is_held_until_checked(mini_case):
-    need = lambda r: GMVerdict(ok=True, needs_llm_check="11시" in r.text, triggers=["시각"])  # noqa: E731
+    need = lambda r: GMVerdict(ok="11시" not in r.text, needs_llm_check="11시" in r.text,  # noqa: E731
+                               triggers=["incident_time"] if "11시" in r.text else [])  # 실제 검사처럼: 신호면 ok=False
     chunks = ['{"emotion": "neutral", "text": "퇴근했어요. ', "11시쯤이요. ", '집에 갔죠."}']
 
     async def yes(r, v):
@@ -115,7 +116,8 @@ async def test_signal_sentence_waits_for_real_sources_like_normal_path(mini_case
 
     def check(r):  # 실제 검사처럼: 근거로 댄 기억(m1)에 있는 시각이면 LLM 검사 면제
         seen_ids.append(list(r.used_ids))
-        return GMVerdict(ok=True, needs_llm_check="11시" in r.text and "m1" not in r.used_ids, triggers=["시각"])
+        sig = "11시" in r.text and "m1" not in r.used_ids
+        return GMVerdict(ok=not sig, needs_llm_check=sig, triggers=["incident_time"] if sig else [])
 
     calls = []
 
@@ -148,3 +150,26 @@ async def test_sentence_limit_comes_from_context(mini_case):
     reply, _, _, _ = await answer_stream(stub, ctx, role="npc", gm_code_check=lambda r: GMVerdict(ok=True),
                                          fallback_line=lambda: "모르겠어요.", hooks=hooks)
     assert reply.text == "하나. 둘."
+
+
+async def test_real_gm_check_signal_is_held_not_cut(mini_case):
+    """실제 게임 마스터 코드 검사(신호면 ok=False)로: 사건 시각 문장은 끊지 않고 잡아 뒀다가 LLM 검사 뒤 낸다."""
+    from server.config import load_game_config
+    from server.rules import gm_rules
+
+    cfg = load_game_config()
+    t0 = mini_case.incident.time
+    hhmm = f"{t0 // 60 % 24}시 {t0 % 60}분"
+    checked = []
+
+    async def llm_check(r, v):
+        checked.append(v.triggers)
+        return True
+
+    chunks = ['{"emotion": "neutral", "text": "퇴근했어요. ', f"{hhmm}쯤엔 집이었어요. ", '그게 다예요."}']
+    _, shown, _, run = _run(mini_case, chunks, check=lambda r: gm_rules.check_reply(cfg, mini_case, "npc_dba", r.text),
+                            llm_check=llm_check)
+    reply, _, _, streamed = await run
+    assert streamed and shown[0] == "퇴근했어요." and "incident_time" in checked[0]
+    assert reply.text == f"퇴근했어요. {hhmm}쯤엔 집이었어요. 그게 다예요."
+

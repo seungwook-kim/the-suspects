@@ -117,6 +117,14 @@ def relevant_lies(case: CaseBible, npc_id: str, question: str, min_overlap: int 
     return out
 
 
+def hidden_topics(case: CaseBible, npc_id: str, revealed: set[str] | frozenset[str] = frozenset()) -> list[str]:
+    """그 인물(범인·공범)이 숨겨야 하는 주제 전체와 그때 할 말. 질문과 관련 없어 보여도 늘 준다:
+    돌려 묻는 질문("제일 화났던 일")에 거짓말 지침이 빠져 진실을 말한 일(2026-10-15 탈옥 평가)을 막는다.
+    revealed: 형사가 반박 증거를 내밀어 이미 깨진 거짓말 id(그 주제는 숨기지 않는다)."""
+    return [f"{lie.topic}: 물으면 '{lie.lie}'라고 한다" for lie in case.lie_ledger
+            if lie.liar_id == npc_id and lie.id not in revealed]
+
+
 # ---------------------------------------------------------------------------- 추천 칩
 def base_questions(case: CaseBible) -> list[str]:
     """어느 사건에나 통하는 기본 질문. 현장 이름만 사건에서 가져온다."""

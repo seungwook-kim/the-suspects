@@ -60,6 +60,8 @@ class TurnDeps:
     # 그 NPC의 거짓말 지침 (범인·공범만)
     lie_guidance: Callable[[CaseBible, str, str], list[str]]
     case_brief: Callable[[CaseBible, GameState], str]  # 한 판 동안 그대로인 사건 공통 정보 (지시문 쪽)
+    # 그 인물이 숨겨야 하는 주제 전체(범인·공범의 거짓말 장부). 질문과 상관없이 늘 준다
+    hidden: Callable[[CaseBible, str], list[str]] | None = None
     # 지금 날짜·시각·장소 (행동마다 바뀌어 사용자 글 쪽에 넣는다, PRD §12.8 캐싱 순서)
     scene: Callable[[CaseBible, GameState], str] | None = None
     # 게임 마스터 LLM 검사: 코드 검사가 트리거만 남겼을 때(확정 위반 없음) 실행. True면 통과
@@ -256,6 +258,7 @@ async def _answer_core(s: TurnState) -> None:
         character=ch, state=game.npc_states[npc_id], question=s["text"], hits=s.get("hits", []),
         case_brief=deps.case_brief(case, game), lie_guidance=deps.lie_guidance(case, npc_id, s["text"]),
         scene=deps.scene(case, game) if deps.scene else "", sentences=deps.reply_sentences,
+        hidden=deps.hidden(case, npc_id) if deps.hidden else [],
         conversation_summary=game.conversation_summary,
     )
     role = _answer_role(ch, s["route"])
