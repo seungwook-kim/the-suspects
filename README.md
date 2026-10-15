@@ -1,6 +1,6 @@
 # The Suspects
 
-![The Suspects — 용의자들](docs/images/thumbnail.webp)
+![The Suspects 메인 화면: 사건 고르기와 AI 용의자 사진](docs/images/thumbnail.webp)
 
 > 스스로 움직이는 AI 용의자들을 심문해 범인을 찾는 추리 게임
 > RAG · LangGraph 기반 **자율형 멀티 에이전트** 프로젝트
