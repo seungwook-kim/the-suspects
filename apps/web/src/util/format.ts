@@ -48,3 +48,23 @@ const ENDING_TEXT: Record<string, { title: string; body: string }> = {
 export function endingText(ending: string) {
   return ENDING_TEXT[ending] ?? { title: '사건 종료', body: '' }
 }
+
+/** 받침을 보고 조사를 붙인다(서버 server/game/josa.py와 같은 규칙). 끝 글자를 못 읽으면 두 꼴을 같이 쓴다. */
+export function josa(word: string, pair: '은/는' | '이/가' | '을/를' | '으로/로'): string {
+  const ch = word.replace(/[\s'"’”)\]]+$/, '').slice(-1)
+  const code = ch.charCodeAt(0)
+  const digits: Record<string, [boolean, boolean]> = {
+    '0': [true, false], '1': [true, true], '2': [false, false], '3': [true, false], '4': [false, false],
+    '5': [false, false], '6': [true, false], '7': [true, true], '8': [true, true], '9': [false, false],
+  }
+  let info: [boolean, boolean] | null = null
+  if (code >= 0xac00 && code <= 0xd7a3) {
+    const jong = (code - 0xac00) % 28
+    info = [jong !== 0, jong === 8]
+  } else if (ch in digits) info = digits[ch]
+  const [a, b] = pair === '으로/로' ? ['으로', '로'] : (pair.split('/') as [string, string])
+  if (!info) return pair === '으로/로' ? `${word}(으)로` : `${word}${a}(${b})`
+  const [has, rieul] = info
+  if (pair === '으로/로') return word + (has && !rieul ? '으로' : '로')
+  return word + (has ? a : b)
+}

@@ -16,6 +16,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from server.config import GameConfig
+from server.schemas import Character
 
 Stage = Literal["none", "in_character", "chips_again", "turn_away", "rumor"]
 
@@ -61,3 +62,31 @@ def register_offtopic(cfg: GameConfig, streak: int) -> OfftopicOutcome:
 def register_normal(cfg: GameConfig, streak: int) -> int:
     """정상 질문이 들어왔다. 연속 횟수를 서서히 낮춘다(0 아래로는 안 감)."""
     return max(0, streak - cfg.offtopic.decay_per_normal)
+
+
+_DEFAULT_LINES = {"gibberish": "네? 뭐라고 하셨어요?", "meta": "…형사님, 많이 피곤하신가 봐요.",
+                  "inappropriate": "말씀이 너무 심하시네요.", "turn_away": "바빠서요. 나중에 오세요."}
+
+
+def style_of(character: Character) -> str:
+    """대사 말투 고르기: 겁 많음 > 냉정함 > 수다쟁이 > 무뚝뚝 > 기본 (gm_rules.fallback_line과 같은 순서)."""
+    if character.temperament == "timid":
+        return "timid"
+    if character.temperament == "cold":
+        return "cold"
+    if character.small_talk_style == "chatty":
+        return "chatty"
+    if character.small_talk_style == "blunt":
+        return "blunt"
+    return "default"
+
+
+def line(cfg: GameConfig, kind: str, character: Character, turn: int) -> str:
+    """엉뚱한 입력에 인물이 할 말. 같은 인물이 같은 말을 연달아 하지 않게 turn(연속 횟수 등)으로 돌려 고른다.
+    설정이 없으면 예전 한 줄을 쓴다."""
+    by_style = cfg.offtopic.lines.get(kind) or {}
+    options = by_style.get(style_of(character)) or by_style.get("default") or []
+    if not options:
+        return _DEFAULT_LINES.get(kind, "네?")
+    return options[turn % len(options)]
+

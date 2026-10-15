@@ -203,3 +203,50 @@ async def test_early_answer_is_dropped_when_router_says_small_talk(tmp_path):
     text = "".join(e.get("delta", "") for e in evs if e["type"] == "TEXT_MESSAGE_CONTENT")
     assert svc.llm.stream_cancelled and "집에 있었어요" not in text  # 먼저 만들던 수사 답은 화면에 안 나간다
     assert text  # 잡담 답(가짜 LLM)이 나갔다
+
+
+async def test_reaction_leaking_hidden_truth_is_replaced(tmp_path):
+    """증거를 보여 줬지만 그 거짓말을 깨는 증거가 아닐 때, 범인이 숨길 진실을 말하면 LLM 검사로 막는다."""
+    from server.game.service import GMCheck
+
+    svc = GameService(tmp_path, in_memory=True)
+    case = svc.cases["demo_db_deleted"]
+    culprit = case.culprit_ids[0]
+    leak = '{"emotion": "nervous", "text": "석진이 카드로 서버실에 잠깐 들어갔다 나왔슈. 그게 다유."}'
+
+    class Leaky:
+        can_stream = True
+
+        def __init__(self, inner):
+            self.inner, self.checked = inner, 0
+
+        def __getattr__(self, name):
+            return getattr(self.inner, name)
+
+        async def structured_stream(self, *, schema, on_partial, **_):
+            await on_partial(leak)
+            return schema.model_validate_json(leak), leak
+
+        async def structured(self, **kw):
+            if kw["role"] == "gm_check":
+                self.checked += 1
+                return GMCheck(ok=False, reason="숨길 진실"), False
+            return await self.inner.structured(**kw)
+
+    svc.llm = Leaky(svc.llm)
+    game_id, _ = svc.new_game("demo_db_deleted", {"difficulty": "easy"})
+    st = svc.store.load_live(game_id)
+    rebut = {e for lie in case.lie_ledger if lie.liar_id == culprit for e in lie.rebuttal_evidence_ids}
+    ev = next(e for e in case.evidence if e.id not in rebut)
+    st.notebook.evidence_ids.append(ev.id)
+    ns = st.npc_states[culprit]
+    ns.visible = True
+    if ns.location_id not in st.unlocked_locations:
+        st.unlocked_locations.append(ns.location_id)
+    st.player_location = ns.location_id
+    svc.store.save_live(st)
+    from server.game.masking import IdMasker
+    eid = IdMasker(case, st.id_salt).out("evidence", ev.id)
+    evs = await asyncio.wait_for(_collect(svc.act(game_id, {"type": "present", "npc_id": culprit, "evidence_id": eid})), 5)
+    text = "".join(e.get("delta", "") for e in evs if e["type"] == "TEXT_MESSAGE_CONTENT")
+    assert svc.llm.checked == 1 and "카드로 서버실" not in text  # 잡아 둔 문장은 검사에 걸려 나가지 않았다

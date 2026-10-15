@@ -288,3 +288,17 @@ def test_citation_sampling_deterministic(cfg):
     assert citation.sampled_for_relevance(cfg, "r1", "76조의2") == citation.sampled_for_relevance(cfg, "r1", "76조의2")
     hits = sum(citation.sampled_for_relevance(cfg, f"r{i}", "10조") for i in range(2000))
     assert 0.15 * 2000 < hits < 0.25 * 2000
+
+
+# ---------------------------------------------------------------- 엉뚱한 입력 대사
+def test_offtopic_lines_vary_by_character_and_turn(cfg):
+    from server.rules import offtopic
+    from server.schemas import Character
+
+    timid = Character(id="a", name="가", role="r", age=30, face_seed=1, personality="p", speech_style="s", temperament="timid")
+    cold = Character(id="b", name="나", role="r", age=30, face_seed=1, personality="p", speech_style="s", temperament="cold")
+    assert offtopic.line(cfg, "meta", timid, 0) != offtopic.line(cfg, "meta", cold, 0)  # 성격마다 다르게
+    seq = [offtopic.line(cfg, "meta", cold, i) for i in range(3)]
+    assert len(set(seq)) == 3  # 연달아 같은 말을 하지 않는다
+    assert offtopic.line(cfg, "turn_away", cold, 0) == "더 할 말 없습니다."
+    assert offtopic.line(cfg, "없는종류", cold, 0) == "네?"

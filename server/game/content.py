@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 from collections import Counter
 
+from server.game.josa import josa
 from server.schemas import CaseBible, Character, Chip, Evidence, GameState
 
 
@@ -175,7 +176,7 @@ def hint_text(case: CaseBible, state: GameState) -> str:
     """다음에 볼 만한 곳을 정답 없이 가리킨다."""
     for loc in case.locations:
         if loc.id in state.unlocked_locations and remaining_at(case, state, loc.id) > 0:
-            return f"선배, {loc.name}은(는) 아직 다 안 살펴본 것 같아요."
+            return f"선배, {josa(loc.name, '은/는')} 아직 다 안 살펴본 것 같아요."
     for loc in case.locations:
         if loc.id not in state.unlocked_locations and loc.unlock_condition:
             kind, _, value = loc.unlock_condition.partition(":")

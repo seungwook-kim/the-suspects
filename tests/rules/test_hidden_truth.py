@@ -43,3 +43,10 @@ def test_prompt_always_has_hidden_topics_for_liar():
 
 def test_leak_eval_flags_hidden_truth():
     assert any(f.startswith("숨길 진실") for f in detect(CASE, CULPRIT, LEAKED))
+
+
+def test_prompt_structure_phrase_is_violation():
+    cfg = load_game_config()
+    v = gm_rules.check_reply(cfg, CASE, CULPRIT, "누구랑 있었는지는 제가 아는 내용에 없어서 말씀드리기 어렵네요.")
+    assert "meta_phrase" in v.violations
+    assert "meta_phrase" not in gm_rules.check_reply(cfg, CASE, CULPRIT, "그건 기억이 잘 안 나유.").violations

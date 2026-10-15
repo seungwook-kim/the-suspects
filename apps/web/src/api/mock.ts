@@ -1,5 +1,6 @@
 // 목(mock) 백엔드. 계약(docs/api-contract.md)과 같은 모양의 REST 응답과 AG-UI 이벤트를 만든다.
 // VITE_USE_MOCK=1 일 때만 쓰인다. 사건 비밀(범인 등)은 이 파일 안에만 있고 화면 코드는 모른다.
+import { josa } from '../util/format'
 import type { Api } from './client'
 import type {
   Action,
@@ -348,7 +349,7 @@ async function* runAction(g: MockGame, a: Action): AsyncGenerator<AgEvent> {
       } else if (v.notebook.evidence_ids.includes(e.id)) {
         yield* speak('narrator', null, '이미 살펴본 곳이다. 새로 나올 것은 없다.')
       } else {
-        yield* speak('narrator', null, `${e.name}을(를) 발견했다. 수첩에 적어 두자.`)
+        yield* speak('narrator', null, `${josa(e.name, '을/를')} 발견했다. 수첩에 적어 두자.`)
         yield* addEvidence(g, e)
         yield custom('cutin', { text: '단서 발견!', style: 'find' })
       }

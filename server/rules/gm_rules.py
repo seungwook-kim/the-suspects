@@ -143,10 +143,29 @@ def _mentions(text: str, name: str) -> bool:
     return any(v in text for v in _name_variants(name))
 
 
+_PUNCT_RUN = re.compile(r"[.!?。…]+")
+
+
+def split_sentences(text: str) -> list[str]:
+    """문장으로 나눈다(원문 그대로). 말줄임("..", "...", "…")은 문장 끝이 아니다: "아, 그게요... 집에 있었어요."는 한 문장.
+    인물 답 자르기·실시간 판정·게임 마스터 문장 수 검사가 모두 이 규칙 하나를 쓴다(2026-10-15 규칙 불일치 수정)."""
+    out, start = [], 0
+    for m in _PUNCT_RUN.finditer(text):
+        run = m.group()
+        if set(run) <= {".", "…"} and (len(run) >= 2 or run == "…"):
+            continue  # 말줄임
+        nxt = text[m.end():m.end() + 1]
+        if nxt and not nxt.isspace():
+            continue  # 바로 글자가 이어지면("1.5", 따옴표 안 "안 했어."라고) 문장 끝이 아니다
+        out.append(text[start:m.end()])
+        start = m.end()
+    if text[start:].strip():
+        out.append(text[start:])
+    return [s for s in out if s.strip()]
+
+
 def count_sentences(text: str) -> int:
-    t = text.replace("...", "…").strip()
-    parts = re.split(r"[.!?。]+(?:\s+|$)", t)
-    return sum(1 for p in parts if p.strip())
+    return len(split_sentences(text.strip()))
 
 
 # ---------------------------------------------------------------------------
@@ -155,6 +174,9 @@ def count_sentences(text: str) -> int:
 
 
 _STEM = re.compile(r"[가-힣A-Za-z0-9]{2,}")
+# 지시문 구조를 드러내는 말: 칸 이름을 돌려 말하기("제가 아는 내용에 없어서"), 대괄호 칸 이름, 지시문·프롬프트
+# (2026-10-15 실제 모델 자동 플레이에서 발견). 사실 누출은 아니지만 몰입을 깨므로 다시 만들게 한다.
+_META_PHRASE = re.compile(r"아는 (내용|것|기억|정보)에(는)? (없|안 )|제 기억 목록|\[[^\]\n]{1,12}\]|지시문|프롬프트")
 
 
 def _stems(text: str) -> set[str]:
@@ -198,6 +220,8 @@ def check_reply(
         n = count_sentences(text)
         if n < lo or n > hi:
             violations.append("sentence_count")
+        if _META_PHRASE.search(text):
+            violations.append("meta_phrase")
 
     # 1. 범인 이름 (권한 밖)
     if not kn.knows_culprit:

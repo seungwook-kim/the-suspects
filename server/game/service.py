@@ -23,6 +23,7 @@ from server.cases.loader import list_case_ids, load_case_by_id
 from server.config import load_game_config
 from server.game import content as C
 from server.game.events import EventBuilder
+from server.game.josa import josa
 from server.game.masking import IdMasker, new_salt
 from server.game.night_deps import build_night_deps
 from server.game.portrait_library import PortraitLibrary
@@ -423,6 +424,24 @@ class GameService:
         push(eb.custom("chips", {"chips": [c.model_dump() for c in after.chips]}))
         push(eb.run_finished())
 
+    async def _gm_llm_judge(self, case: CaseBible, npc_id: str, reply: NPCReply, verdict: GMVerdict,
+                            hits: list[RetrievalHit], game_id: str, llm=None) -> bool:
+        """게임 마스터 LLM 검사(부록 F.11): 알 수 있는 정보만 말했는지, 숨길 진실을 털어놓지 않았는지. True면 통과."""
+        hidden = ""
+        if "hidden_truth" in verdict.triggers:  # 숨길 진실을 털어놓았는지도 본다
+            truths = [lie.truth for lie in case.lie_ledger if lie.liar_id == npc_id]
+            hidden = f"\n이 인물이 증거 없이는 숨겨야 하는 사실: {truths}\n대답이 이 사실을 털어놓았으면 ok=false."
+        out, _ = await (llm or self.llm).structured(
+            role="gm_check", bucket="gm", schema=GMCheck,
+            system="추리 게임의 게임 마스터다. 인물의 대답이 그 인물이 알 수 있는 정보만 말했는지, "
+                   "숨겨야 할 사실을 털어놓지 않았는지 판정한다.",
+            user=f"인물: {C.char(case, npc_id).name}\n인물이 아는 것: {[h.content for h in hits]}\n"
+                 f"대답: {reply.text}\n문제 신호: {verdict.triggers}{hidden}",
+            fake=lambda: GMCheck(ok=True), fallback=lambda: GMCheck(ok=False, reason="판정 실패"),
+            game_id=game_id, node="gm_llm",
+        )
+        return out.ok
+
     def _spend(self, state: GameState, cost_kind: str) -> None:
         """행동 소모와 게임 속 시간 흐름 (실제 행동과 칩 답 미리 만들기가 같은 계산을 쓴다)."""
         _absorb(state, act_rules.spend(self.cfg, state, cost_kind))
@@ -489,7 +508,8 @@ class GameService:
             state.visited_locations.append(loc)
         name = next(l.name for l in case.locations if l.id == loc)
         here = [C.char(case, n).name for n, ns in state.npc_states.items() if ns.visible and ns.location_id == loc]
-        self._say(events, eb, "narrator", None, f"{name}(으)로 왔다." + (f" {', '.join(here)}이(가) 있다." if here else ""))
+        self._say(events, eb, "narrator", None,
+                  f"{josa(name, '으로/로')} 왔다." + (f" {josa(', '.join(here), '이/가')} 있다." if here else ""))
         # 범인의 경계: 형사가 하루에 자기 위치를 여러 번 찾아오면 경계가 오른다 (부록 F.10)
         from server.rules import alertness as alert_rules
         for n, ns in state.npc_states.items():
@@ -508,7 +528,7 @@ class GameService:
             return
         for e in new:
             ev = C.evidence(case, e)
-            self._say(events, eb, "narrator", None, f"'{ev.name}'을(를) 찾았다. {ev.content}")
+            self._say(events, eb, "narrator", None, f"{josa(chr(39) + ev.name + chr(39), '을/를')} 찾았다. {ev.content}")
         events.append(eb.custom("notebook", {"added": {"evidence_ids": [masker.out("evidence", e) for e in new]}}))
 
     # ----------------------------------------------------------------- 대화
@@ -527,20 +547,7 @@ class GameService:
             return ground_verdict(cfg, case_, v, reply.text, grounded)
 
         async def gm_llm_check(case_, game, npc_id, reply, verdict) -> bool:
-            hidden = ""
-            if "hidden_truth" in verdict.triggers:  # 숨길 진실을 털어놓았는지도 본다
-                truths = [lie.truth for lie in case_.lie_ledger if lie.liar_id == npc_id]
-                hidden = f"\n이 인물이 증거 없이는 숨겨야 하는 사실: {truths}\n대답이 이 사실을 털어놓았으면 ok=false."
-            out, _ = await llm.structured(
-                role="gm_check", bucket="gm", schema=GMCheck,
-                system="추리 게임의 게임 마스터다. 인물의 대답이 그 인물이 알 수 있는 정보만 말했는지, "
-                       "숨겨야 할 사실을 털어놓지 않았는지 판정한다.",
-                user=f"인물: {C.char(case_, npc_id).name}\n인물이 아는 것: {[h.content for h in hold.get('hits', [])]}\n"
-                     f"대답: {reply.text}\n문제 신호: {verdict.triggers}{hidden}",
-                fake=lambda: GMCheck(ok=True), fallback=lambda: GMCheck(ok=False, reason="판정 실패"),
-                game_id=game.game_id, node="gm_llm",
-            )
-            return out.ok
+            return await self._gm_llm_judge(case_, npc_id, reply, verdict, hold.get("hits", []), game.game_id, llm)
 
         def handle_offtopic(game: GameState, npc_id: str, route: RouterOutput) -> dict:
             outcome = off_rules.register_offtopic(cfg, game.offtopic_streak)
@@ -561,11 +568,8 @@ class GameService:
             if outcome.partner_interject:
                 evs.extend(EventBuilder().text("partner", "partner", "선배, 시간 없어요. 사건 얘기부터 하죠."))
             ch = C.char(case, npc_id)
-            line = {"gibberish": "네? 뭐라고 하셨어요?",
-                    "meta": "…형사님, 많이 피곤하신가 봐요.",
-                    "inappropriate": "말씀이 너무 심하시네요."}.get(route.kind, "네?")
-            if outcome.turn_away:
-                line = "바빠서요. 나중에 오세요."
+            kind = "turn_away" if outcome.turn_away else route.kind
+            line = off_rules.line(cfg, kind, ch, outcome.streak + game.action_no)  # 성격별, 같은 말 연달아 안 나오게
             return {"line": line, "events": evs, "chips_again": outcome.show_chips}
 
         def on_small_talk(game: GameState, ch) -> None:
@@ -698,16 +702,24 @@ class GameService:
                 events.append(start)
             events.append(eb.text_delta(mid, piece))
 
+        async def hidden_check(r: NPCReply, v: GMVerdict) -> bool:
+            # 반응은 원래 LLM 1회: 숨길 진실 신호만 LLM 검사로 확인한다(이미 깨진 거짓말은 신호에서 빠져 있음)
+            if "hidden_truth" not in v.triggers:
+                return True
+            return await self._gm_llm_judge(case, npc_id, r, v, hits, state.game_id)
+
         hooks = npc_agent.StreamHooks(
             on_emotion=lambda e: events.append(eb.custom("emotion", {"npcId": npc_id, "emotion": forced_emotion or e})),
-            on_text=on_text)
+            on_text=on_text, llm_check=hidden_check)
         llm = self.llm if self.cfg.speed.stream_npc_answers else _NoStream(self.llm)
-        reply, _, _, streamed = await npc_agent.answer_stream(
+        reply, verdict, fb, streamed = await npc_agent.answer_stream(
             llm, ctx, role="npc_minor" if ch.tier == "minor" else "npc",
             gm_code_check=lambda r: ground_verdict(self.cfg, case, gm_rules.check_reply(
                 self.cfg, case, npc_id, r.text, revealed_lies=revealed_lies), r.text, " ".join(h.content for h in hits), presented),
             fallback_line=lambda: gm_rules.fallback_line(self.cfg, ch), hooks=hooks, game_id=state.game_id,
         )
+        if not streamed and not fb and not await hidden_check(reply, verdict):  # 한 번에 만든 답도 같은 검사
+            reply = NPCReply(text=gm_rules.fallback_line(self.cfg, ch), emotion=reply.emotion, used_ids=[])
         if forced_emotion:
             reply.emotion = forced_emotion
         state.npc_states[npc_id].emotion = reply.emotion
@@ -731,7 +743,7 @@ class GameService:
         lies = [l for l in case.lie_ledger if l.liar_id == npc_id and eid in l.rebuttal_evidence_ids]
         if lies:
             events.append(eb.custom("cutin", {"text": "이의 있음!", "style": "objection"}))
-            reply = await self._npc_react(case, state, npc_id, f"형사가 '{ev.name}'을(를) 내밀었다: {ev.content}", events, eb,
+            reply = await self._npc_react(case, state, npc_id, f"형사가 {josa(chr(39) + ev.name + chr(39), '을/를')} 내밀었다: {ev.content}", events, eb,
                                           forced_emotion="flustered",
                                           forced_reaction="증거 앞에서 당황한다. 앞서 한 말과 어긋난다는 걸 들킨 반응을 보인다.",
                                           presented=ev.name, revealed_lies=frozenset(l.id for l in lies))
@@ -751,7 +763,7 @@ class GameService:
                 public = [c.model_dump() for c in self._view(case, state, masker).notebook.contradictions if c.id in new_c]
                 events.append(eb.custom("notebook", {"added": {"contradictions": public}}))
         else:
-            await self._npc_react(case, state, npc_id, f"형사가 '{ev.name}'을(를) 보여 주며 묻는다: {ev.content}", events, eb,
+            await self._npc_react(case, state, npc_id, f"형사가 {josa(chr(39) + ev.name + chr(39), '을/를')} 보여 주며 묻는다: {ev.content}", events, eb,
                                   presented=ev.name)
 
     async def _do_bluff(self, case, state, masker, action, events, eb) -> None:
@@ -804,7 +816,7 @@ class GameService:
         new = self._obtain(case, state, got)
         for e in new:
             ev = C.evidence(case, e)
-            self._say(events, eb, "narrator", None, f"'{ev.name}'을(를) 받았다. {ev.content}")
+            self._say(events, eb, "narrator", None, f"{josa(chr(39) + ev.name + chr(39), '을/를')} 받았다. {ev.content}")
         if new:
             events.append(eb.custom("notebook", {"added": {"evidence_ids": [masker.out("evidence", e) for e in new]}}))
 

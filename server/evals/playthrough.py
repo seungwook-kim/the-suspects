@@ -118,6 +118,10 @@ def render(res: PlayResult, records: list[dict]) -> str:
     lines = [f"결과: {res.ending} · {res.days}일차 · 행동 {res.actions}번 · 걸린 시간 {res.seconds:.0f}초 · "
              f"오류 {len(res.errors)}개 · 대체 동작 {fb}번 · 중간에 끊은 답 {stopped}번", ""]
     lines += [f"- 오류: {e}" for e in res.errors]
+    for r in records:  # 끊은 답: 왜 끊었는지(문장 수 초과는 정상 — 평소 경로도 앞 문장만 쓴다)
+        if (r.get("extra") or {}).get("stopped"):
+            lines.append(f"- 끊은 답({r.get('role')}, {r.get('node')}): {(r.get('extra') or {}).get('cut', '이유 기록 없음')} "
+                         f"→ {(r.get('output') or '')[:80]}")
     lines += ["", "| 누구 | 질문 | 화면에 나간 답 |", "|:--|:--|:--|"]
     lines += [f"| {w} | {q} | {a.replace('|', '/')} |" for w, q, a in res.lines]
     lines += ["", render_markdown(summarize(records), title="이번 판 호출 기록")]

@@ -25,6 +25,8 @@ class OfftopicSteps(_Base):
 class OfftopicCfg(_Base):
     decay_per_normal: int
     partner_interject_at: int
+    # 엉뚱한 입력에 인물이 할 말: 종류(meta·gibberish·inappropriate·turn_away) → 말투(timid·cold·chatty·blunt·default) → 후보들
+    lines: dict[str, dict[str, list[str]]] = {}
 
 
 class ActionsCfg(_Base):

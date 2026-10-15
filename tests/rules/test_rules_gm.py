@@ -122,3 +122,12 @@ def test_fallback_lines(cfg, case):
     assert gm.fallback_line(cfg, chatty) == "어머, 그 얘긴 나중에 해요~"
     assert gm.fallback_line(cfg, blunt) == "기억 안 납니다."
     assert gm.fallback_line(cfg, ch["c"]) == cfg.gm.fallback_lines["default"]
+
+
+def test_split_sentences_shared_rule():
+    assert gm.split_sentences("아, 그게요... 저는 9시쯤 퇴근했어요... 그 뒤는 모릅니다. 죄송합니다.") == [
+        "아, 그게요... 저는 9시쯤 퇴근했어요... 그 뒤는 모릅니다.", " 죄송합니다."]
+    assert gm.count_sentences("마, 퇴근했다 아이가! 집에 갔십니다. 그게 다요?") == 3
+    assert gm.count_sentences("버전 2.0 배포는 끝났어요.") == 1  # 숫자 사이 점은 문장 끝이 아님
+    assert gm.count_sentences("그…… 모르겠어요") == 1
+    assert gm.count_sentences('그분이 "난 안 했어."라고 했어요. 진짜예요.') == 2  # 따옴표 안 마침표는 끝이 아님

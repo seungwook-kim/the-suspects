@@ -22,6 +22,7 @@ from server.cases.generate.plan import (
     Plan,
 )
 from server.cases.verify import BANNED_APPEARANCE_WORDS
+from server.game.josa import josa
 
 TONE_KO = {"comic": "코믹하고 가벼운", "balanced": "적당히 긴장감 있는", "serious": "진지하고 묵직한"}
 
@@ -94,7 +95,7 @@ def fake_concept(plan: Plan) -> ConceptOut:
     names = {"entry": "1층 입구", "main": "중앙 사무실", "rest": "휴게실", "scene": "자료 보관실",
              "watch": "관리실", "store": "비품 창고", "private": "개인 작업실"}
     return ConceptOut(
-        title=f"{plan.theme_text[:20]} 사건", setting=f"{plan.theme_text}을(를) 둘러싼 현대 한국의 작은 건물",
+        title=f"{plan.theme_text[:20]} 사건", setting=f"{josa(plan.theme_text, '을/를')} 둘러싼 현대 한국의 작은 건물",
         incident_what="중요한 물건이 사라졌다",
         incident_summary=f"{_hhmm(plan.incident_time)}쯤 {names['scene']}에서 중요한 물건이 사라졌다. 그날 밤 건물에 남아 있던 사람은 몇 명뿐이다.",
         locations=[LocOut(slot=k, name=names[k], description=f"{names[k]}. {d}") for k, d in LOCATION_SLOTS],
