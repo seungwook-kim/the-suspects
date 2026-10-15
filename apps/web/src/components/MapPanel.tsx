@@ -1,11 +1,12 @@
 import { useMemo } from 'react'
 import type { PlayerView } from '../api/types'
-import { layoutGraph, separateBoxes } from '../util/layout'
+import { fitLabel, layoutGraph, separateBoxes } from '../util/layout'
 
 const W = 270
 const H = 400
 const NW = 100
 const NH = 50
+const LABEL_W = NW - 28 // 칸 이름이 쓸 수 있는 폭(오른쪽 위 '처음 가는 곳' 점과 겹치지 않게)
 
 interface Props {
   view: PlayerView
@@ -52,6 +53,8 @@ export function MapPanel({ view, interrogeeId, locked, onMove, onTalk }: Props) 
           const can = reachable.has(l.id)
           const fresh = !visited.has(l.id)
           const people = view.characters.filter((c) => c.location_id === l.id)
+          const label = fitLabel(l.name, LABEL_W)
+          const two = label.lines.length > 1
           return (
             <g
               key={l.id}
@@ -68,8 +71,10 @@ export function MapPanel({ view, interrogeeId, locked, onMove, onTalk }: Props) 
                 aria-label={`${l.name}${isHere ? ' (현재 위치)' : can ? (fresh ? ', 이동 (처음 가는 곳, 행동 1)' : ', 이동 (가 본 곳, 행동 없음)') : ', 다른 장소를 거쳐야 함'}`}
                 onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && !locked && can && onMove(l.id)}
               />
-              <text x={NW / 2} y={19} textAnchor="middle" className="node-name" pointerEvents="none">
-                {l.name}
+              <text x={NW / 2} y={two ? 13 : 19} textAnchor="middle" className="node-name" style={{ fontSize: label.size }} pointerEvents="none">
+                {label.lines.map((line, i) => (
+                  <tspan key={i} x={NW / 2} dy={i ? label.size * 1.1 : 0}>{line}</tspan>
+                ))}
               </text>
               {fresh && <circle cx={NW - 9} cy={9} r={3.5} className="node-fresh" pointerEvents="none" />}
               {people.map((c, i) => {
@@ -79,7 +84,7 @@ export function MapPanel({ view, interrogeeId, locked, onMove, onTalk }: Props) 
                   <g
                     key={c.id}
                     className={`dot${interrogeeId === c.id ? ' active' : ''}${talkable ? ' talk' : ''}`}
-                    transform={`translate(${x},35)`}
+                    transform={`translate(${x},${two ? 37 : 35})`}
                     onClick={(ev) => {
                       ev.stopPropagation()
                       if (locked) return

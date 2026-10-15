@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ClearHistory } from '../api/types'
 import { buildShareText, chipText, dayPeriod, formatDayTime, plainTitle } from './format'
-import { layoutGraph, separateBoxes } from './layout'
+import { fitLabel, layoutGraph, separateBoxes } from './layout'
 
 describe('시간·공유 문구', () => {
   it('분 단위 clock 을 N일차 HH:MM 으로', () => {
@@ -68,3 +68,22 @@ describe('지도 자동 배치', () => {
     expect(plainTitle('사건 01')).toBe('사건 01')
   })
 })
+
+describe('fitLabel (지도 칸 이름)', () => {
+  it('짧으면 한 줄 12px, 길면 가운뎃점·띄어쓰기에서 두 줄', () => {
+    expect(fitLabel('2층 회의실', 72)).toEqual({ lines: ['2층 회의실'], size: 12 })
+    expect(fitLabel('1층 로비·보안데스크', 72).lines).toEqual(['1층 로비·', '보안데스크'])
+    expect(fitLabel('3층 개발팀 사무실', 72).lines).toEqual(['3층 개발팀', '사무실'])
+    expect(fitLabel('지하 1층 복도·청소용품실', 72).lines).toEqual(['지하 1층 복도·', '청소용품실'])
+  })
+  it('두 줄 모두 칸 폭 안에 들어간다', () => {
+    for (const name of ['1층 로비·보안데스크', '지하 1층 복도·청소용품실', '옥상 휴게 공간', '아주긴띄어쓰기없는장소이름이에요']) {
+      const { lines, size } = fitLabel(name, 72)
+      for (const line of lines) {
+        const em = [...line].reduce((w, ch) => w + (/[가-힣]/.test(ch) ? 1 : /[\s·]/.test(ch) ? 0.35 : 0.6), 0)
+        expect(em * size).toBeLessThanOrEqual(72.01)
+      }
+    }
+  })
+})
+

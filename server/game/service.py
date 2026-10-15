@@ -896,6 +896,12 @@ class GameService:
         events: list[dict] = []
         t = step.get("type")
         last = None
+
+        def emote(npc_id: str | None, emotion: str) -> None:  # 최종 추리 장면의 표정(목 백엔드와 같은 흐름)
+            if npc_id and npc_id in state.npc_states:
+                state.npc_states[npc_id].emotion = emotion  # type: ignore[assignment]
+                events.append(eb.custom("emotion", {"npcId": npc_id, "emotion": emotion}))
+
         try:
             if t == "start":
                 accused = step.get("accused_id")
@@ -909,7 +915,11 @@ class GameService:
                 st = fin_rules.accuse(self.cfg, case, st, accused)
                 state.phase = "finale"
                 if st.pending_confirmation:
+                    emote(accused, "angry")
                     self._say(events, eb, "npc", accused, "제가요? 증거라도 있어요? 다시 생각해 보시죠.")
+                else:
+                    emote(accused, "nervous")
+                    self._say(events, eb, "npc", accused, "제, 제가요? 증거라도 있으세요?")
             else:
                 if not state.finale:
                     raise _BadAction("최종 추리를 먼저 시작하세요.")
@@ -924,8 +934,10 @@ class GameService:
                     who = C.char(case, st.accused_id).name if st.accused_id else ""
                     if res.correct:
                         events.append(eb.custom("cutin", {"text": "이의 있음!", "style": "objection"}))
+                        emote(st.accused_id, "flustered")
                         self._say(events, eb, "npc", st.accused_id, "그, 그건…!")
                     else:
+                        emote(st.accused_id, "angry")
                         self._say(events, eb, "npc", st.accused_id, f"그게 저랑 무슨 상관이죠? ({who})")
                     last = {"result": "correct" if res.correct else ("rebutted" if res.rebuttal else "wrong"),
                             "evidence_id": step.get("evidence_id")}
@@ -943,6 +955,7 @@ class GameService:
                 state.phase = "ended"
                 line = {"success": "결국 모든 게 드러났다.", "escaped": "증거가 모자랐다. 범인은 끝내 버텼다.",
                         "wrong_accusation": "엉뚱한 사람을 지목하고 말았다…"}[ending]
+                emote(st.accused_id, {"success": "sad", "escaped": "happy", "wrong_accusation": "angry"}[ending])
                 self._say(events, eb, "narrator", None, line)
                 events.append(eb.custom("ending", {"ending": ending, "replay": self._replay(case, state)}))
         except (_BadAction, ValueError) as e:

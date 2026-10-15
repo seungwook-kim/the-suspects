@@ -48,3 +48,22 @@ async def test_innocent_accusation_pending_then_retract_or_confirm(tmp_path):
     await collect(svc.finale(game_id, {"type": "start", "accused_id": innocent}))
     evs = await collect(svc.finale(game_id, {"type": "confirm"}))
     assert any(e.get("name") == "ending" and e["value"]["ending"] == "wrong_accusation" for e in evs)
+
+
+async def test_finale_changes_accused_expression(tmp_path):
+    """최종 추리 장면에서 지목된 사람의 표정이 바뀐다(지목: 긴장, 맞는 증거: 당황, 해결: 슬픔)."""
+    svc, case, game_id, masker = setup(tmp_path)
+    culprit = case.culprit_ids[0]
+
+    def emotions(evs):
+        return [e["value"]["emotion"] for e in evs if e.get("name") == "emotion" and e["value"]["npcId"] == culprit]
+
+    assert emotions(await collect(svc.finale(game_id, {"type": "start", "accused_id": culprit}))) == ["nervous"]
+    seen = []
+    for stage in svc.cfg.finale.stages:
+        ev = next(e for e in case.evidence if stage in e.element_tags and culprit in e.linked_suspects)
+        seen += emotions(await collect(svc.finale(game_id, {"type": "present", "stage": stage,
+                                                            "evidence_id": masker.out("evidence", ev.id)})))
+    assert seen[:-1] == ["flustered"] * (len(seen) - 1) and seen[-1] == "sad"
+    assert svc.store.load_live(game_id).npc_states[culprit].emotion == "sad"
+

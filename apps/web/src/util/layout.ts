@@ -135,3 +135,34 @@ export function separateBoxes(nodes: LayoutNode[], width: number, height: number
   }
   return p
 }
+
+/** 글자 폭 어림(em): 한글 1, 공백·가운뎃점 0.35, 그 밖(영문·숫자) 0.6. */
+function emWidth(s: string): number {
+  let w = 0
+  for (const ch of s) w += /[가-힣]/.test(ch) ? 1 : /[\s·]/.test(ch) ? 0.35 : 0.6
+  return w
+}
+
+/** 지도 칸 이름을 칸 안에 맞춘다: 12px로 들어가면 한 줄, 아니면 10.5px, 그래도 길면
+ * 가운데에 가장 가까운 가운뎃점·띄어쓰기에서 두 줄("1층 로비·" / "보안데스크"). maxW는 쓸 수 있는 폭(px). */
+export function fitLabel(name: string, maxW: number): { lines: string[]; size: number } {
+  const w = emWidth(name)
+  if (w * 12 <= maxW) return { lines: [name], size: 12 }
+  if (w * 10.5 <= maxW) return { lines: [name], size: 10.5 }
+  const chars = [...name]
+  const cuts = chars.map((ch, i) => (ch === '·' || ch === ' ' ? i : -1)).filter((i) => i > 0 && i < chars.length - 1)
+  const mid = chars.length / 2
+  let first: string
+  let second: string
+  if (cuts.length) {
+    const at = cuts.reduce((a, b) => (Math.abs(b - mid) < Math.abs(a - mid) ? b : a))
+    first = chars.slice(0, chars[at] === '·' ? at + 1 : at).join('').trim()
+    second = chars.slice(at + 1).join('').trim()
+  } else {
+    // 띄어쓰기도 가운뎃점도 없으면 글자 가운데에서 나눈다
+    first = chars.slice(0, Math.ceil(mid)).join('')
+    second = chars.slice(Math.ceil(mid)).join('')
+  }
+  const size = Math.min(10.5, Math.max(8, Math.floor((maxW / Math.max(emWidth(first), emWidth(second))) * 2) / 2))
+  return { lines: [first, second], size }
+}
