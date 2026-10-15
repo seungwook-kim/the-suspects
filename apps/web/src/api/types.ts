@@ -222,6 +222,7 @@ export type FinaleStep =
   | { type: 'start'; accused_id: string }
   | { type: 'present'; stage: FinaleStage; evidence_id: string }
   | { type: 'confirm' }
+  | { type: 'retract' }
 
 // ---- AG-UI 이벤트 ----
 export type MessageRole = 'npc' | 'narrator' | 'partner' | 'chief'
@@ -274,9 +275,11 @@ export interface EndingValue {
 }
 // 계약에 없음: 최종 추리 쇼 진행 상태(제안). 백엔드가 보내 줘야 한다.
 export interface FinaleValue {
-  accused_id: string
-  stage: FinaleStage | 'done'
+  accused_id: string | null
+  stage: FinaleStage | 'done' | null
   lives: number
   filled: FinaleStage[]
   last?: { result: 'correct' | 'wrong' | 'rebutted'; evidence_id?: string } | null
+  /** 무고한 사람을 지목해 반박을 들었다: 그래도 지목(confirm) 또는 다시 고르기(retract) */
+  pending?: boolean
 }

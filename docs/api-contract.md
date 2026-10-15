@@ -109,7 +109,7 @@ CaseJob = {
 | `director` | `{eventId, title, text}` | 연출 감독 이벤트(전화, 제보, 정전 등) |
 | `night_progress` | `{step, total, text}` | "밤이 깊어 갑니다…" 진행 표시 |
 | `overheard` | `{locationId, lines: [{speakerId, text}]}` | 엿듣기 |
-| `finale` | `{accused_id, stage, lives, filled: ["opportunity"\|"means"\|"motive"], last: {result: "correct"\|"wrong"\|"rebutted", evidence_id?}}` | 최종 추리 쇼 진행 상태 |
+| `finale` | `{accused_id, stage, lives, filled: ["opportunity"\|"means"\|"motive"], last: {result: "correct"\|"wrong"\|"rebutted", evidence_id?}, pending}` | 최종 추리 쇼 진행 상태. `stage` = 다음에 밝힐 단계(기회 → 수단 → 동기 순, 다 밝혔으면 `"done"`). `pending: true` = 무고한 사람을 지목해 반박을 들은 상태(그래도 지목 `confirm` → 오지목 엔딩 / 다시 고르기 `retract`). `accused_id: null` = 지목을 물렀다(지목 화면으로) |
 | `ending` | `{ending, replay?}` | 엔딩·진실 리플레이 데이터 (replay 모양은 Phase 3에서 확정) |
 
 ## 캐릭터 그림

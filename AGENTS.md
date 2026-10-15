@@ -23,14 +23,16 @@
 | `server/cases/` | 사건 원본 로드·검수 |
 | `server/rag/` | 기억 저장소, 검색(권한 필터), 청킹 |
 | `server/storage/` | 게임 상태, 세이브 슬롯, 클리어 삭제 |
-| `server/llm/` | 모델 연결(OpenRouter / 가짜 LLM) |
+| `server/llm/` | 모델 연결(OpenAI 호환 API / 개발용 명령줄 연결 / 가짜 LLM), 실시간 출력, 호출 기록, 지연 측정 도구(`latency.py`) |
 | `server/agents/` | NPC, 라우터, 게임 마스터 등 에이전트 |
-| `server/graphs/` | LangGraph 그래프 |
+| `server/graphs/` | LangGraph 그래프 (심문, 밤 시뮬레이션) |
+| `server/evals/` | 평가 실행기(탈옥 누출, 한 판 자동 플레이). 진짜 모델 실행은 명령으로만 |
 | `server/api/` | FastAPI, SSE 이벤트 |
 | `apps/web/` | 프론트엔드 |
 | `data/cases/` | 시연용 고정 사건 |
 | `tests/` | 테스트 (영역별 하위 폴더) |
-| `docs/` | API 계약, 의존성 표, ADR |
+| `docs/` | API 계약, 화풍, 의존성 표, ADR, README 화면 캡처(`docs/images/`) |
+| `evals/` | 평가 데이터(라우터 예시·검증 문장, 탈옥 공격 세트)와 측정 보고서(`evals/reports/`) |
 
 ## 3. 작업 방식
 - Python 3.12, 패키지 관리는 `uv`. 실행: `uv run pytest`, 서버: `uv run uvicorn server.api.app:app --reload`.
@@ -38,6 +40,9 @@
 - 새 기능에는 테스트를 같이 쓴다. 규칙 엔진은 같은 입력에 항상 같은 결과가 나와야 한다(결정적).
 - 큰 설계 결정은 `docs/adr/`에 ADR로 남긴다(템플릿: `docs/adr/0000-template.md`).
 - API 키가 없어도 가짜 LLM으로 한 판이 끝까지 돌아가야 한다.
+- 테스트·측정의 방법·수치·한계는 PRD에 넣지 않고 `evals/reports/날짜-주제.md`로 따로 남긴다(PRD §17.5). PRD에는 결정만 적는다.
+- 성능 개선은 개발 PC에서만 효과가 나는 방법 대신 출시 환경에도 남는 공통 경로로 하고, 고치기 전후를 같은 방법으로 잰다.
+- 화면과 서버 사이 계약(`docs/api-contract.md`)을 바꾸면 목 백엔드(`apps/web/src/api/mock.ts`)와 실제 서버를 함께 맞추고, 실제 서버로도 화면을 확인한다.
 - 커밋과 푸시는 사용자가 요청할 때만 한다.
 
 ## 4. 문체

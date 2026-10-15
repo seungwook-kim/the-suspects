@@ -69,4 +69,20 @@ describe('Finale', () => {
     act(() => btn('결과 카드 보기').click())
     expect(onResult).toHaveBeenCalled()
   })
+
+  it('무고한 사람을 지목해 반박을 들으면: 증거 칸 대신 그래도 지목 / 다시 고르기', () => {
+    render(mk({ finale: { accused_id: 'c1', stage: 'opportunity', lives: 3, filled: [], last: null, pending: true } }))
+    expect(host.textContent).toContain('가람이 반박합니다')
+    expect(host.textContent).not.toContain('밝힐 증거를 제시하세요')
+    act(() => btn('다시 고른다').click())
+    expect(finaleStep).toHaveBeenCalledWith({ type: 'retract' })
+    act(() => btn('그래도 지목한다').click())
+    expect(finaleStep).toHaveBeenCalledWith({ type: 'confirm' })
+  })
+
+  it('지목 직후(실제 서버): 다음에 밝힐 단계의 증거 칸이 열린다', () => {
+    render(mk({ finale: { accused_id: 'c0', stage: 'opportunity', lives: 3, filled: [], last: null, pending: false } }))
+    expect(host.textContent).toContain('기회: 밝힐 증거를 제시하세요')
+    expect(btn('추리 확정')).toBeUndefined()
+  })
 })

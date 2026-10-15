@@ -558,6 +558,9 @@ async function* runFinale(g: MockGame, step: FinaleStep): AsyncGenerator<AgEvent
       yield { type: 'RUN_ERROR', message: '아직 기회·수단·동기를 모두 밝히지 못했습니다.', code: 'finale_incomplete' }
       return
     }
+  } else if (step.type === 'retract') {
+    g.finale = null // 실제 서버처럼 지목을 무르면 지목 화면으로
+    yield custom('finale', { accused_id: null, stage: null, lives: 3, filled: [] } satisfies FinaleValue)
   }
   yield { type: 'RUN_FINISHED' }
 }

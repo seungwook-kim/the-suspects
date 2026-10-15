@@ -186,8 +186,10 @@ function applyCustom(s: ClientState, name: string, value: unknown): ClientState 
       return { ...s, night: value as NightProgressValue }
     case 'overheard':
       return { ...s, overheard: value as OverheardValue }
-    case 'finale':
-      return { ...s, finale: value as FinaleValue }
+    case 'finale': {
+      const f = value as FinaleValue
+      return { ...s, finale: f.accused_id ? f : null } // 지목을 무르면 지목 화면으로
+    }
     case 'ending':
       return { ...s, ending: value as EndingValue }
     default:

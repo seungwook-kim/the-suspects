@@ -7,7 +7,7 @@ import { Overlays } from '../components/Overlays'
 import { Portrait } from '../character/Portrait'
 import { FINALE_STAGES, FINALE_STAGE_LABEL } from '../api/types'
 import type { GameApi } from '../state/useGame'
-import { endingText } from '../util/format'
+import { endingText, josa } from '../util/format'
 
 interface Props {
   g: GameApi
@@ -92,6 +92,7 @@ export function Finale({ g, onBack, onResult }: Props) {
   }
 
   const stage = f?.stage ?? 'done'
+  const pending = !!f?.pending
   const filled = f?.filled ?? []
   const lives = f?.lives ?? 0
   const evidence = view.evidence
@@ -173,7 +174,21 @@ export function Finale({ g, onBack, onResult }: Props) {
             )}
           </div>
 
-          {stage === 'done' && (
+          {pending && (
+            <div className="fin-pending">
+              <p className="notice"><Icon name="warning-circle" /><span>{josa(accused?.name ?? '', '이/가')} 반박합니다. 그래도 이 사람으로 확정하면 되돌릴 수 없습니다.</span></p>
+              <div className="actions">
+                <button type="button" className="btn" disabled={busy} onClick={() => void finaleStep({ type: 'retract' })}>
+                  <span className="btn-label"><Icon name="arrow-left" />다시 고른다</span>
+                </button>
+                <button type="button" className="btn btn-cta btn-lg" disabled={busy} onClick={() => void finaleStep({ type: 'confirm' })}>
+                  <span className="btn-label"><Icon name="seal-check" />그래도 지목한다</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!pending && stage === 'done' && (
             <div className="actions">
               <button type="button" className="btn btn-cta btn-lg" disabled={busy} onClick={() => void finaleStep({ type: 'confirm' })}>
                 <span className="btn-label"><Icon name="seal-check" />추리 확정</span>
@@ -182,7 +197,7 @@ export function Finale({ g, onBack, onResult }: Props) {
           )}
         </article>
 
-        {stage !== 'done' && (
+        {!pending && stage && stage !== 'done' && (
           <section className="paper fin-ev" aria-labelledby="fin-ev-title">
             <header className="fin-ev-head">
               <h2 id="fin-ev-title">{FINALE_STAGE_LABEL[stage]}: 밝힐 증거를 제시하세요</h2>

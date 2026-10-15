@@ -895,6 +895,7 @@ class GameService:
         yield eb.run_started()
         events: list[dict] = []
         t = step.get("type")
+        last = None
         try:
             if t == "start":
                 accused = step.get("accused_id")
@@ -926,11 +927,8 @@ class GameService:
                         self._say(events, eb, "npc", st.accused_id, "그, 그건…!")
                     else:
                         self._say(events, eb, "npc", st.accused_id, f"그게 저랑 무슨 상관이죠? ({who})")
-                    events.append(eb.custom("finale", {
-                        "accused_id": st.accused_id, "stage": step.get("stage"), "lives": st.lives, "filled": st.passed,
-                        "last": {"result": "correct" if res.correct else ("rebutted" if res.rebuttal else "wrong"),
-                                 "evidence_id": step.get("evidence_id")},
-                    }))
+                    last = {"result": "correct" if res.correct else ("rebutted" if res.rebuttal else "wrong"),
+                            "evidence_id": step.get("evidence_id")}
                 elif t == "confirm":
                     st = fin_rules.confirm_accusation(st)
                 elif t == "retract":
@@ -938,6 +936,8 @@ class GameService:
             state.finale = st.model_dump()
             state.finale_wrong = st.wrong
             ending = fin_rules.ending_of(st)
+            if ending == "none":  # 진행 중: 화면이 그릴 상태(다음에 밝힐 단계, 반박 대기 여부)
+                events.append(eb.custom("finale", self._finale_value(st, last if t == "present" else None)))
             if ending in ("success", "escaped", "wrong_accusation"):
                 state.ending = ending  # type: ignore[assignment]
                 state.phase = "ended"
@@ -945,9 +945,6 @@ class GameService:
                         "wrong_accusation": "엉뚱한 사람을 지목하고 말았다…"}[ending]
                 self._say(events, eb, "narrator", None, line)
                 events.append(eb.custom("ending", {"ending": ending, "replay": self._replay(case, state)}))
-            elif t == "start":
-                events.append(eb.custom("finale", {"accused_id": st.accused_id, "stage": None, "lives": st.lives,
-                                                   "filled": st.passed, "last": None}))
         except (_BadAction, ValueError) as e:
             events.append(eb.run_error(str(e), code="bad_step"))
         self.store.save_live(state)
@@ -955,6 +952,13 @@ class GameService:
             yield ev
         yield eb.snapshot(self._view(case, state, masker))
         yield eb.run_finished()
+
+    def _finale_value(self, st, last: dict | None = None) -> dict:
+        """최종 추리 진행 상태(docs/api-contract.md `finale`). stage = 다음에 밝힐 단계(설정 순서), 다 밝혔으면 "done".
+        pending = 무고한 사람을 지목해 반박을 들은 상태(그래도 지목 confirm / 다시 고르기 retract). 지목을 무르면 accused_id가 없다."""
+        nxt = next((s for s in self.cfg.finale.stages if s not in st.passed), "done")
+        return {"accused_id": st.accused_id, "stage": nxt if st.accused_id else None, "lives": st.lives,
+                "filled": list(st.passed), "last": last, "pending": bool(st.pending_confirmation)}
 
     def _replay(self, case: CaseBible, state: GameState) -> dict:
         """진실 리플레이: 사건 당일 타임라인 + 수사 기간 밤 행동. 엔딩 후에만 공개."""
