@@ -26,7 +26,7 @@
 | `server/llm/` | 모델 연결(OpenAI 호환 API / 개발용 명령줄 연결 / 가짜 LLM), 실시간 출력, 호출 기록, 지연 측정 도구(`latency.py`) |
 | `server/agents/` | NPC, 라우터, 게임 마스터 등 에이전트 |
 | `server/graphs/` | LangGraph 그래프 (심문, 밤 시뮬레이션) |
-| `server/evals/` | 평가 실행기(탈옥 누출, 한 판 자동 플레이). 진짜 모델 실행은 명령으로만 |
+| `server/evals/` | 평가 실행기(탈옥 누출, 한 판 자동 플레이, 탐정 에이전트 풀이율). 진짜 모델 실행은 명령으로만(탐정은 `--real` 필요) |
 | `server/jobs/` | 따로 돌리는 정기 작업. `daily_portraits.py`: 매일 다른 직업군 인물 사진을 표정 사진까지 사진 보관함에 쌓음(Windows 작업 스케줄러 `TheSuspects-DailyPortraits`, 매일 09:10) |
 | `server/api/` | FastAPI, SSE 이벤트 |
 | `apps/web/` | 프론트엔드 |

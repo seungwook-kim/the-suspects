@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
 
-Bucket = Literal["npc", "gm", "night", "casegen", "image", "retrieval"]
+Bucket = Literal["npc", "gm", "night", "casegen", "image", "retrieval", "detective"]
 
 # 핫 패스 노드 지연 예산 (PRD §14.1, 초) — 넘으면 경고
 LATENCY_BUDGET_S: dict[str, float] = {
