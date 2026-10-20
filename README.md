@@ -188,7 +188,7 @@ cd apps/web && npm test       # 화면
 
 ## 다음 할 일 (PRD 기준)
 
-- **운영:** Langfuse 연결(PRD Phase 0), GitHub Actions에서 테스트·빠른 평가 자동 실행
+- **운영:** Langfuse 연결(PRD Phase 0), GitHub Actions의 빠른 평가 자동 실행(서버·화면 테스트는 `.github/workflows/ci.yml`로 push마다 돈다)
 - **평가:** 탐정 자동 플레이 에이전트로 풀이율, G-Eval로 캐릭터 일관성·누출, RAGAS로 근거성, 실제 플레이 기록으로 지연 p95·추측 생성 적중률
 - **기능:** 장소 배경 그림 생성, 직업·법령 지식 베이스, 파트너 형사의 기록 조회 에이전트, 대질 심문, 역할 반전 모드, 외부 클라이언트용 MCP 게임 서버
 - **출시 준비:** 출시용 API 연결로 바꾸고 역할별 모델 선발전, 사건 생성 시간 단축
