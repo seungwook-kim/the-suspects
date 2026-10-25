@@ -186,6 +186,7 @@ class Plan:
     people: list[Person]
     evidence_ids: dict[str, str]  # 증거 칸 키 -> E1..
     beats: list[Beat]
+    cast_hint: str = ""  # 상황 목록(data/situations.yaml)의 등장 후보 직업 안내. 비면 작가가 자유롭게 정한다
 
     def by_plot(self, plot: str) -> Person:
         return next(p for p in self.people if p.plot == plot)
@@ -228,5 +229,5 @@ def draw(case_id: str, theme_text: str, options: dict | None, seed: int | None =
         skeleton=rng.choice(list(SKELETONS)), motive_type=rng.choice(MOTIVES), weather=rng.choice(WEATHER),
         incident_time=rng.randrange(21 * 60 + 30, 23 * 60 + 31, 5), people=people,
         evidence_ids={s.key: f"E{i + 1}" for i, s in enumerate(EVIDENCE_SLOTS)},
-        beats=_beats(n - 4),
+        beats=_beats(n - 4), cast_hint=str(opts.get("cast_hint") or ""),
     )

@@ -169,6 +169,9 @@ def cast_prompt(plan: Plan, concept: ConceptOut) -> tuple[str, str]:
         f"장소: {', '.join(f'{l.name}({l.slot})' for l in concept.locations)}\n분위기: {TONE_KO.get(plan.tone, '')}\n"
         f"인물 칸 (이름·성별은 바꾸지 않는다):\n{people}"
     )
+    if plan.cast_hint:
+        user += ("\n등장 후보 직업 (이 중에서 인물마다 서로 다른 직업을 고른다. 성별이 맞는 후보를 우선하고, "
+                 "outfit은 괄호 안 값을 따른다. 후보에 없는 직업은 쓰지 않는다):\n" + plan.cast_hint)
     return system, user
 
 

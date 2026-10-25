@@ -421,8 +421,16 @@ def main(argv: list[str] | None = None) -> None:
 
     svc = _temp_service()
     if args.theme == "rotate":
-        args.theme = _next_theme(args.record, list(svc.presets))
+        from server.cases import situations
+
+        presets = list(svc.presets)
+        try:
+            args.theme = situations.rotation_case(presets, args.record)
+        except (OSError, ValueError, LookupError):  # 상황 목록을 못 읽으면 예전 방식(사건 단위)
+            args.theme = _next_theme(args.record, presets)
         print(f"[주제] {args.theme}")
+        if len(presets) <= 1:
+            print("[안내] 만들어 둔 상황 사건이 아직 없어 기본 사건만 돌린다(python -m server.cases.generate_next --dry-run 참고)")
     model = args.model
     if args.alternate and args.record:
         model = _next_model(args.record)
