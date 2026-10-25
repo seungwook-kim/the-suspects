@@ -21,11 +21,15 @@ from pathlib import Path
 GROUP_NAMES: dict[str, str] = {
     "security": "경비·보안직", "cleaning": "미화·청소직", "medical": "의료직", "culinary": "조리·요식업",
     "delivery": "배달·운송직", "student": "학생", "field": "현장·기술직", "office": "사무·관리직", "general": "일반·기타",
+    "teaching": "교직·강사", "public": "공무·치안·법조", "arts_media": "예술·공연·언론", "agri_fishery": "농어업",
+    "retail_service": "판매·접객",
 }
 # 정해진 옷차림 값 → 직업군
 OUTFIT_GROUPS: dict[str, str] = {
     "suit": "office", "office_lanyard": "office", "security_uniform": "security", "cleaner_uniform": "cleaning",
     "chef": "culinary", "doctor": "medical", "delivery": "delivery", "school_uniform": "student", "work_clothes": "field",
+    "teacher_smart": "teaching", "public_uniform": "public", "formal_gov": "public", "creative_casual": "arts_media",
+    "farm_clothes": "agri_fishery", "store_apron": "retail_service", "hotel_uniform": "retail_service",
 }
 # 자유 서술용 낱말 (앞에 있는 직업군이 우선: "청소원(시설관리 용역)"은 현장·기술이 아니라 미화)
 KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
@@ -34,6 +38,11 @@ KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("medical", ("의사", "간호", "의료", "약사", "doctor", "nurse")),
     ("culinary", ("요리", "셰프", "조리", "주방", "바리스타", "chef", "cook")),
     ("delivery", ("배달", "택배", "퀵", "운송", "delivery", "courier")),
+    ("teaching", ("교사", "선생", "교감", "교장", "교수", "강사", "조교", "teacher", "professor")),
+    ("public", ("경찰", "형사", "순경", "판사", "검사", "변호사", "공무원", "소방", "법원", "police", "judge", "lawyer", "prosecutor")),
+    ("arts_media", ("기자", "작가", "배우", "감독", "음악", "화가", "예술", "큐레이터", "피디", "촬영", "사진가", "편집장", "journalist", "actor", "artist")),
+    ("agri_fishery", ("농부", "농장", "농업", "어부", "어업", "축산", "원예", "farmer", "fisher")),
+    ("retail_service", ("점원", "판매", "캐셔", "계산원", "승무원", "프런트", "벨보이", "접객", "매장", "점장", "카운터", "clerk", "cashier", "steward")),
     ("student", ("학생", "교복", "student")),
     ("field", ("작업복", "현장", "정비", "설비", "기술자", "기사", "worker", "mechanic")),
     ("office", ("개발자", "매니저", "관리자", "회사원", "사원", "직원", "대리", "과장", "팀장", "기획", "디자이너",

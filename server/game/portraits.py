@@ -33,7 +33,14 @@ OUTFIT_EN = {
     "cleaner_uniform": "a plain cleaning staff uniform", "security_uniform": "a plain navy security guard uniform shirt",
     "chef": "a plain white chef's jacket", "doctor": "a plain white doctor's coat",
     "delivery": "a plain delivery worker's jacket", "school_uniform": "a Korean school uniform",
-    "work_clothes": "practical work clothes", "office_lanyard": "office clothes with a blank white ID card on a plain lanyard",
+    "work_clothes": "practical work clothes",
+    "teacher_smart": "smart casual teacher clothes, a cardigan over a collared shirt",
+    "public_uniform": "a plain dark civil-service style uniform shirt without insignia or patches",
+    "formal_gov": "formal conservative office clothes, a dark jacket and a plain shirt",
+    "creative_casual": "stylish creative casual clothes, a light scarf or a neat jacket",
+    "farm_clothes": "weathered practical farm work clothes and a plain work hat",
+    "store_apron": "a plain store staff apron over a polo shirt",
+    "hotel_uniform": "a plain hotel staff uniform with a vest and a blank name-tag-free collar", "office_lanyard": "office clothes with a blank white ID card on a plain lanyard",
 }
 HAIR_EN = {
     "short": "short hair", "side": "side-parted hair", "long": "long hair", "bun": "hair tied in a bun",

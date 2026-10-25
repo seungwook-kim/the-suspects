@@ -188,7 +188,9 @@ def outfit_for(group: str | None, age_hi: int) -> str:
                 "delivery": "delivery", "field": "work_clothes"}[group]
     if group == "office":
         return "suit"
-    return "casual"
+    more = {"teaching": "teacher_smart", "public": "public_uniform", "arts_media": "creative_casual",
+            "agri_fishery": "farm_clothes", "retail_service": "store_apron"}
+    return more.get(group or "", "casual")
 
 
 def cast_hint(situation: dict[str, Any]) -> str:
@@ -197,6 +199,13 @@ def cast_hint(situation: dict[str, Any]) -> str:
     for r in situation["roles"]:
         lines.append(f"- {r['role']} ({g_ko[r['gender']]}, {r['age'][0]}~{r['age'][1]}세, "
                      f"outfit={outfit_for(r.get('group'), r['age'][1])}): {r['hook']}")
+    # 그 장소의 중심 집단(후보에 3명 이상 나오는 직업군, 예: 학교의 학생)은 등장인물에 꼭 들어가야 한다.
+    # 2026-10-26: 학교 사건에 학생이 한 명도 안 나온 일이 있었다(대표 지적)
+    main = Counter(r.get("group") or r.get("needs_new_group") for r in situation["roles"])
+    for g, n in main.items():
+        if g and n >= 3:
+            names = [r["role"] for r in situation["roles"] if (r.get("group") or r.get("needs_new_group")) == g]
+            lines.append(f"※ 반드시 지킨다: 위 후보 중 [{', '.join(names)}] 에서 최소 2명은 등장인물에 넣는다. 이 장소의 중심 인물이다.")
     return "\n".join(lines)
 
 

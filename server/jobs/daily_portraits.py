@@ -58,16 +58,29 @@ SPECS: dict[str, dict] = {
               "ages": (28, 62), "accessories": ["", "cap", "glasses"]},
     "office": {"outfits": ["suit", "office_lanyard"], "roles": ["회사원", "팀장", "개발자", "기획자", "디자이너", "과장"],
                "ages": (25, 55), "accessories": ["", "glasses", "badge"]},
-    "general": {"outfits": ["casual", "hoodie"], "roles": ["상점 주인", "프리랜서 작가", "동네 주민", "택시 운전사", "주부"],
+    "general": {"outfits": ["casual", "hoodie"], "roles": ["상점 주인", "프리랜서 번역가", "동네 주민", "택시 운전사", "주부"],
                 "ages": (22, 70), "accessories": ["", "glasses", "cap"]},
+    "teaching": {"outfits": ["teacher_smart"], "roles": ["고등학교 교사", "체육교사", "교감", "학원 강사", "대학 강사", "교수"],
+                 "ages": (28, 62), "accessories": ["", "glasses", "badge"]},
+    "public": {"outfits": ["public_uniform", "formal_gov"], "roles": ["경찰관", "형사", "판사", "검사", "변호사", "구청 공무원", "소방관"],
+               "ages": (27, 60), "accessories": ["", "glasses", "badge"]},
+    "arts_media": {"outfits": ["creative_casual"], "roles": ["신문 기자", "방송 작가", "배우", "영화감독", "큐레이터", "사진작가", "연주자"],
+                   "ages": (24, 58), "accessories": ["", "glasses", "cap"]},
+    "agri_fishery": {"outfits": ["farm_clothes"], "roles": ["농부", "과수원 주인", "어부", "축산 농가", "농장 일꾼"],
+                     "ages": (30, 72), "accessories": ["", "cap"]},
+    "retail_service": {"outfits": ["store_apron", "hotel_uniform"], "roles": ["편의점 점원", "카페 점장", "호텔 프런트 직원", "승무원", "마트 계산원", "백화점 판매원"],
+                       "ages": (22, 58), "accessories": ["", "badge", "cap"]},
 }
 HAIR_M = ["short", "side", "buzz", "curly", "short", "side", "bald"]
 HAIR_F = ["short", "long", "bun", "ponytail", "curly", "side", "long"]
 
 
-def make_person(group: str, rng: random.Random) -> dict:
+def make_person(group: str, rng: random.Random, have: dict[str, int] | None = None) -> dict:
+    """have: 이 직업군 폴더의 성별별 사진 수. 있으면 적은 쪽 성별을 더 자주 뽑는다(2026-10-26 남녀 구분·균형 요청)."""
     spec = SPECS[group]
     gender = rng.choice(["M", "F"])
+    if have and have.get("M", 0) != have.get("F", 0) and rng.random() < 0.8:
+        gender = "M" if have.get("M", 0) < have.get("F", 0) else "F"
     hair = rng.choice(HAIR_M if gender == "M" else HAIR_F)
     if group == "student" and hair == "bald":
         hair = "short"
@@ -186,8 +199,15 @@ async def run(count: int, group: str | None, var_dir: Path, images: ImageClient,
         fails = 0
         return img
 
+    def gender_have() -> dict[str, int]:
+        have = {"M": 0, "F": 0}
+        for rec in library.records():
+            if rec.get("kind") == "base" and rec.get("group") == group and rec.get("gender") in have:
+                have[rec["gender"]] += 1
+        return have
+
     async def one() -> None:
-        p, seed = make_person(group, rng), rng.randrange(2**31)
+        p, seed = make_person(group, rng, gender_have()), rng.randrange(2**31)
         prompt = portrait_prompt(role=p["role"], age=p["age"], gender=p["gender"], appearance=p["appearance"])
         base = await draw(prompt, seed)
         if not base:

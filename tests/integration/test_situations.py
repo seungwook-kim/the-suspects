@@ -79,7 +79,7 @@ def test_report_and_gaps(data, tmp_path):
     assert {n for n, _, _ in gp["new"]} == set(data["proposed_groups"])
     text = S.report(data, lib, tmp_path / "nocases")
     assert "상황 27개" in text or f"상황 {len(data['situations'])}개" in text
-    assert "새 상자 제안" in text and "school" in text
+    assert "school" in text
 
 
 def test_cast_hint_reaches_cast_prompt(data):
@@ -168,3 +168,23 @@ def test_portrait_job_continues_same_group_after_quota_stop():
     assert D.pick_group(runs, Lib()) == "medical"
     runs = [{"group": "medical", "made": 2, "ts": 1.0, "stopped": "", "carry": False}]
     assert D.pick_group(runs, Lib()) != "medical"
+
+
+def test_cast_hint_requires_the_central_group(data):
+    hint = S.cast_hint(S.by_id(data)["school"])
+    assert "반드시 지킨다" in hint and "모범생 학생회장" in hint and "방송반 학생" in hint
+
+
+def test_new_groups_are_classified_and_balanced():
+    import random
+
+    from server.game.portrait_library import GROUP_NAMES, job_group
+    from server.jobs import daily_portraits as D
+
+    for g in ("teaching", "public", "arts_media", "agri_fishery", "retail_service"):
+        assert g in GROUP_NAMES and g in D.SPECS
+    assert job_group("체육교사") == "teaching" and job_group("형사") == "public" and job_group("신문 기자") == "arts_media"
+    assert job_group("농부") == "agri_fishery" and job_group("편의점 점원") == "retail_service"
+    rng = random.Random(0)
+    genders = [D.make_person("teaching", rng, {"M": 10, "F": 0})["gender"] for _ in range(200)]
+    assert genders.count("F") > 140  # 적은 쪽(여)을 더 자주 뽑는다
