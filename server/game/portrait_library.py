@@ -1,6 +1,6 @@
 """사진 보관함(직군함): 그린 초상화를 직업군별 상자에 쌓아 둔다 (2026-10-13~14 사용자 결정).
 
-- 위치: var/portrait_library/<직업군>/<성별>_<나이대>/<uuid>.webp
+- 위치: var/portrait_library/<직업군>/<성별 M|F>/<나이대>/<uuid>.webp (2026-10-25: 직업군 → 성별 → 나이대)
   - 직업군마다 상자 폴더와 그 상자의 목록(<직업군>/index.jsonl)이 있다. 나중에 직업군별로 DB에 나눠 넣기 쉽게.
   - 전체 목록 index.jsonl(모든 상자 합본)과 상자 이름표 groups.json도 둔다.
 - 직업군: 옷차림이 정해진 값(생성 사건)이면 그 값으로, 자유 서술(기본 사건)이면 직업 이름·옷 설명의 낱말로 정한다.
@@ -59,7 +59,8 @@ def age_band(age: int) -> str:
 
 
 def _bucket(gender: str, age: int) -> str:
-    return f"{gender if gender in ('M', 'F') else 'X'}_{age_band(age)}"
+    """직업군 폴더 안의 상대 경로: 성별/나이대 (예: F/20s)."""
+    return f"{gender if gender in ('M', 'F') else 'X'}/{age_band(age)}"
 
 
 def _line(rec: dict) -> str:
@@ -94,7 +95,7 @@ class PortraitLibrary:
         name = f"{uuid.uuid4().hex}.{ext}"
         (sub / name).write_bytes(img)
         rec = {
-            "file": f"{group}/{sub.name}/{name}", "group": group, "group_name": GROUP_NAMES[group], "kind": kind,
+            "file": f"{group}/{_bucket(person['gender'], person['age'])}/{name}", "group": group, "group_name": GROUP_NAMES[group], "kind": kind,
             "source": source, "created_at": round(time.time(), 3), "provider": provider, "model": model, "seed": seed,
             "role": person["role"], "age": person["age"], "gender": person["gender"],
             "appearance": appearance, "prompt": prompt,

@@ -315,10 +315,10 @@ async def test_library_keeps_photos_after_clear_by_job_group(tmp_path):
     assert sorted(json.loads(x)["appearance"].get("outfit", "") for x in lines) == outfits
     for line in lines:
         rec = json.loads(line)
-        # 직업군/성별_나이대/파일 — 직업군은 옷차림으로 정한다
-        group, bucket, _ = rec["file"].split("/")
+        # 직업군/성별/나이대/파일 — 직업군은 옷차림으로 정한다
+        group, gender, band, _ = rec["file"].split("/")
         assert group == rec["group"] == job_group(rec["role"], rec["appearance"])
-        assert bucket == f"{rec['gender']}_{rec['age'] // 10 * 10}s"
+        assert (gender, band) == (rec["gender"], f"{rec['age'] // 10 * 10}s")
         assert image_ext((library / rec["file"]).read_bytes()) == "webp"
         assert rec["kind"] == "base" and isinstance(rec["seed"], int)
     blob = "\n".join(lines)
@@ -382,7 +382,7 @@ def test_library_find_by_outfit_gender_age(tmp_path):
     add("chef", "F", 56)              # 직업군 다름
     assert [h["file"] for h in lib.find(group="security", gender="F", age=56)] == [g55, g58]  # 나이 가까운 순
     assert [h["file"] for h in lib.find(group="security", gender="F", age=56, exclude={g55})] == [g58]
-    assert g58.startswith("security/F_50s/") and job_group("", {"outfit": "hoodie"}) == "general"
+    assert g58.startswith("security/F/50s/") and job_group("", {"outfit": "hoodie"}) == "general"
 
 
 def test_free_text_appearance_used_in_prompt_and_group():

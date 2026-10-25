@@ -20,8 +20,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -87,7 +89,9 @@ SYSTEM = """너는 추리 게임의 탐정(형사)이다. 사건을 직접 수�
 - end_day: 하루를 끝낸다(남은 행동이 있어도). 밤에 인물들이 움직이고 새 정보가 생긴다. 마지막 날에는 쓸 수 없고 지목해야 한다.
 - accuse: 범인을 지목한다. 증거가 충분하거나 마지막 날 행동을 다 썼을 때만.
 규칙: 화면에 없는 id를 지어내지 않는다. 증거와 진술이 어긋나는 사람을 의심하고, 기회·수단·동기를 각각 보이는 증거를 모은다.
-행동 수가 한정되어 있으니 같은 질문·같은 장소 조사를 되풀이하지 않는다. 낭비 없이 모순을 찾는다."""
+행동 수가 한정되어 있으니 같은 질문·같은 장소 조사를 되풀이하지 않는다. 낭비 없이 모순을 찾는다.
+최종 추리에는 기회·수단·동기를 각각 보이는 증거가 하나씩 필요하다. 증거는 장소마다 흩어져 있으니, 지목하기 전에 화면의
+"아직 안 가 본 장소"를 모두 둘러보고 장소마다 조사한다. 서로 다른 인물의 증거가 섞여 있으니 의심하는 인물과 이어지는 것을 고른다."""
 
 VERDICT_SYSTEM = """너는 추리 게임의 탐정이다. 수사를 마치고 범인을 지목한다. 화면에 보이는 정보(인물, 증거, 진술, 모순)만 근거로 쓴다.
 범인(accused_id)을 정하고, 기회·수단·동기 각각을 가장 잘 보이는 증거 id를 고른다(증거 목록에 있는 id만, 다른 사람 얘기인 증거는 쓰지 않는다).
@@ -105,6 +109,10 @@ def observe(view: PlayerView, mem: Memory) -> str:
                                    ("[가 봄]" if l.id in view.visited_locations else "") for l in view.locations),
              "인물: " + "; ".join(f"{c.id}={c.name}({c.role},{c.age}세,{c.location_id or '위치 모름'}) {c.one_liner}"
                                 for c in view.characters)]
+    unseen = [f"{l.id}={l.name}" for l in view.locations if l.id not in view.visited_locations]
+    uninvestigated = [l.id for l in view.locations if l.id in view.visited_locations and not mem.investigated.get(l.id)]
+    lines.append("아직 안 가 본 장소: " + (", ".join(unseen) or "없음") +
+                 (" · 가 봤지만 조사 안 한 곳: " + ", ".join(uninvestigated) if uninvestigated else ""))
     if view.evidence:
         lines.append("가진 증거:\n" + "\n".join(f"- {e.id} [{e.kind}] {e.name}: {e.content}" for e in view.evidence))
     else:
@@ -310,18 +318,117 @@ def render(results: list[DetectiveResult]) -> str:
     return "\n".join(lines)
 
 
+ALTERNATE = ("claude-sonnet-5-5", "claude-haiku-5-5")
+
+
+def _next_model(record: str) -> str:
+    """기록의 마지막 판과 다른 모델. 기록이 없으면 첫 모델."""
+    last = ""
+    try:
+        for line in Path(record).read_text(encoding="utf-8").splitlines():
+            last = json.loads(line).get("model") or last
+    except (OSError, ValueError):
+        pass
+    return ALTERNATE[1] if last == ALTERNATE[0] else ALTERNATE[0]
+
+
+def _use_model(svc: Any, model: str) -> None:
+    """이 실행에서만 모든 글 역할의 모델을 바꾼다(설정 파일은 그대로)."""
+    cfg = svc.llm.cfg["profiles"][svc.llm.profile]
+    for role, rc in (cfg.get("roles") or {}).items():
+        if isinstance(rc, dict) and role != "portrait":
+            rc["model"] = model
+    svc.llm.model_override = model
+
+
+PAUSE_HOURS = 5  # Max 요금제 5시간 한도 창만큼 쉰다
+
+
+def _pause_file(record: str) -> Path:
+    return Path(record).with_suffix(".pause")
+
+
+def _paused(record: str) -> bool:
+    try:
+        return float(_pause_file(record).read_text()) > time.time()
+    except (OSError, ValueError):
+        return False
+
+
+def _record(path: str, args: Any, r: DetectiveResult) -> None:
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    row = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "model": getattr(args, "_model", "") or "", "theme": args.theme, "difficulty": args.difficulty,
+           **{k: v for k, v in asdict(r).items() if k != "log"}, "log": r.log[-30:]}
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    # 대체 응답·오류가 많으면 한도에 걸렸을 수 있다 → 5시간 쉰다(재시도·결제 우회 없음)
+    if r.errors or r.fallbacks >= 3:
+        _pause_file(path).write_text(str(time.time() + PAUSE_HOURS * 3600))
+
+
+def _rows(record: str) -> list[dict]:
+    rows: list[dict] = []
+    try:
+        for line in Path(record).read_text(encoding="utf-8").splitlines():
+            try:
+                rows.append(json.loads(line))
+            except ValueError:
+                continue
+    except OSError:
+        pass
+    return rows
+
+
+def _next_theme(record: str | None, themes: list[str]) -> str:
+    """--theme rotate: 기록에서 가장 오래전에 돌린(안 돌린 주제가 먼저) 주제. 같으면 목록 앞쪽."""
+    last = {t: -1 for t in themes}
+    for i, row in enumerate(_rows(record) if record else []):
+        if row.get("theme") in last:
+            last[row["theme"]] = i
+    return min(themes, key=lambda t: (last[t], themes.index(t)))
+
+
+def summarize(record: str) -> dict[str, dict[str, int]]:
+    """주제별 판 수·성공 수 (기록 파일 기준)."""
+    out: dict[str, dict[str, int]] = {}
+    for row in _rows(record):
+        d = out.setdefault(row.get("theme") or "?", {"games": 0, "success": 0})
+        d["games"] += 1
+        d["success"] += row.get("ending") == "success"
+    return out
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description="탐정 자동 플레이 에이전트(풀이율). 진짜 모델은 --real이 있을 때만")
     ap.add_argument("--games", type=int, default=1)
-    ap.add_argument("--theme", default="demo_db_deleted")
+    ap.add_argument("--theme", default="demo_db_deleted", help="사건 id. rotate면 --record 기록에서 가장 오래 안 돌린 사건")
+    ap.add_argument("--summary", metavar="RECORD", help="기록 파일의 주제별 판 수·성공 수만 출력")
     ap.add_argument("--difficulty", choices=["easy", "normal", "hard"], default="normal")
     ap.add_argument("--max-steps", type=int, default=80)
     ap.add_argument("--max-calls", type=int, default=300, help="한 판의 LLM 호출 상한(넘으면 그 판을 멈춘다)")
     ap.add_argument("--real", action="store_true", help="진짜 모델 사용량이 드는 것을 알고 실행")
+    ap.add_argument("--model", help="모든 역할(그림 제외)을 이 모델로 바꿔 돌린다. 예: claude-haiku-5-5")
+    ap.add_argument("--alternate", action="store_true", help="--record 파일의 마지막 판과 다른 모델(소넷↔하이쿠)로 돌린다")
+    ap.add_argument("--record", help="판마다 결과 한 줄(JSON)을 이 파일에 덧붙인다(정기 실행용)")
     args = ap.parse_args(argv)
+    if args.summary:
+        for t, d in summarize(args.summary).items():
+            print(f"{t}: {d['games']}판 중 성공 {d['success']}")
+        return
+    if args.record and _paused(args.record):
+        return  # 앞 판에서 한도·오류 신호가 있어 쉬는 중. 한도가 풀릴 때까지 기다리고 결제로 우회하지 않는다
     from server.llm.latency import _temp_service
 
     svc = _temp_service()
+    if args.theme == "rotate":
+        args.theme = _next_theme(args.record, list(svc.presets))
+        print(f"[주제] {args.theme}")
+    model = args.model
+    if args.alternate and args.record:
+        model = _next_model(args.record)
+    if model:
+        _use_model(svc, model)
+    args._model = model or ""
     if not svc.llm.fake_mode and not args.real:
         raise SystemExit("진짜 모델 연결이 켜져 있다. 사용량이 드니 --real을 붙여 다시 실행하라(풀이율은 한도 안에서만 잰다).")
     results = []
@@ -329,6 +436,10 @@ def main(argv: list[str] | None = None) -> None:
         r = asyncio.run(play(svc, args.theme, max_steps=args.max_steps, max_calls=args.max_calls, difficulty=args.difficulty))
         results.append(r)
         print(f"[판 {g + 1}] {r.ending} 호출 {r.total_calls}번 {r.seconds:.0f}초" + (f" ({r.stopped})" if r.stopped else ""))
+        if args.record:
+            _record(args.record, args, r)
+        for line in r.log[-12:]:  # 왜 그렇게 끝났는지(지목 이유, 증거 부족 등)를 바로 볼 수 있게
+            print("   ·", line)
         svc.llm.tracer.records.clear()  # 다음 판의 호출 상한을 새로 센다
     print(render(results))
 

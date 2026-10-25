@@ -54,3 +54,20 @@ async def test_invalid_actions_are_counted_not_executed(tmp_path):
     svc.llm.structured = patched
     res = await play(svc, max_steps=8)
     assert res.invalid_steps >= 3 and res.actions == 0  # 무효 행동은 행동을 쓰지 않는다
+
+
+def test_rotate_theme_picks_least_recently_played(tmp_path):
+    import json
+
+    rec = tmp_path / "r.jsonl"
+    themes = ["a", "b", "c"]
+    assert detective._next_theme(None, themes) == "a"
+    assert detective._next_theme(str(rec), themes) == "a"  # 기록 파일 없음
+    rows = [{"theme": "a", "ending": "success"}, {"theme": "b", "ending": "escaped"}]
+    rec.write_text("\n".join(json.dumps(r) for r in rows) + "\n{깨진 줄\n", encoding="utf-8")
+    assert detective._next_theme(str(rec), themes) == "c"  # 안 돌린 주제 먼저
+    rec.write_text(rec.read_text(encoding="utf-8") + json.dumps({"theme": "c"}) + "\n", encoding="utf-8")
+    assert detective._next_theme(str(rec), themes) == "a"  # 가장 오래 전에 돌린 것
+    assert detective._next_theme(str(rec), ["only"]) == "only"
+    assert detective.summarize(str(rec)) == {"a": {"games": 1, "success": 1}, "b": {"games": 1, "success": 0},
+                                              "c": {"games": 1, "success": 0}}
