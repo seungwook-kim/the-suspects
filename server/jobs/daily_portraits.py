@@ -91,6 +91,9 @@ def read_runs(path: Path) -> list[dict]:
 
 def pick_group(runs: list[dict], library: PortraitLibrary) -> str:
     """마지막으로 돌린 지 가장 오래된 직업군(안 돌린 건 가장 먼저), 같으면 기본 사진이 가장 적은 것."""
+    # 할당량(Cloudflare 하루 한도)이 떨어져 멈춘 직업군이 있으면 다음 실행은 그 직업군을 이어서 한다(2026-10-26 대표 요청)
+    if runs and runs[-1].get("carry") and runs[-1].get("group") in GROUP_NAMES:
+        return runs[-1]["group"]
     last = {g: 0.0 for g in GROUP_NAMES}
     for r in runs:
         if r.get("group") in last and r.get("made", 0) > 0:
@@ -225,6 +228,8 @@ async def run(count: int, group: str | None, var_dir: Path, images: ImageClient,
 
     await asyncio.gather(*(fill(b, e) for b, e in todo), *(one() for _ in range(count)))  # 빈 표정이 먼저
     save_attempts(var_dir, attempts)
+    if result["stopped"] == "quota" or str(result["stopped"]).startswith("image-disabled"):
+        result["carry"] = True  # 할당량이 떨어져 멈춘 날: 다음 실행이 같은 직업군을 이어서 한다
     _append(log_path, result)
     return result
 

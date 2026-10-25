@@ -127,3 +127,44 @@ def test_confirm_refuses_fake_llm_and_second_try_same_day(monkeypatch, tmp_path)
         monkeypatch.setattr("server.cases.generate_next._today", lambda: "20261026")
         GN.main(["--confirm", "--situation", "library"])
     assert "이미" in str(e2.value)
+
+
+def test_usage_limit_failure_is_refunded_and_retried(monkeypatch, tmp_path):
+    """사용량 부족으로 못 만들면 오늘 시도로 치지 않아 풀린 뒤 바로 다시 할 수 있다. 사건 내용이 틀린 실패는 시도로 남는다."""
+    from types import SimpleNamespace as NS
+
+    assert GN.is_usage_limit("You've hit your usage limit. resets at 3pm")
+    assert GN.is_usage_limit("HTTP 429 Too Many Requests")
+    assert not GN.is_usage_limit("검수 실패: 인물이 부족하다")
+
+    state = tmp_path / "state.json"
+    plan = {"case_id": "sit_x_20261026", "theme_text": "t", "options": {}, "seed": 1, "situation": {"id": "x"}}
+
+    async def limited(*a, **k):
+        return NS(outcome="failed", case=None, message="usage limit reached", problems=[])
+
+    async def invalid(*a, **k):
+        return NS(outcome="failed", case=None, message="검수 실패", problems=["인물 부족"])
+
+    import server.cases.generate as G
+
+    monkeypatch.setattr(G, "generate_case", limited)
+    out = asyncio.run(GN.generate(plan, None, case_dir=tmp_path, state_path=state, today="20261026"))
+    assert out.startswith(GN.RETRY_MARK) and GN.attempts_today(state, "20261026") == 0
+
+    monkeypatch.setattr(G, "generate_case", invalid)
+    out = asyncio.run(GN.generate(plan, None, case_dir=tmp_path, state_path=state, today="20261026"))
+    assert not out.startswith(GN.RETRY_MARK) and GN.attempts_today(state, "20261026") == 1
+
+
+def test_portrait_job_continues_same_group_after_quota_stop():
+    from server.jobs import daily_portraits as D
+
+    class Lib:
+        def records(self):
+            return []
+
+    runs = [{"group": "medical", "made": 2, "ts": 1.0, "stopped": "quota", "carry": True}]
+    assert D.pick_group(runs, Lib()) == "medical"
+    runs = [{"group": "medical", "made": 2, "ts": 1.0, "stopped": "", "carry": False}]
+    assert D.pick_group(runs, Lib()) != "medical"

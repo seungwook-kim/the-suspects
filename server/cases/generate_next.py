@@ -4,7 +4,7 @@
   uv run python -m server.cases.generate_next --confirm           # 진짜로 만든다(하루 1건, 사용량이 든다)
 
 - --confirm이 없으면 어떤 경우에도 모델을 부르지 않는다(--dry-run이 기본 동작과 같다).
-- 하루 1건: var/generate_next_state.json 에 오늘 시도를 먼저 적는다(실패해도 하루 한 번만 시도한다).
+- 하루 1건: var/generate_next_state.json 에 오늘 시도를 먼저 적는다. 사건 내용이 틀려 실패하면 하루 한 번만 시도한 것으로 치고, 사용량 부족으로 못 만든 것은 시도로 치지 않고 --retry-minutes 로 풀리는 즉시 다시 한다.
 - 가짜 LLM(모델 연결이 꺼진 상태)이면 만들지 않는다. 가짜 사건을 data/cases에 저장하면 평가가 오염된다.
 - 결제가 생기는 우회(API 키·추가 사용량)는 쓰지 않는다. 한도에 걸리면 멈추고 내일 다시 한다.
 - 저장 위치: data/cases/sit_<상황id>_<날짜>.json (게임 서버가 시작 때 읽는 기본 사건 목록에 들어간다).
@@ -54,6 +54,27 @@ def _bump(path: Path, today: str, note: dict[str, Any]) -> None:
     path.write_text(json.dumps(st, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+RETRY_MARK = "[사용량 부족] "
+_LIMIT_WORDS = ("rate limit", "rate_limit", "usage limit", "usage_limit", "limit reached", "quota", "overloaded", "429",
+                "too many requests", "한도", "사용량", "capacity", "credit", "resets at", "try again later")
+
+
+def is_usage_limit(message: str) -> bool:
+    """사용량·한도 때문에 못 만든 실패인지(그런 실패만 다시 시도한다. 사건 내용이 틀린 실패는 다시 시도하지 않는다)."""
+    m = (message or "").lower()
+    return any(w in m for w in _LIMIT_WORDS)
+
+
+def _refund(path: Path, today: str) -> None:
+    st = _read_state(path)
+    by_day = st.get("by_day") or {}
+    if int(by_day.get(today, 0)) > 0:
+        by_day[today] = int(by_day[today]) - 1
+    if st.get("log"):
+        st["log"][-1]["refunded"] = "사용량 부족"
+    path.write_text(json.dumps(st, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def make_plan(situation_id: str | None = None, *, play_minutes: int = 40, runs_file: str | Path | None = S.RUNS_FILE,
               case_dir: str | Path | None = None, data: dict | None = None, today: str | None = None, seed: int | None = None) -> dict:
     """무엇을 만들지 정한다(코드뿐). 반환: situation, case_id, theme_text, options, prompt(개념 단계에서 모델에 보낼 글)."""
@@ -100,7 +121,11 @@ async def generate(p: dict, llm: Any, *, case_dir: Path, state_path: Path, today
     _bump(state_path, today, {"case_id": p["case_id"], "situation": p["situation"]["id"]})
     res = await generate_case(llm, p["case_id"], p["theme_text"], p["options"], seed=p.get("seed"))
     if res.outcome != "ok" or res.case is None:
-        return f"만들지 못했다({res.outcome}): {res.message} {'; '.join(res.problems[:3])}"
+        msg = f"만들지 못했다({res.outcome}): {res.message} {'; '.join(res.problems[:3])}"
+        if is_usage_limit(msg):  # 사용량이 없어서 못 만든 것은 오늘 시도로 치지 않고, 풀리면 바로 다시 한다
+            _refund(state_path, today)
+            return RETRY_MARK + msg
+        return msg
     case_dir.mkdir(parents=True, exist_ok=True)
     out = case_dir / f"{p['case_id']}.json"
     out.write_text(res.case.model_dump_json(indent=2), encoding="utf-8")
@@ -113,6 +138,9 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--confirm", action="store_true", help="진짜로 만든다(사용량이 드는 것을 알고 실행)")
     ap.add_argument("--situation", help="상황 id를 직접 고른다(기본: 사건이 가장 적은 상황)")
     ap.add_argument("--play-minutes", type=int, choices=[20, 40, 60], default=40)
+    ap.add_argument("--retry-minutes", type=int, default=0,
+                    help="사용량이 없어서 못 만들면 이 분마다 다시 시도해 풀리는 즉시 만든다(0이면 한 번만). 사건이 틀린 실패는 다시 시도하지 않는다")
+    ap.add_argument("--retry-max-hours", type=int, default=24, help="다시 시도를 멈추는 한계 시간")
     args = ap.parse_args(argv)
     p = make_plan(args.situation, play_minutes=args.play_minutes)
     print(render_plan(p))
@@ -134,7 +162,14 @@ def main(argv: list[str] | None = None) -> None:
     llm = LLMClient()
     if llm.fake_mode:
         raise SystemExit("모델 연결이 꺼져 있다(가짜 LLM). 가짜 사건을 저장하지 않는다.")
-    print(asyncio.run(generate(p, llm, case_dir=DEFAULT_CASE_DIR, state_path=STATE_PATH)))
+    deadline = time.time() + args.retry_max_hours * 3600
+    while True:
+        out = asyncio.run(generate(p, llm, case_dir=DEFAULT_CASE_DIR, state_path=STATE_PATH))
+        print(out, flush=True)
+        if not out.startswith(RETRY_MARK) or args.retry_minutes <= 0 or time.time() + args.retry_minutes * 60 > deadline:
+            return
+        print(f"{args.retry_minutes}분 뒤 다시 시도한다(사용량이 풀리는 즉시 만든다).", flush=True)
+        time.sleep(args.retry_minutes * 60)
 
 
 if __name__ == "__main__":
